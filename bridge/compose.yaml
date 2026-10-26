@@ -1,0 +1,16 @@
+services:
+  claude-bridge:
+    build: .
+    init: true
+    user: "${BRIDGE_UID:-1000}:${BRIDGE_GID:-1000}"
+    ports:
+      - "127.0.0.1:18741:18741"
+    environment:
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      MC_WORKSPACE: /projects
+    volumes:
+      - "${MC_GAME_DIR:?Set MC_GAME_DIR to the Minecraft instance directory}:/game"
+      - "${CLAUDE_WORKSPACE:?Set CLAUDE_WORKSPACE to the coding workspace}:/projects"
+      - claude-auth:/home/bridge/.claude
+volumes:
+  claude-auth:

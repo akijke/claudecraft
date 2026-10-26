@@ -1,0 +1,8 @@
+# Linux-only opt-in: grants access to the host Docker daemon.
+# Set DOCKER_GID to the numeric group owning /var/run/docker.sock.
+services:
+  claude-bridge:
+    group_add:
+      - "${DOCKER_GID:?Set DOCKER_GID to the host docker socket group}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

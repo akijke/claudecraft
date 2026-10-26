@@ -1,0 +1,16 @@
+.gradle/
+build/
+run/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+connection.json
+bridge-token
+chats.json
+bridge-config.json
+*.tmp
+.claude/
+.idea/
+*.iml

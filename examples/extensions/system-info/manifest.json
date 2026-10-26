@@ -1,0 +1,8 @@
+{
+  "id": "system-info",
+  "enabled": true,
+  "server": {
+    "command": "python",
+    "args": ["${extension}/server.py"]
+  }
+}

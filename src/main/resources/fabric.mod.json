@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "claude_chat",
+  "version": "${version}",
+  "name": "Claude Chat",
+  "description": "Local Claude Code conversation in Minecraft chat",
+  "environment": "client",
+  "entrypoints": { "client": ["dev.claudechat.ClaudeChat"] },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
