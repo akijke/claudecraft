@@ -58,6 +58,21 @@ accepting сбрасывается без await между проверкой и
 Ответы настоящей модели: `CLAUDECRAFT_SDK_IT=1 python -m unittest test_sdk_integration`
 (нужен claude auth login), ещё не прогонялось.
 
+Автозапуск и аккаунт (2026-10-27): BridgeLauncher.java распаковывает bridge из JAR
+(claudecraft/bridge, см. processResources) в config/claude-chat/runtime, ищет Python
+3.11+ (настройка → py -3 → python), создаёт runtime/venv, pip install по хешу
+requirements, запускает bridge.py --game-dir, останавливает дерево процессов на
+CLIENT_STOPPING. Уже работающий мост (отвечает на /events) не трогает. Настройки
+мода: config/claude-chat/client.json (autoStart, python). SettingsScreen.java
+(/c settings, /claude; рендер 26.3 = extractRenderState + GuiGraphicsExtractor):
+статус моста, вход/выход, код входа, API-ключ (маскирован), автозапуск, Python.
+Мост: backends/account.py — `claude auth login` с BROWSER=none, ссылка из stdout,
+код пишется в stdin; GET /account; действия login/login_code/login_cancel/logout/
+apikey; ключ в secrets.json (0600), api.py берёт его оттуда или из окружения.
+Проверено: runClient — мод грузится, распаковка/Python/venv; распакованный мост
+запускается; реальный CLI выдаёт ссылку входа, отмена работает. В игре экран
+настроек визуально ещё не проверялся.
+
 Прочее: /events возвращает boot id моста; мод шлёт его обратно, при смене моста
 курсор сбрасывается (раньше после перезапуска моста события пропадали). Новый
 клиент без boot начинает с текущего момента (старую историю не проигрывает).

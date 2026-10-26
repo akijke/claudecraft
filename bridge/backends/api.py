@@ -3,9 +3,9 @@ from aiohttp import ClientSession, ClientTimeout
 
 
 async def run(bridge, chat, text):
-    key = os.environ.get('ANTHROPIC_API_KEY')
+    key = bridge.account.api_key()
     if not key:
-        raise ValueError('Set ANTHROPIC_API_KEY in bridge environment for API chats')
+        raise ValueError('Нет API-ключа: добавь его в /c settings (или ANTHROPIC_API_KEY в окружении моста)')
     messages = chat.messages[-40:] + [{'role': 'user', 'content': text}]
     async with ClientSession(timeout=ClientTimeout(total=300)) as session:
         async with session.post('https://api.anthropic.com/v1/messages',

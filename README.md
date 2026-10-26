@@ -58,28 +58,31 @@ Claude Chat + Code 1.1 — Minecraft Java 26.3 / Fabric.
 
 ## Установка
 
-1. Установи **JDK 25** и выполни в папке проекта `./gradlew build` (Windows:
-   `gradlew.bat build`); wrapper сам скачает Gradle 9.8.2.
-2. Установи Minecraft **26.3**, Fabric Loader **0.20.1**, Fabric API
-   **0.165.0+26.3**. Скопируй `build/libs/claude-chat-1.1.0.jar` в `mods`.
-3. Для моста нужен **Python 3.11+**. Создай venv, активируй его и установи:
+1. Minecraft **26.3**, Fabric Loader **0.20.1**, Fabric API **0.165.0+26.3**.
+   Положи `claude-chat-1.1.0.jar` в `mods`.
+2. Установи **Python 3.11+** (python.org, галочка «Add to PATH»).
+3. Запусти игру. Мод сам распакует мост в `config/claude-chat/runtime`, создаст
+   там отдельное окружение Python, при первом запуске установит зависимости
+   (до пары минут) и запустит мост. При закрытии игры мост останавливается.
+4. Открой настройки: `/c settings` или `/claude`. Там:
+   - **Мост** — состояние, перезапуск, автозапуск, путь к Python (если не найден сам);
+   - **Аккаунт Claude** — «Войти: подписка Claude» или «Войти: Console (API)»:
+     открой страницу входа, войди, скопируй код со страницы, вставь в поле
+     (Ctrl+V) и нажми «Отправить». Это обычный `claude auth login`, вход
+     сохраняется там же, где у Claude Code в терминале;
+   - **API-ключ** для `/c new api` (хранится в `config/claude-chat/secrets.json`,
+     в игре показывается только замаскированным).
+5. `/c c` или `/cc c` — выбор чатов. В Windows для shell-инструментов Claude Code
+   нужен Git Bash.
 
-       python -m pip install -r bridge/requirements.txt
-
-4. Для локальных сессий установи Claude Code и выполни `claude auth login`.
-   Альтернатива — `ANTHROPIC_API_KEY` в окружении моста; для `/c new api` ключ обязателен.
-   В Windows для shell-инструментов Claude Code требуется Git Bash.
-5. Запусти мост **на машине, где запущен Minecraft**:
-
-       python bridge/bridge.py --game-dir "/абсолютный/путь/к/папке/игры"
-
-   Это папка конкретного профиля лаунчера, в которой находятся `mods` и `config`.
-6. Запусти игру. `/c c` или `/cc c` откроет выбор чатов.
+Ручной запуск моста по-прежнему работает (мод заметит его и не будет запускать
+второй): `python bridge/bridge.py --game-dir "<папка профиля с mods и config>"`.
+Сборка из исходников: JDK 25, `./gradlew build` (Windows: `gradlew.bat build`).
+Лог моста: `config/claude-chat/runtime/bridge.log`.
 
 Мод читает `config/claude-chat/connection.json` и подключается только к
 127.0.0.1. Мост использует случайный bearer-токен. Браузерные HTTP-запросы с Origin
 отклоняются. Не публикуй connection.json, bridge-token и историю чатов.
-Мод не запускает Python автоматически: мост имеет отдельный жизненный цикл.
 
 ## Настройки и расширения
 

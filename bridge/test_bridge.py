@@ -144,6 +144,73 @@ class SdkTurnTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(e.get('kind') == 'error' for e in self.bridge.events))
 
 
+class AccountTests(unittest.IsolatedAsyncioTestCase):
+    """In-game account flow against a fake `claude auth` CLI."""
+    async def asyncSetUp(self):
+        import sys
+        from unittest import mock
+        self.temp = tempfile.TemporaryDirectory()
+        fake = Path(__file__).with_name('fake_claude_auth.py')
+        patches = [mock.patch('backends.account.cli_command', lambda config: [sys.executable, str(fake)]),
+                   mock.patch.dict('os.environ', {'FAKE_AUTH_FILE': str(Path(self.temp.name) / 'logged-in')})]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def login_state(self, *states):
+        async with asyncio.timeout(15):
+            while self.bridge.account.login_state not in states:
+                await asyncio.sleep(0.02)
+
+    async def test_login_with_code_then_logout(self):
+        status = await self.bridge.account.status()
+        self.assertFalse(status['account']['logged_in'])
+        await self.bridge.command({'mode': 'c', 'action': 'login'})
+        await self.login_state('waiting_code')
+        self.assertTrue(self.bridge.account.login_url.startswith('https://claude.com/'))
+        await self.bridge.command({'mode': 'c', 'action': 'login_code', 'text': 'good-code#abc'})
+        await self.login_state('done', 'failed')
+        self.assertEqual(self.bridge.account.login_state, 'done')
+        status = await self.bridge.account.status()
+        self.assertEqual(status['account']['email'], 'player@example.com')
+        await self.bridge.command({'mode': 'c', 'action': 'logout'})
+        self.assertFalse((await self.bridge.account.status())['account']['logged_in'])
+
+    async def test_wrong_code_reports_error(self):
+        await self.bridge.account.login()
+        await self.login_state('waiting_code')
+        await self.bridge.account.submit_code('bad')
+        await self.login_state('done', 'failed')
+        self.assertEqual(self.bridge.account.login_state, 'failed')
+        self.assertIn('invalid code', self.bridge.account.login_error)
+
+    async def test_cancel_login_kills_cli(self):
+        await self.bridge.account.login()
+        await self.login_state('waiting_code')
+        process = self.bridge.account.process
+        await self.bridge.command({'mode': 'c', 'action': 'login_cancel'})
+        self.assertIsNotNone(process.returncode)
+        self.assertEqual(self.bridge.account.login_state, 'idle')
+
+    async def test_api_key_stored_masked_and_removed(self):
+        await self.bridge.command({'mode': 'c', 'action': 'apikey', 'text': 'sk-test-0123456789abcdef'})
+        self.assertEqual(self.bridge.account.api_key(), 'sk-test-0123456789abcdef')
+        status = await self.bridge.account.status()
+        self.assertNotIn('0123456789ab', json.dumps(status))
+        self.assertTrue(status['api_key'].endswith('cdef'))
+        with self.assertRaises(ValueError):
+            self.bridge.account.set_api_key('bad key with spaces')
+        await self.bridge.command({'mode': 'c', 'action': 'apikey', 'text': ''})
+        with unittest.mock.patch.dict('os.environ', {}, clear=False) as env:
+            env.pop('ANTHROPIC_API_KEY', None)
+            self.assertIsNone(self.bridge.account.api_key())
+
+
 class BridgeTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()

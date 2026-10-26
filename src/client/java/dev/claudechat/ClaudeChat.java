@@ -4,6 +4,7 @@ import com.google.gson.*;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -23,7 +24,7 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.*;
 
 /** UI only: all SDK credentials, agent processes and conversation scheduling live in the local bridge. */
 public final class ClaudeChat implements ClientModInitializer {
-    private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
+    final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "claude-bridge-http"); t.setDaemon(true); return t;
     });
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
@@ -33,7 +34,10 @@ public final class ClaudeChat implements ClientModInitializer {
         "cancel", "restart", "new", "select", "rename", "status", "clearqueue", "reply", "pending",
         "local", "reload", "tools", "capabilities");
     private final Set<String> needsText = Set.of("q", "queue", "f", "force");
+    // "settings" is handled in the mod itself (opens SettingsScreen), never sent to the bridge.
     private Path connection;
+    final BridgeLauncher launcher = new BridgeLauncher(this::bridgeAnswers);
+    private volatile boolean openSettings;
     private volatile long cursor;
     // Bridge instance id: when it changes the bridge restarted and its event numbers reset.
     private volatile String boot = "";
@@ -43,6 +47,8 @@ public final class ClaudeChat implements ClientModInitializer {
 
     @Override public void onInitializeClient() {
         connection = FabricLoader.getInstance().getConfigDir().resolve("claude-chat/connection.json");
+        if (launcher.autoStart()) launcher.start();
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> launcher.stop());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
             for (String mode : new String[]{"c", "cc"}) {
                 dispatcher.register(literal(mode)
@@ -53,8 +59,15 @@ public final class ClaudeChat implements ClientModInitializer {
                         dispatch(mode, StringArgumentType.getString(c, "input")); return 1;
                     })));
             }
+            dispatcher.register(literal("claude").requires(source -> source.attended())
+                .executes(c -> { openSettings = true; return 1; }));
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (openSettings) {
+                // Deferred: the chat screen closes right after a command runs.
+                openSettings = false;
+                client.setScreenAndShow(new SettingsScreen(this, null));
+            }
             long now = System.currentTimeMillis();
             if (client.player == null || now < nextPoll || !polling.compareAndSet(false, true)) return;
             nextPoll = now + 500;
@@ -76,7 +89,7 @@ public final class ClaudeChat implements ClientModInitializer {
                     if (now - lastFailure > 30000) {
                         lastFailure = now;
                         client.execute(() -> {
-                            if (ticket == epoch) say("c", "Мост не подключён. Запусти bridge.py; /c help — инструкция.");
+                            if (ticket == epoch) say("c", bridgeProblem());
                         });
                     }
                 } finally { polling.set(false); }
@@ -96,6 +109,7 @@ public final class ClaudeChat implements ClientModInitializer {
         String action = split[0];
         String text = split.length == 2 ? split[1] : "";
         if (action.equals("help")) { help(mode); return; }
+        if (action.equals("settings")) { openSettings = true; return; }
         if (!actions.contains(action)) { action = "q"; text = input; }
         JsonObject data = command(mode, action, text);
         if (action.equals("reply")) {
@@ -110,7 +124,22 @@ public final class ClaudeChat implements ClientModInitializer {
         send(mode, data);
     }
 
-    private JsonObject command(String mode, String action, String text) {
+    /** Explains why the bridge does not answer, based on the launcher state. */
+    private String bridgeProblem() {
+        return switch (launcher.state()) {
+            case INSTALLING, STARTING -> "Мост запускается: " + launcher.detail();
+            case FAILED -> "Мост не запустился: " + launcher.detail() + " — /c settings";
+            case OFF, STOPPED -> "Мост выключен. Включи автозапуск или перезапусти в /c settings.";
+            default -> "Мост не отвечает. /c settings — перезапуск и лог.";
+        };
+    }
+
+    boolean bridgeAnswers() {
+        try { request("/events?boot=", null); return true; }
+        catch (Exception e) { return false; }
+    }
+
+    JsonObject command(String mode, String action, String text) {
         JsonObject data = new JsonObject();
         data.addProperty("mode", mode); data.addProperty("action", action); data.addProperty("text", text);
         return data;
@@ -126,7 +155,7 @@ public final class ClaudeChat implements ClientModInitializer {
             }
         });
     }
-    private JsonObject request(String path, JsonObject body) throws Exception {
+    JsonObject request(String path, JsonObject body) throws Exception {
         if (!Files.isRegularFile(connection)) throw new IllegalStateException("Нет connection.json; запусти bridge.py --game-dir <папка игры>");
         JsonObject config = JsonParser.parseString(Files.readString(connection)).getAsJsonObject();
         int port = config.get("port").getAsInt();
@@ -210,8 +239,9 @@ public final class ClaudeChat implements ClientModInitializer {
         say(mode, "c | chats — выбор чата | new local" + (mode.equals("c") ? " | new api" : " | local (импорт CLI)")
             + " | rename <имя> | cancel | restart | status | clearqueue | pending | reload | tools");
         say(mode, "restart перезапускает запрос/процесс SDK с сохранением истории; new начинает новый диалог.");
-        say(mode, "Мост: Python 3.11+, pip install -r bridge/requirements.txt; python bridge/bridge.py --game-dir <папка игры>");
-        show(button("Чаты", "/" + mode + " chats", false).append(" ")
+        say(mode, "settings (или /claude) — мост, вход в аккаунт Claude, API-ключ. Мост: " + launcher.state().label + ".");
+        show(button("Настройки", "/" + mode + " settings", false).append(" ")
+            .append(button("Чаты", "/" + mode + " chats", false)).append(" ")
             .append(button("Статус", "/" + mode + " status", false)).append(" ")
             .append(button("Ожидающие вопросы", "/" + mode + " pending", false)));
     }

@@ -12,6 +12,7 @@ import platform
 import re
 import uuid
 from aiohttp import web
+from backends.account import Account
 
 
 def uid():
@@ -65,6 +66,7 @@ class Bridge:
         self.boot = uid()  # lets clients notice a bridge restart (event numbering resets)
         self.lock = asyncio.Lock()
         self.runner = runner or self.run_backend
+        self.account = Account(self)
         state = self.directory / 'chats.json'
         if state.exists():
             data = json.loads(state.read_text(encoding='utf-8'))
@@ -177,7 +179,10 @@ class Bridge:
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    self.emit(chat, 'Ошибка: ' + str(e)[:1500], kind='error')
+                    message = 'Ошибка: ' + str(e)[:1500]
+                    if re.search(r'auth|login|credential|401|api key', str(e), re.I):
+                        message += '\nПроверь вход в аккаунт Claude: /c settings'
+                    self.emit(chat, message, kind='error')
         except asyncio.CancelledError:
             self.emit(chat, 'Текущий запрос прерван.', kind='status')
         finally:
@@ -370,6 +375,16 @@ class Bridge:
                     event.pop('chat', None)
                     event.pop('mode', None)
                     self.emit(self.chats[p['chat']], p['event']['text'], **event)
+        elif action == 'login':
+            await self.account.login(console=data.get('text') == 'console')
+        elif action == 'login_code':
+            await self.account.submit_code(data.get('text', ''))
+        elif action == 'login_cancel':
+            await self.account.cancel_login()
+        elif action == 'logout':
+            await self.account.logout()
+        elif action == 'apikey':
+            self.account.set_api_key(data.get('text', ''))
         elif action == 'local':
             if mode != 'cc':
                 raise ValueError('Use /cc local to import CLI coding sessions')
@@ -388,6 +403,7 @@ class Bridge:
         return {'ok': True}
 
     async def close(self):
+        await self.account.cancel_login()
         for chat in self.chats.values():
             await self.stop(chat)
         self.persist()
@@ -426,6 +442,9 @@ def create_app(bridge, token):
                                  'cursor': batch[-1]['seq'] if batch else max(cursor, 0)})
     app.router.add_post('/command', command)
     app.router.add_get('/events', events)
+    async def account(request):
+        return web.json_response(await bridge.account.status())
+    app.router.add_get('/account', account)
     async def cleanup(app):
         await bridge.close()
     app.on_cleanup.append(cleanup)

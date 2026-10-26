@@ -27,6 +27,11 @@ processResources {
     filesMatching('fabric.mod.json') {
         expand 'version': version
     }
+    // The mod extracts and starts this copy of the bridge (BridgeLauncher).
+    from('bridge') {
+        into 'claudecraft/bridge'
+        include 'bridge.py', 'requirements.txt', 'backends/*.py'
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {

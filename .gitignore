@@ -10,6 +10,8 @@ connection.json
 bridge-token
 chats.json
 bridge-config.json
+secrets.json
+client.json
 *.tmp
 .claude/
 .idea/
