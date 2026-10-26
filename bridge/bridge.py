@@ -62,6 +62,7 @@ class Bridge:
         self.pending = {}
         self.events = deque(maxlen=2000)
         self.sequence = 0
+        self.boot = uid()  # lets clients notice a bridge restart (event numbering resets)
         self.lock = asyncio.Lock()
         self.runner = runner or self.run_backend
         state = self.directory / 'chats.json'
@@ -414,10 +415,15 @@ def create_app(bridge, token):
         async with bridge.lock:
             return web.json_response(await bridge.command(await request.json()))
     async def events(request):
-        cursor = int(request.query.get('after', '0'))
+        boot = request.query.get('boot', '')
+        if not boot:
+            # Fresh client: start at "now" instead of replaying old history (use pending for prompts).
+            return web.json_response({'events': [], 'cursor': bridge.sequence, 'boot': bridge.boot})
+        # A restarted bridge numbers events from 1 again: the old cursor would hide them all.
+        cursor = int(request.query.get('after', '0')) if boot == bridge.boot else 0
         batch = [e for e in bridge.events if e['seq'] > cursor][:50]
-        return web.json_response({'events': batch,
-                                 'cursor': batch[-1]['seq'] if batch else bridge.sequence})
+        return web.json_response({'events': batch, 'boot': bridge.boot,
+                                 'cursor': batch[-1]['seq'] if batch else max(cursor, 0)})
     app.router.add_post('/command', command)
     app.router.add_get('/events', events)
     async def cleanup(app):

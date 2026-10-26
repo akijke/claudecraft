@@ -42,8 +42,29 @@ accepting сбрасывается без await между проверкой и
 сессию, либо получает TurnClosed и выполняется следующим (с сообщением, без отмены).
 Доставка f — фоновая задача (не держит bridge.lock). CLI без эха → f отклоняется
 явно. API-чат во время ответа → явная ошибка, без отмены и без очереди.
-Алиасы: queue=q, force=f, c/chats=chat. Реальный CLI ещё не прогнан:
-`CLAUDECRAFT_SDK_IT=1 python -m unittest test_sdk_integration` (нужен claude auth login).
+Алиасы: queue=q, force=f, c/chats=chat.
+
+Проверено на настоящем CLI 2.1.310 через bridge/fake_anthropic.py
+(`CLAUDECRAFT_CLI_IT=1 python -m unittest test_cli_fake_api`, 4/4 OK):
+- эхо промпта приходит только вместе с первым выводом модели, не при приёме;
+- f во время хода с инструментами → вставляется в следующий tool_result
+  («The user sent a new message while you were working»), один ResultMessage;
+- f во время чистого текста → эхо ПОСЛЕ первого ResultMessage, отдельный ход
+  (новый SystemMessage init) в том же процессе;
+- f до того, как CLI прочитал первый промпт → CLI склеивает их в одно сообщение
+  "a\nb" с одним эхом. Поэтому подтверждения сопоставляются по содержимому
+  (SdkTurn.acknowledge), а не по количеству эхо.
+Со встроенным CLI f пишется сразу (trusted_replay); с cli_path — после первого эха.
+Ответы настоящей модели: `CLAUDECRAFT_SDK_IT=1 python -m unittest test_sdk_integration`
+(нужен claude auth login), ещё не прогонялось.
+
+Прочее: /events возвращает boot id моста; мод шлёт его обратно, при смене моста
+курсор сбрасывается (раньше после перезапуска моста события пропадали). Новый
+клиент без boot начинает с текущего момента (старую историю не проигрывает).
+Таймаут разрешения (10 мин) → PermissionResultDeny, а не исключение в SDK.
+Отладка: logger `claudecraft.sdk` (DEBUG) печатает каждое сообщение SDK.
+На Windows SDK блокирует event loop ~1 с при запуске CLI (CreateProcess) —
+довод держать процесс CLI живым между элементами очереди (ещё не сделано).
 
 Другие команды уже есть: cancel, restart, new local, /c new api, rename, status,
 clearqueue, pending, reply, /cc local (импорт CLI-сессий настроенного workspace),
@@ -78,7 +99,7 @@ Claude Code может писать расширения и вызвать minec
 
 ## Проверка и ближайшая работа
 
-22 теста ядра проходят (Python 3.14, SDK 0.2.174): `cd bridge && python -m unittest -v`.
+23 теста ядра проходят (Python 3.14, SDK 0.2.174): `cd bridge && python -m unittest -v`.
 HTTP middleware тестируется в памяти, без реального TCP. Нет подтверждённой
 запуска в Minecraft, реального SDK/API, Docker image (демон Docker не был запущен).
 

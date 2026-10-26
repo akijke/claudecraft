@@ -13,8 +13,13 @@ the "accepting" flag flip happen without an await in between, so an `f` either
 gets into the session or is told the session is already closed.
 """
 import asyncio
+from collections import deque
 import json
+import logging
 from urllib.parse import urlparse
+
+
+log = logging.getLogger('claudecraft.sdk')
 
 
 class TurnClosed(Exception):
@@ -36,27 +41,52 @@ def is_replayed_prompt(message, types):
 
 
 class SdkTurn:
-    def __init__(self, bridge, chat, client, types, ack_timeout=30):
+    def __init__(self, bridge, chat, client, types, trusted_replay=False):
         self.bridge = bridge
         self.chat = chat
-        self.client = client
+        self.client = None
         self.types = types
+        # The bundled CLI is known to echo prompts, so f can be written immediately.
+        # For an unknown cli_path we wait for proof (the first echo) before writing.
+        self.trusted_replay = trusted_replay
         self.sent = 0
         self.acked = 0
+        # Texts written to the CLI and not yet echoed back, in send order.
+        self.unacked = deque()
         self.accepting = True
         # None until we know whether the CLI echoes prompts (needed for safe f).
         self.replay = None
         self.ready = asyncio.Event()
-        self.ack_timeout = ack_timeout
         self.write_lock = asyncio.Lock()  # FIFO: several f messages keep their order
+        if client is not None:
+            self.attach(client)
+
+    def attach(self, client):
+        """Called once the CLI process is connected."""
+        self.client = client
+        if self.trusted_replay and self.replay is None:
+            self.replay = True
+            self.ready.set()
+
+    def _no_echo(self):
+        """Output arrived before any echo: this CLI does not replay prompts."""
+        extra = self.sent - 1
+        self.replay = False
+        self.acked = self.sent
+        self.unacked.clear()
+        self.ready.set()
+        if extra > 0:
+            self.bridge.emit(self.chat, 'Этот Claude CLI не подтверждает сообщения f; ответ на уже '
+                             'отправленные f может не показаться. Обнови Claude Code.', kind='error')
 
     async def inject(self, text):
         """Add a user message to the running session without interrupting it."""
         if not self.ready.is_set():
-            try:
-                await asyncio.wait_for(self.ready.wait(), self.ack_timeout)
-            except asyncio.TimeoutError:
-                raise ValueError('Claude ещё запускается; повтори f через пару секунд') from None
+            # The CLI echoes the first prompt only together with the first model output,
+            # which can take long while Claude thinks. Runs in a background delivery task,
+            # so waiting here blocks nothing; cancel/stop cancels it.
+            self.bridge.emit(self.chat, 'f будет передано, как только Claude начнёт отвечать…', kind='status')
+            await self.ready.wait()
         if not self.accepting:
             raise TurnClosed()
         if not self.replay:
@@ -66,24 +96,52 @@ class SdkTurn:
         async with self.write_lock:
             if not self.accepting:
                 raise TurnClosed()
-            # Count first: the reader must not finish while this write is in flight.
+            # Register first: the reader must not finish while this write is in flight.
             self.sent += 1
+            self.unacked.append(text)
             try:
                 await self.client.query(text)
             except Exception:
                 self.sent -= 1
+                self.unacked.pop()
                 raise
+
+    def acknowledge(self, message):
+        """Match an echoed prompt against sent texts.
+
+        Prompts that queue up before the CLI reads them are merged into ONE user
+        message (texts joined by newlines) with one echo, so count by content.
+        """
+        content = message.content
+        if isinstance(content, list):
+            content = '\n'.join(b.text for b in content if isinstance(b, self.types.TextBlock))
+        position = matched = 0
+        while self.unacked:
+            index = content.find(self.unacked[0], position)
+            if index < 0:
+                break
+            position = index + len(self.unacked[0])
+            self.unacked.popleft()
+            matched += 1
+        if not matched and self.unacked:
+            matched = 1  # unknown echo format: still make progress
+            self.unacked.popleft()
+        self.acked += matched
 
     async def drive(self, text):
         T = self.types
-        self.sent = 1
-        await self.client.query(text)
+        async with self.write_lock:
+            self.sent += 1
+            self.unacked.append(text)
+            await self.client.query(text)
         error = None
         try:
             async for message in self.client.receive_messages():
+                log.debug('sdk <- %s sent=%d acked=%d %.300r', type(message).__name__,
+                          self.sent, self.acked, message)
                 if is_replayed_prompt(message, T):
-                    self.acked += 1
-                    if self.replay is None:
+                    if self.replay is not False:
+                        self.acknowledge(message)
                         self.replay = True
                         self.ready.set()
                     continue
@@ -91,11 +149,8 @@ class SdkTurn:
                     self.chat.sdk_id = message.data.get('session_id', self.chat.sdk_id)
                     self.bridge.persist()
                 elif isinstance(message, T.AssistantMessage):
-                    if self.replay is None:
-                        # Output before any echo: this CLI does not replay prompts.
-                        self.replay = False
-                        self.acked = self.sent
-                        self.ready.set()
+                    if self.acked == 0 and self.replay is not False:
+                        self._no_echo()
                     for block in message.content:
                         if isinstance(block, T.TextBlock):
                             self.bridge.emit(self.chat, block.text, kind='text')
@@ -103,13 +158,11 @@ class SdkTurn:
                             self.bridge.emit(self.chat, f'Инструмент: {block.name}', kind='status')
                 elif isinstance(message, T.ResultMessage):
                     self.chat.sdk_id = message.session_id or self.chat.sdk_id
-                    if self.replay is None:
-                        self.replay = False
-                        self.acked = self.sent
-                        self.ready.set()
+                    if self.acked == 0 and self.replay is not False:
+                        self._no_echo()
                     if message.is_error:
                         error = message.result or message.subtype
-                    if self.acked >= self.sent:
+                    if not self.unacked:
                         self.accepting = False  # no await between check and flip
                         break
                     if error:
@@ -133,6 +186,14 @@ async def run(bridge, chat, text):
         PermissionResultDeny, tool, create_sdk_mcp_server)
 
     async def permission(name, data, context):
+        try:
+            return await decide(name, data)
+        except TimeoutError:
+            # No click within 10 minutes: refuse the tool, keep the session alive.
+            bridge.emit(chat, f'Нет ответа 10 минут — {name} отклонён.', kind='status')
+            return PermissionResultDeny(message='No answer from the Minecraft user in time')
+
+    async def decide(name, data):
         if name == 'AskUserQuestion':
             answers = {}
             for question in data.get('questions', []):
@@ -155,7 +216,10 @@ async def run(bridge, chat, text):
         if parsed.scheme not in ('https', 'http') or not parsed.hostname or len(url) > 2048:
             return {'content': [{'type': 'text', 'text': 'Invalid HTTP(S) URL'}], 'is_error': True}
         bridge.emit(chat, 'Открой ссылку во внешнем браузере, затем нажми «Готово».', kind='url', url=url)
-        result = await bridge.ask_user(chat, 'question', 'Завершил действие в браузере?', ['Готово', 'Отмена'])
+        try:
+            result = await bridge.ask_user(chat, 'question', 'Завершил действие в браузере?', ['Готово', 'Отмена'])
+        except TimeoutError:
+            return {'content': [{'type': 'text', 'text': 'No answer from the user'}], 'is_error': True}
         return {'content': [{'type': 'text', 'text': result}]}
 
     tools = (['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
@@ -187,11 +251,11 @@ async def run(bridge, chat, text):
     if bridge.config.get('cli_path'):
         options.cli_path = bridge.config['cli_path']
     # Registered before connecting, so an early `f` waits for the session instead of missing it.
-    turn = SdkTurn(bridge, chat, None, _types())
+    turn = SdkTurn(bridge, chat, None, _types(), trusted_replay=not bridge.config.get('cli_path'))
     chat.live = turn
     try:
         async with ClaudeSDKClient(options=options) as client:
-            turn.client = client
+            turn.attach(client)
             await turn.drive(text)
     finally:
         turn.accepting = False

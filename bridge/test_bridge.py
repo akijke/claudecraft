@@ -52,7 +52,7 @@ class SdkTurnTests(unittest.IsolatedAsyncioTestCase):
         self.bridge = Bridge(self.temp.name, AsyncMock())
         self.chat = self.bridge.chats[self.bridge.selected['cc']]
         self.client = FakeClient()
-        self.turn = SdkTurn(self.bridge, self.chat, self.client, sdk, ack_timeout=1)
+        self.turn = SdkTurn(self.bridge, self.chat, self.client, sdk)
 
     async def asyncTearDown(self):
         await self.bridge.close()
@@ -98,6 +98,18 @@ class SdkTurnTests(unittest.IsolatedAsyncioTestCase):
                  self.result())
         await asyncio.wait_for(drive, 2)
         self.assertEqual(self.texts(), ['answer 1', 'answer 2'])
+
+    async def test_merged_echo_acknowledges_both(self):
+        # Seen with the real CLI: prompts queued before it reads stdin become ONE message.
+        turn = SdkTurn(self.bridge, self.chat, self.client, sdk, trusted_replay=True)
+        drive = asyncio.create_task(turn.drive('first'))
+        await asyncio.sleep(0)
+        await turn.inject('extra')
+        self.put(sdk.UserMessage(content='first\nextra'),
+                 sdk.AssistantMessage(content=[sdk.TextBlock('both')], model='m'),
+                 self.result())
+        await asyncio.wait_for(drive, 2)
+        self.assertEqual((turn.sent, turn.acked), (2, 2))
 
     async def test_inject_after_result_reports_closed(self):
         drive = asyncio.create_task(self.turn.drive('first'))
@@ -330,7 +342,15 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
                               {'mode':'cc','action':'q','text':'HTTP question'})
         self.assertEqual(response.status, 200)
         await self.wait_started(1)
+        # Fresh client: no history replay, only a starting cursor and the bridge id.
         response = await call('GET', '/events?after=0', headers)
+        first = json.loads(response.text)
+        self.assertEqual(first['events'], [])
+        self.bridge.emit(self.chat, 'after connect', kind='status')
+        response = await call('GET', f"/events?after={first['cursor']}&boot={first['boot']}", headers)
+        self.assertEqual([e['text'] for e in json.loads(response.text)['events']], ['after connect'])
+        # Bridge restarted (new boot id): old cursor is ignored, nothing is hidden.
+        response = await call('GET', f"/events?after=99999&boot=old-instance", headers)
         self.assertGreater(len(json.loads(response.text)['events']), 0)
         response = await call('POST', '/command', headers, {'mode':'bad','action':'q'})
         self.assertEqual(response.status, 400)

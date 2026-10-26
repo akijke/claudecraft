@@ -35,6 +35,8 @@ public final class ClaudeChat implements ClientModInitializer {
     private final Set<String> needsText = Set.of("q", "queue", "f", "force");
     private Path connection;
     private volatile long cursor;
+    // Bridge instance id: when it changes the bridge restarted and its event numbers reset.
+    private volatile String boot = "";
     private long nextPoll;
     private long lastFailure;
     private volatile long epoch;
@@ -59,12 +61,16 @@ public final class ClaudeChat implements ClientModInitializer {
             long ticket = epoch;
             io.execute(() -> {
                 try {
-                    JsonObject response = request("/events?after=" + cursor, null);
+                    String sentBoot = boot;
+                    JsonObject response = request("/events?after=" + cursor + "&boot="
+                        + java.net.URLEncoder.encode(sentBoot, java.nio.charset.StandardCharsets.UTF_8), null);
                     long nextCursor = response.get("cursor").getAsLong();
+                    String nextBoot = response.has("boot") ? response.get("boot").getAsString() : "";
                     client.execute(() -> {
                         if (ticket != epoch || client.player == null) return;
                         for (JsonElement row : response.getAsJsonArray("events")) render(row.getAsJsonObject());
                         cursor = nextCursor;
+                        boot = nextBoot;
                     });
                 } catch (Exception e) {
                     if (now - lastFailure > 30000) {
