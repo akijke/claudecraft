@@ -111,6 +111,33 @@ class SdkTurnTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(drive, 2)
         self.assertEqual((turn.sent, turn.acked), (2, 2))
 
+    async def test_cost_is_cumulative_per_process(self):
+        # Seen with the real CLI: usage is per turn, total_cost_usd grows per process.
+        self.chat.run_usage = {}
+        drive = asyncio.create_task(self.turn.drive('first'))
+        self.put(sdk.UserMessage(content='first'))
+        await self.turn.inject('extra')
+        usage = {'input_tokens': 2, 'output_tokens': 3}
+        def result(cost):
+            return sdk.ResultMessage(subtype='success', duration_ms=1, duration_api_ms=1, is_error=False,
+                                     num_turns=1, session_id='s1', usage=usage, total_cost_usd=cost)
+        self.put(result(0.5), sdk.UserMessage(content='extra'), result(1.0))
+        await asyncio.wait_for(drive, 2)
+        self.assertEqual(self.chat.usage['output_tokens'], 6)
+        self.assertAlmostEqual(self.chat.usage['cost_usd'], 1.0)
+
+    async def test_tool_progress_lines(self):
+        drive = asyncio.create_task(self.turn.drive('go'))
+        self.put(sdk.UserMessage(content='go'),
+                 sdk.AssistantMessage(content=[sdk.ToolUseBlock('t1', 'Bash', {'command': 'ls -la'}),
+                                               sdk.ToolUseBlock('t2', 'TodoWrite', {'todos': [
+                                                   {'content': 'A', 'status': 'completed'}]})], model='m'),
+                 sdk.UserMessage(content=[sdk.ToolResultBlock('t1', 'boom', True)], tool_use_result={}),
+                 self.result())
+        await asyncio.wait_for(drive, 2)
+        kinds = [(e['kind'], e['text']) for e in self.bridge.events if e['kind'] in ('tool', 'todo', 'tool_error')]
+        self.assertEqual(kinds, [('tool', 'ls -la'), ('todo', 'План'), ('tool_error', 'boom')])
+
     async def test_inject_after_result_reports_closed(self):
         drive = asyncio.create_task(self.turn.drive('first'))
         self.put(sdk.UserMessage(content='first'), self.result())
@@ -142,6 +169,110 @@ class SdkTurnTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(drive, 2)
         self.assertEqual(self.texts(), ['recovered'])
         self.assertTrue(any(e.get('kind') == 'error' for e in self.bridge.events))
+
+
+class FeatureTests(unittest.IsolatedAsyncioTestCase):
+    """ls/cd/cat, auto-approval, token accounting, progress descriptions."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.chat = self.bridge.chats[self.bridge.selected['cc']]
+        ws = self.bridge.workspace
+        (ws / 'src').mkdir()
+        (ws / 'src' / 'Main.java').write_text('class Main {}\n', encoding='utf-8')
+        (ws / 'notes.txt').write_text('line1\nline2\n', encoding='utf-8')
+        (ws / 'blob.bin').write_bytes(b'\0\1\2')
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    def last(self):
+        return self.bridge.events[-1]
+
+    async def cmd(self, action, text=''):
+        await self.bridge.command({'mode': 'cc', 'action': action, 'text': text})
+        return self.last()
+
+    async def test_ls_cd_pwd_cat(self):
+        listing = await self.cmd('ls')
+        self.assertEqual(listing['kind'], 'listing')
+        names = [(r['name'], r['dir']) for r in listing['rows']]
+        self.assertEqual(names[0], ('extensions', True))  # folders first
+        self.assertIn(('notes.txt', False), names)
+        await self.cmd('cd', 'src')
+        self.assertEqual(Path(self.bridge.chat_cwd(self.chat)), (self.bridge.workspace / 'src').resolve())
+        self.assertEqual((await self.cmd('pwd'))['text'], self.bridge.chat_cwd(self.chat))
+        self.assertIn('class Main', (await self.cmd('cat', 'Main.java'))['text'])
+        await self.cmd('cd', '..')
+        self.assertIsNone(self.chat.cwd)  # back at workspace root
+        await self.cmd('cd', 'src')
+        await self.cmd('cd', '~')
+        self.assertIsNone(self.chat.cwd)
+        self.assertEqual((await self.cmd('dir'))['kind'], 'listing')  # alias
+        with self.assertRaisesRegex(ValueError, 'двоичный'):
+            await self.cmd('cat', 'blob.bin')
+        with self.assertRaisesRegex(ValueError, 'Нет такой папки'):
+            await self.cmd('cd', 'missing')
+        restored = Bridge(self.temp.name)
+        await self.cmd('cd', 'src')
+        self.bridge.persist()
+        restored = Bridge(self.temp.name)
+        self.assertTrue(restored.chats[self.chat.id].cwd.endswith('src'))
+        await restored.close()
+
+    async def test_auto_modes(self):
+        from backends.sdk import auto_allows
+        self.assertFalse(auto_allows(self.chat, 'Read'))
+        event = await self.cmd('auto', 'edits')
+        self.assertEqual(event['kind'], 'auto')
+        self.assertTrue(auto_allows(self.chat, 'Edit'))
+        self.assertTrue(auto_allows(self.chat, 'mcp__minecraft__open_browser'))
+        self.assertFalse(auto_allows(self.chat, 'Bash'))
+        await self.cmd('auto', 'all')
+        self.assertTrue(auto_allows(self.chat, 'Bash'))
+        await self.cmd('auto', 'off')
+        self.chat.allowed.append('WebFetch')
+        self.assertTrue(auto_allows(self.chat, 'WebFetch'))
+        await self.cmd('auto', 'off')
+        self.assertFalse(auto_allows(self.chat, 'WebFetch'))  # off also forgets "always"
+        with self.assertRaises(ValueError):
+            await self.cmd('auto', 'yolo')
+
+    async def test_always_button_is_valid_answer(self):
+        task = asyncio.create_task(self.bridge.ask_user(
+            self.chat, 'permission', 'Bash', ['Разрешить', 'Отклонить', 'Всегда разрешать Bash']))
+        await asyncio.sleep(0)
+        request = next(iter(self.bridge.pending))
+        with self.assertRaises(ValueError):
+            self.bridge.answer(self.chat, request, '4')
+        self.bridge.answer(self.chat, request, '3')
+        self.assertEqual(await task, '3')
+
+    async def test_tokens_report(self):
+        self.chat.run_usage = {}
+        self.bridge.add_usage(self.chat, {'input_tokens': 10, 'output_tokens': 5,
+                                          'cache_read_input_tokens': 100}, 0.01)
+        other = self.bridge.new_chat('c', 'local')
+        self.bridge.add_usage(other, {'input_tokens': 1, 'output_tokens': 1}, 0.001)
+        event = await self.cmd('tokens')
+        self.assertEqual(event['kind'], 'tokens')
+        this, total = event['rows']
+        self.assertEqual((this['input'], this['output'], this['cache']), (110, 5, 100))
+        self.assertEqual((total['input'], total['output']), (111, 6))
+        self.assertAlmostEqual(total['cost'], 0.011)
+
+    def test_describe(self):
+        from backends.describe import describe, todo_rows
+        cwd = str(self.bridge.workspace)
+        self.assertEqual(describe('Read', {'file_path': str(self.bridge.workspace / 'src' / 'Main.java')}, cwd),
+                         ('📄', 'Читаю src/Main.java'))
+        icon, text = describe('Bash', {'command': 'git status', 'description': 'Check repo'}, cwd)
+        self.assertEqual((icon, text), ('$', 'git status  — Check repo'))
+        self.assertEqual(describe('mcp__ext__run', {}, cwd), ('⚙', 'ext.run'))
+        rows = todo_rows({'todos': [{'content': 'Fix', 'activeForm': 'Fixing', 'status': 'in_progress'},
+                                    {'content': 'Test', 'status': 'pending'}]})
+        self.assertEqual(rows, [{'text': 'Fixing', 'status': 'in_progress'}, {'text': 'Test', 'status': 'pending'}])
 
 
 class AccountTests(unittest.IsolatedAsyncioTestCase):

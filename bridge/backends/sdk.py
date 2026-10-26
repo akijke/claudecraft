@@ -13,10 +13,12 @@ the "accepting" flag flip happen without an await in between, so an `f` either
 gets into the session or is told the session is already closed.
 """
 import asyncio
+from pathlib import Path
 from collections import deque
 import json
 import logging
 from urllib.parse import urlparse
+from backends.describe import EDIT_TOOLS, describe, todo_rows, clip
 
 
 log = logging.getLogger('claudecraft.sdk')
@@ -58,6 +60,8 @@ class SdkTurn:
         self.replay = None
         self.ready = asyncio.Event()
         self.write_lock = asyncio.Lock()  # FIFO: several f messages keep their order
+        self.cwd = None          # folder used to shorten paths in progress lines
+        self.cost_seen = 0.0     # total_cost_usd is cumulative per CLI process
         if client is not None:
             self.attach(client)
 
@@ -147,7 +151,16 @@ class SdkTurn:
                     continue
                 if isinstance(message, T.SystemMessage) and message.subtype == 'init':
                     self.chat.sdk_id = message.data.get('session_id', self.chat.sdk_id)
+                    if message.data.get('cwd') and not getattr(self.chat, 'session_cwd', None):
+                        self.chat.session_cwd = message.data['cwd']
                     self.bridge.persist()
+                elif isinstance(message, T.UserMessage):
+                    # Tool results: only failures are worth a chat line.
+                    if isinstance(message.content, list):
+                        for block in message.content:
+                            if isinstance(block, T.ToolResultBlock) and block.is_error:
+                                body = block.content if isinstance(block.content, str) else json.dumps(block.content, ensure_ascii=False)
+                                self.bridge.emit(self.chat, clip(body, 300), kind='tool_error')
                 elif isinstance(message, T.AssistantMessage):
                     if self.acked == 0 and self.replay is not False:
                         self._no_echo()
@@ -155,9 +168,16 @@ class SdkTurn:
                         if isinstance(block, T.TextBlock):
                             self.bridge.emit(self.chat, block.text, kind='text')
                         elif isinstance(block, T.ToolUseBlock):
-                            self.bridge.emit(self.chat, f'Инструмент: {block.name}', kind='status')
+                            if block.name == 'TodoWrite':
+                                self.bridge.emit(self.chat, 'План', kind='todo', rows=todo_rows(block.input))
+                            else:
+                                icon, line = describe(block.name, block.input, self.cwd)
+                                self.bridge.emit(self.chat, line, kind='tool', icon=icon, tool=block.name)
                 elif isinstance(message, T.ResultMessage):
                     self.chat.sdk_id = message.session_id or self.chat.sdk_id
+                    cost = message.total_cost_usd or 0.0
+                    self.bridge.add_usage(self.chat, message.usage, max(cost - self.cost_seen, 0.0))
+                    self.cost_seen = max(cost, self.cost_seen)
                     if self.acked == 0 and self.replay is not False:
                         self._no_echo()
                     if message.is_error:
@@ -174,6 +194,15 @@ class SdkTurn:
             self.ready.set()
         if error:
             raise ValueError(error)
+
+
+def auto_allows(chat, name):
+    """Auto-approval policy of the chat (/cc auto off|edits|all + "always" buttons)."""
+    if name in chat.allowed:
+        return True
+    if chat.auto == 'all':
+        return True
+    return chat.auto == 'edits' and (name in EDIT_TOOLS or name.startswith('mcp__minecraft__'))
 
 
 def _types():
@@ -204,9 +233,19 @@ async def run(bridge, chat, text):
                 answers[question['question']] = await bridge.ask_user(
                     chat, 'question', description, labels, question.get('multiSelect', False))
             return PermissionResultAllow(updated_input={**data, 'answers': answers})
+        if auto_allows(chat, name):
+            return PermissionResultAllow(updated_input=data)
+        icon, line = describe(name, data, effective)
         answer = await bridge.ask_user(chat, 'permission',
-            f'{name}\n' + json.dumps(data, ensure_ascii=False)[:16000])
-        return (PermissionResultAllow(updated_input=data) if answer == '1'
+            f'{name}\n' + json.dumps(data, ensure_ascii=False)[:16000],
+            ['Разрешить', 'Отклонить', f'Всегда разрешать {name}'], summary=f'{icon} {line}', tool=name)
+        if answer == '3':
+            if name not in chat.allowed:
+                chat.allowed.append(name)
+                bridge.persist()
+            bridge.emit(chat, f'{name} теперь разрешается без вопроса в этом чате (/cc auto off — сбросить).',
+                        kind='status')
+        return (PermissionResultAllow(updated_input=data) if answer in ('1', '3')
                 else PermissionResultDeny(message='User declined in Minecraft'))
 
     @tool('open_browser', 'Show a browser URL to the Minecraft user. Wait for explicit user confirmation.', {'url': str})
@@ -233,7 +272,16 @@ async def run(bridge, chat, text):
 
     minecraft_tools = [open_browser, reload_tools] if chat.mode == 'cc' else [open_browser]
     mcp['minecraft'] = create_sdk_mcp_server(name='minecraft', tools=minecraft_tools)
-    options = ClaudeAgentOptions(cwd=str(bridge.workspace), resume=chat.sdk_id,
+    # The CLI stores a session under the folder it was created in, so a resumed
+    # session keeps that folder; a later `cd` is given via add_dirs + a prompt note.
+    effective = bridge.chat_cwd(chat)
+    session_dir = (chat.session_cwd or effective) if chat.sdk_id else effective
+    if not chat.sdk_id:
+        chat.session_cwd = None
+    extra_dirs = [effective] if Path(effective) != Path(session_dir) else []
+    if extra_dirs:
+        text = f'[Текущая папка пользователя: {effective}]\n{text}'
+    options = ClaudeAgentOptions(cwd=session_dir, resume=chat.sdk_id, add_dirs=extra_dirs,
         tools=tools, mcp_servers=mcp, can_use_tool=permission,
         permission_mode='default', setting_sources=[],
         # Echo accepted prompts so `f` messages can be matched against ResultMessage.
@@ -252,6 +300,7 @@ async def run(bridge, chat, text):
         options.cli_path = bridge.config['cli_path']
     # Registered before connecting, so an early `f` waits for the session instead of missing it.
     turn = SdkTurn(bridge, chat, None, _types(), trusted_replay=not bridge.config.get('cli_path'))
+    turn.cwd = effective
     chat.live = turn
     try:
         async with ClaudeSDKClient(options=options) as client:

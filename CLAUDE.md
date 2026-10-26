@@ -73,6 +73,17 @@ apikey; ключ в secrets.json (0600), api.py берёт его оттуда �
 запускается; реальный CLI выдаёт ссылку входа, отмена работает. В игре экран
 настроек визуально ещё не проверялся.
 
+Интерфейс (2026-10-27): ChatStyle.java рендерит события по kind (thinking, text c
+markdown, tool, tool_error, todo, done, error, status, permission, question,
+chats, listing, cwd, file, tokens, auto, url). Описания инструментов — в мосте,
+backends/describe.py. Значки только из проверенных на скриншоте (📄 📁 🔍 ✎ ✚ ☰ ◆
+⚙ ◎ ⟳ ✔ ✖ ⚠ ✦ Σ ∞ ☑ ☐ ▶); ▤ ▣ ⌕ ↻ ▸ рисуются крошечными — не использовать.
+Визуальная проверка: `gradlew runShots` (DevShots.java, -Dclaudecraft.devshots)
+открывает настройки и превью чата, кладёт PNG в run/screenshots и выходит.
+Чат хранит cwd, session_cwd, auto (off|edits|all), allowed (кнопка «всегда»),
+usage. Токены: usage в ResultMessage — за ход, total_cost_usd — накопительно за
+процесс CLI (проверено на реальном CLI), поэтому стоимость считается по приращению.
+
 Прочее: /events возвращает boot id моста; мод шлёт его обратно, при смене моста
 курсор сбрасывается (раньше после перезапуска моста события пропадали). Новый
 клиент без boot начинает с текущего момента (старую историю не проигрывает).

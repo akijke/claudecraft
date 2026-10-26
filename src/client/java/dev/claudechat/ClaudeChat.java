@@ -32,12 +32,14 @@ public final class ClaudeChat implements ClientModInitializer {
     // Short aliases are resolved by the bridge: queue=q, force=f, c/chats=chat.
     private final Set<String> actions = Set.of("q", "queue", "f", "force", "c", "chats", "chat",
         "cancel", "restart", "new", "select", "rename", "status", "clearqueue", "reply", "pending",
-        "local", "reload", "tools", "capabilities");
+        "local", "reload", "tools", "capabilities", "tokens", "usage", "auto",
+        "ls", "dir", "cd", "pwd", "cat", "type");
     private final Set<String> needsText = Set.of("q", "queue", "f", "force");
     // "settings" is handled in the mod itself (opens SettingsScreen), never sent to the bridge.
     private Path connection;
     final BridgeLauncher launcher = new BridgeLauncher(this::bridgeAnswers);
     private volatile boolean openSettings;
+    private final DevShots devShots = new DevShots(this);
     private volatile long cursor;
     // Bridge instance id: when it changes the bridge restarted and its event numbers reset.
     private volatile String boot = "";
@@ -47,7 +49,7 @@ public final class ClaudeChat implements ClientModInitializer {
 
     @Override public void onInitializeClient() {
         connection = FabricLoader.getInstance().getConfigDir().resolve("claude-chat/connection.json");
-        if (launcher.autoStart()) launcher.start();
+        if (launcher.autoStart() && !DevShots.ENABLED) launcher.start();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> launcher.stop());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
             for (String mode : new String[]{"c", "cc"}) {
@@ -63,6 +65,7 @@ public final class ClaudeChat implements ClientModInitializer {
                 .executes(c -> { openSettings = true; return 1; }));
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            devShots.tick(client);
             if (openSettings) {
                 // Deferred: the chat screen closes right after a command runs.
                 openSettings = false;
@@ -174,75 +177,45 @@ public final class ClaudeChat implements ClientModInitializer {
     }
 
     private void render(JsonObject event) {
-        String mode = event.get("mode").getAsString();
-        String id = event.get("chat").getAsString();
-        String tag = mode + ":" + id.substring(0, Math.min(6, id.length()));
-        say(tag, event.get("text").getAsString());
-        String kind = event.get("kind").getAsString();
-        if (kind.equals("chats")) {
-            for (JsonElement item : event.getAsJsonArray("rows")) {
-                JsonObject row = item.getAsJsonObject();
-                show(Component.literal(row.get("selected").getAsBoolean() ? "→ " : "  ")
-                    .append(button(row.get("label").getAsString(), "/" + mode + " select " + row.get("id").getAsString(), false)));
-            }
-            MutableComponent buttons = button("+ Локальный", "/" + mode + " new local", false);
-            if (mode.equals("c")) buttons.append(" ").append(button("+ API", "/c new api", false));
-            else buttons.append(" ").append(button("Импорт CLI", "/cc local", false));
-            show(buttons);
-        } else if (kind.equals("permission") || kind.equals("question")) {
-            String prefix = "/" + mode + " reply " + event.get("request").getAsString() + " ";
-            JsonArray choices = event.getAsJsonArray("choices");
-            for (int i = 0; i < choices.size(); i++) {
-                // For multi-select, suggest numbers rather than submitting the first click.
-                boolean multiple = event.has("multiple") && event.get("multiple").getAsBoolean();
-                show(button((i + 1) + ". " + choices.get(i).getAsString(), prefix + (i + 1), multiple));
-            }
-            if (kind.equals("question")) {
-                show(button("Свой ответ", prefix, true));
-                if (event.has("multiple") && event.get("multiple").getAsBoolean())
-                    say(tag, "Для нескольких вариантов: " + prefix + "1,3");
-            }
-        } else if (kind.equals("url") && event.has("url")) {
-            try {
-                URI uri = URI.create(event.get("url").getAsString());
-                if (("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) && uri.getHost() != null) {
-                    show(Component.literal("[Открыть браузер] " + uri).withStyle(style -> style
-                        .withColor(ChatFormatting.AQUA).withUnderlined(true)
-                        .withClickEvent(new ClickEvent.OpenUrl(uri))));
-                }
-            } catch (IllegalArgumentException ignored) { }
-        }
+        for (Component line : ChatStyle.render(event)) show(line);
     }
-    private MutableComponent button(String label, String command, boolean suggest) {
-        return Component.literal("[" + clean(label) + "]").withStyle(style -> style
-            .withColor(ChatFormatting.AQUA).withUnderlined(true).withClickEvent(suggest
-                ? new ClickEvent.SuggestCommand(command) : new ClickEvent.RunCommand(command)));
-    }
-    private String clean(String text) {
-        return text.replaceAll("\\u001B\\[[;\\d]*[ -/]*[@-~]", "").replace("§", "")
-            .replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "");
-    }
+
+    /** Local (non-bridge) notice in the same style as bridge status lines. */
     private void say(String mode, String text) {
-        for (String line : clean(text).split("\\R")) {
-            if (!line.isBlank()) show(Component.literal("[" + mode + "] " + line));
+        for (String line : ChatStyle.clean(text).split("\\R")) {
+            if (!line.isBlank()) show(ChatStyle.line(mode, ChatStyle.lit("· " + line, ChatStyle.DIM)));
         }
     }
+
     private void show(Component text) {
         Minecraft client = Minecraft.getInstance();
         // Client-only system line: never sent to the server.
         if (client.player != null) client.gui.chatListener().handleSystemMessage(text, false);
     }
+
     private void help(String mode) {
-        say(mode, "/" + mode + " <запрос> или q <запрос> — в очередь, после текущей работы.");
-        say(mode, "f <запрос> (force) — дописать Claude, пока он работает, без отмены задачи."
-            + (mode.equals("c") ? " В API-чатах f недоступно во время ответа." : ""));
-        say(mode, "c | chats — выбор чата | new local" + (mode.equals("c") ? " | new api" : " | local (импорт CLI)")
-            + " | rename <имя> | cancel | restart | status | clearqueue | pending | reload | tools");
-        say(mode, "restart перезапускает запрос/процесс SDK с сохранением истории; new начинает новый диалог.");
-        say(mode, "settings (или /claude) — мост, вход в аккаунт Claude, API-ключ. Мост: " + launcher.state().label + ".");
-        show(button("Настройки", "/" + mode + " settings", false).append(" ")
-            .append(button("Чаты", "/" + mode + " chats", false)).append(" ")
-            .append(button("Статус", "/" + mode + " status", false)).append(" ")
-            .append(button("Ожидающие вопросы", "/" + mode + " pending", false)));
+        String c = "/" + mode + " ";
+        int accent = mode.equals("cc") ? ChatStyle.CODE_MODE : ChatStyle.CLAUDE;
+        show(ChatStyle.line(mode, ChatStyle.lit(mode.equals("cc") ? "✦ Claude Code" : "✦ Claude", accent)
+            .withStyle(s -> s.withBold(true)).append(ChatStyle.lit("   мост: " + launcher.state().label, ChatStyle.DIM))));
+        String[][] rows = {
+            {c + "<запрос>", "в очередь (то же: q, queue)"},
+            {c + "f <текст>", "дописать Claude, пока он работает (force)"},
+            {c + "c", "чаты · new · rename · status · cancel · restart"},
+            {c + "auto off|edits|all", "авторазрешение действий"},
+            {c + "tokens", "расход токенов"},
+            {c + "ls · cd · pwd · cat", "файлы и рабочая папка"},
+            {"/claude", "настройки, вход в аккаунт, API-ключ"},
+        };
+        for (String[] row : rows)
+            show(ChatStyle.line(mode, Component.literal("  ").append(Component.literal(row[0]).withStyle(s -> s
+                .withColor(ChatStyle.AQUA).withClickEvent(new ClickEvent.SuggestCommand(row[0].split(" [<·|]")[0] + " "))))
+                .append(ChatStyle.lit("  " + row[1], ChatStyle.DIM))));
+        show(ChatStyle.line(mode, Component.literal("  ")
+            .append(ChatStyle.button("⚙ Настройки", c + "settings", false, ChatStyle.GOLD, null)).append(" ")
+            .append(ChatStyle.button("☰ Чаты", c + "chats", false, ChatStyle.AQUA, null)).append(" ")
+            .append(ChatStyle.button("Σ Токены", c + "tokens", false, ChatStyle.AQUA, null)).append(" ")
+            .append(ChatStyle.button("⚡ Auto", c + "auto", false, ChatStyle.AQUA, null)).append(" ")
+            .append(ChatStyle.button("📁 ls", c + "ls", false, ChatStyle.AQUA, null))));
     }
 }

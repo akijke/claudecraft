@@ -7,6 +7,15 @@ group = project.maven_group
 
 loom {
     splitEnvironmentSourceSets()
+    runs {
+        // gradlew runShots: screenshots of the settings screen and chat styling (DevShots).
+        shots {
+            client()
+            name = 'Claudecraft screenshots'
+            vmArg '-Dclaudecraft.devshots=true'
+            runDir 'run'
+        }
+    }
     mods {
         'claude_chat' {
             sourceSet sourceSets.main

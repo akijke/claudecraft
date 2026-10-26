@@ -10,6 +10,7 @@ import secrets
 import shutil
 import platform
 import re
+import time
 import uuid
 from aiohttp import web
 from backends.account import Account
@@ -35,6 +36,12 @@ class Chat:
     title: str
     sdk_id: str | None = None
     messages: list = field(default_factory=list)
+    cwd: str | None = None           # `cd` folder; None = workspace
+    session_cwd: str | None = None   # folder the SDK session was created in
+    auto: str = 'off'                # auto-approve: off | edits | all
+    allowed: list = field(default_factory=list)  # tools approved with "always"
+    usage: dict = field(default_factory=dict)    # token/cost totals for /c tokens
+    run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     queue: deque = field(default_factory=deque)
     task: asyncio.Task | None = None
     # Live backend session of the running item (SdkTurn); receives `f` messages.
@@ -125,13 +132,14 @@ class Bridge:
                 'extensions': sorted(self.extensions)}
 
     def persist(self):
-        rows = [{k: getattr(c, k) for k in ('id', 'mode', 'backend', 'title', 'sdk_id', 'messages')}
+        rows = [{k: getattr(c, k) for k in ('id', 'mode', 'backend', 'title', 'sdk_id', 'messages',
+                                            'cwd', 'session_cwd', 'auto', 'allowed', 'usage')}
                 for c in self.chats.values()]
         save_json(self.directory / 'chats.json', {'chats': rows, 'selected': self.selected})
 
     def emit(self, chat, text='', **extra):
         self.sequence += 1
-        event = {'seq': self.sequence, 'mode': chat.mode, 'chat': chat.id,
+        event = {'seq': self.sequence, 'mode': chat.mode, 'chat': chat.id, 'title': chat.title[:32],
                  'text': text[:24000], **extra}
         self.events.append(event)
         return event
@@ -171,11 +179,17 @@ class Bridge:
         try:
             while chat.queue:
                 question = chat.queue.popleft()
-                self.emit(chat, 'Думаю…', kind='status')
+                self.emit(chat, 'Думаю…', kind='thinking', queued=len(chat.queue))
+                chat.run_usage = {}
+                started = time.monotonic()
                 try:
                     await self.runner(chat, question)
                     self.persist()
-                    self.emit(chat, 'Готово.', kind='done')
+                    u = chat.run_usage
+                    self.emit(chat, 'Готово', kind='done', seconds=round(time.monotonic() - started, 1),
+                              input=u.get('input_tokens', 0) + u.get('cache_read_input_tokens', 0)
+                              + u.get('cache_creation_input_tokens', 0),
+                              output=u.get('output_tokens', 0), cost=round(u.get('cost_usd', 0.0), 4))
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -187,6 +201,90 @@ class Bridge:
             self.emit(chat, 'Текущий запрос прерван.', kind='status')
         finally:
             chat.task = None
+
+    def add_usage(self, chat, usage, cost=0.0):
+        """Add one turn's tokens (and cost delta) to the chat totals and the running item."""
+        for bucket in (chat.usage, chat.run_usage):
+            for key in USAGE_KEYS:
+                bucket[key] = bucket.get(key, 0) + int((usage or {}).get(key) or 0)
+            bucket['cost_usd'] = bucket.get('cost_usd', 0.0) + float(cost or 0.0)
+        chat.usage['turns'] = chat.usage.get('turns', 0) + 1
+
+    def tokens_report(self, chat):
+        def row(label, u):
+            total_in = sum(u.get(k, 0) for k in ('input_tokens', 'cache_read_input_tokens',
+                                                  'cache_creation_input_tokens'))
+            return {'label': label, 'input': total_in, 'output': u.get('output_tokens', 0),
+                    'cache': u.get('cache_read_input_tokens', 0), 'cost': round(u.get('cost_usd', 0.0), 4),
+                    'turns': u.get('turns', 0)}
+        everything = {}
+        for c in self.chats.values():
+            for key, value in c.usage.items():
+                everything[key] = everything.get(key, 0) + value
+        rows = [row('Этот чат: ' + chat.title[:40], chat.usage), row('Все чаты', everything)]
+        note = ('Стоимость — оценка Claude Code по ценам API; на подписке списывается лимит, '
+                'а не деньги.' if chat.backend == 'local' else 'Токены из ответов Messages API.')
+        self.emit(chat, 'Токены', kind='tokens', rows=rows, note=note)
+
+    def chat_cwd(self, chat):
+        folder = Path(chat.cwd) if chat.cwd else self.workspace
+        return str(folder if folder.is_dir() else self.workspace)
+
+    def resolve(self, chat, arg):
+        """Path for ls/cd/cat: relative to the chat folder; ~ is the workspace."""
+        arg = (arg or '').strip().strip('"')
+        base = Path(self.chat_cwd(chat))
+        if not arg:
+            return base
+        if arg == '~' or arg.startswith(('~/', '~\\')):
+            return (self.workspace / arg[2:]).resolve()
+        path = Path(arg)
+        return (path if path.is_absolute() else base / path).resolve()
+
+    def ls(self, chat, arg):
+        folder = self.resolve(chat, arg)
+        if not folder.is_dir():
+            raise ValueError(f'Нет такой папки: {folder}')
+        rows = []
+        try:
+            entries = sorted(folder.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except PermissionError:
+            raise ValueError(f'Нет доступа: {folder}') from None
+        for entry in entries[:200]:
+            try:
+                is_dir = entry.is_dir()
+                size = 0 if is_dir else entry.stat().st_size
+            except OSError:
+                continue
+            rows.append({'name': entry.name, 'dir': is_dir, 'size': size})
+        self.emit(chat, str(folder), kind='listing', path=str(folder), rows=rows,
+                  more=max(0, len(entries) - 200), parent=str(folder.parent) if folder.parent != folder else None)
+
+    def cd(self, chat, arg):
+        folder = self.resolve(chat, arg or '~')
+        if not folder.is_dir():
+            raise ValueError(f'Нет такой папки: {folder}')
+        chat.cwd = None if folder == self.workspace else str(folder)
+        self.persist()
+        note = ''
+        if chat.sdk_id and chat.session_cwd and Path(chat.session_cwd) != folder:
+            note = 'Сессия Claude остаётся в своей папке; эта папка будет передана ему как рабочая.'
+        self.emit(chat, str(folder), kind='cwd', note=note)
+
+    def cat(self, chat, arg):
+        if not (arg or '').strip():
+            raise ValueError('Формат: cat <файл>')
+        path = self.resolve(chat, arg)
+        if not path.is_file():
+            raise ValueError(f'Нет такого файла: {path}')
+        with path.open('rb') as f:
+            raw = f.read(40000)
+        if b'\0' in raw[:4000]:
+            raise ValueError('Это двоичный файл — не показываю')
+        text = raw.decode('utf-8', 'replace')
+        lines = text.splitlines()
+        truncated = len(lines) > 150 or path.stat().st_size > len(raw)
+        self.emit(chat, '\n'.join(lines[:150]), kind='file', path=str(path), truncated=truncated)
 
     @staticmethod
     def check_text(text):
@@ -255,14 +353,14 @@ class Bridge:
         except Exception as e:
             self.emit(chat, 'f не доставлено: ' + str(e)[:1500], kind='error')
 
-    async def ask_user(self, chat, kind, text, choices=None, multiple=False):
+    async def ask_user(self, chat, kind, text, choices=None, multiple=False, **extra):
         request = uid()
         future = asyncio.get_running_loop().create_future()
         options = choices or ['Разрешить', 'Отклонить']
         self.pending[request] = {'chat': chat.id, 'future': future, 'choices': options,
                                  'multiple': multiple, 'kind': kind}
         event = self.emit(chat, text, kind=kind, request=request,
-                          choices=options, multiple=multiple)
+                          choices=options, multiple=multiple, **extra)
         self.pending[request]['event'] = event
         try:
             return await asyncio.wait_for(future, 600)
@@ -275,8 +373,8 @@ class Bridge:
             raise ValueError('This question has expired or belongs to another chat')
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 8000:
             raise ValueError('Empty or oversized answer')
-        if pending['kind'] == 'permission' and answer not in ('1', '2'):
-            raise ValueError('Permission requires 1 (allow) or 2 (deny)')
+        if pending['kind'] == 'permission' and answer not in [str(i + 1) for i in range(len(pending['choices']))]:
+            raise ValueError('Permission requires a button number (1 allow, 2 deny, 3 always)')
         value = answer
         if pending['kind'] == 'question':
             parts = answer.split(',')
@@ -331,6 +429,27 @@ class Bridge:
             self.emit(chat, 'Расширения перезагружены для следующих запросов: ' + ', '.join(names), kind='status')
         elif action in ('tools', 'capabilities'):
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
+        elif action == 'tokens':
+            self.tokens_report(chat)
+        elif action == 'auto':
+            value = (data.get('text') or '').strip().lower()
+            if value:
+                if value not in AUTO_MODES:
+                    raise ValueError('auto: off | edits | all')
+                chat.auto = value
+                if value == 'off':
+                    chat.allowed.clear()
+                self.persist()
+            self.emit(chat, AUTO_MODES[chat.auto], kind='auto', mode_value=chat.auto,
+                      allowed=list(chat.allowed))
+        elif action == 'ls':
+            self.ls(chat, data.get('text', ''))
+        elif action == 'cd':
+            self.cd(chat, data.get('text', ''))
+        elif action == 'pwd':
+            self.emit(chat, self.chat_cwd(chat), kind='cwd', note='')
+        elif action == 'cat':
+            self.cat(chat, data.get('text', ''))
         elif action == 'clearqueue':
             chat.queue.clear()
             self.emit(chat, 'Очередь очищена.', kind='status')
@@ -338,8 +457,8 @@ class Bridge:
             state = 'ожидание'
             if chat.task:
                 state = 'работает' + (', f доступно' if chat.live is not None else '')
-            self.emit(chat, f'{chat.title} | {chat.backend} | {state} | очередь {len(chat.queue)}',
-                      kind='status')
+            self.emit(chat, f'{chat.title} | {chat.backend} | {state} | очередь {len(chat.queue)} | '
+                      f'auto {chat.auto} | {self.chat_cwd(chat)}', kind='status')
         elif action == 'new':
             chat = self.new_chat(mode, data.get('text') or 'local')
             self.emit(chat, 'Новый чат создан.', kind='status')
@@ -393,7 +512,8 @@ class Bridge:
             known = {c.sdk_id for c in self.chats.values()}
             for session in sessions:
                 if session.session_id not in known:
-                    imported = Chat(uid(), 'cc', 'local', session.summary or session.session_id[:8], session.session_id)
+                    imported = Chat(uid(), 'cc', 'local', session.summary or session.session_id[:8], session.session_id,
+                                    session_cwd=str(self.workspace))
                     self.chats[imported.id] = imported
                     known.add(session.session_id)
             self.persist()
@@ -410,7 +530,14 @@ class Bridge:
 
 
 # Short and legacy command names → canonical actions (full names keep working).
-ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat'}
+ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls', 'type': 'cat',
+           'usage': 'tokens'}
+USAGE_KEYS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
+AUTO_MODES = {
+    'off': 'Авторазрешение выключено: каждое действие спрашивает подтверждение.',
+    'edits': 'Авторазрешение: чтение, поиск и правка файлов без вопросов; команды (Bash) и интернет спрашивают.',
+    'all': 'Авторазрешение ВСЕГО: Claude выполняет любые команды без вопросов, с правами моста. Будь осторожен.',
+}
 
 
 def create_app(bridge, token):
