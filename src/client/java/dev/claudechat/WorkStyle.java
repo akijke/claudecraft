@@ -46,8 +46,8 @@ final class WorkStyle {
             case "confirm" -> {
                 out.add(line(mode, lit("⚠ " + s(e, "text"), b(e, "danger") ? RED : GOLD)));
                 out.add(line(mode, Component.literal("  ")
-                    .append(button("✔ Да", cmd + s(e, "command"), false, b(e, "danger") ? RED : GREEN, "Подтвердить"))
-                    .append(lit("  (иначе просто ничего не делай)", FAINT))));
+                    .append(button(L.t("✔ Да"), cmd + s(e, "command"), false, b(e, "danger") ? RED : GREEN, L.t("Подтвердить")))
+                    .append(lit(L.t("  (иначе просто ничего не делай)"), FAINT))));
             }
             case "tree" -> {
                 out.add(line(mode, lit("≡ ", DIR).append(lit(s(e, "path"), TEXT))));
@@ -60,11 +60,11 @@ final class WorkStyle {
                         .append(Component.literal(name).withStyle(st -> st.withColor(dir ? DIR : TEXT)
                             .withClickEvent(new ClickEvent.RunCommand(cmd + (dir ? "cd " : "cat ") + s(e, "path") + "/" + rel))))));
                 }
-                if (n(e, "more") > 0) out.add(line(mode, lit("  … и ещё " + n(e, "more"), DIM)));
+                if (n(e, "more") > 0) out.add(line(mode, lit(L.t("  … и ещё ") + n(e, "more"), DIM)));
             }
             case "found" -> {
                 JsonArray rows = e.getAsJsonArray("rows");
-                out.add(line(mode, lit("🔍 «" + s(e, "text") + "»  ", GOLD).append(lit(rows.size() + " найдено в " + s(e, "root"), DIM))));
+                out.add(line(mode, lit("🔍 «" + s(e, "text") + "»  ", GOLD).append(lit(rows.size() + L.t(" найдено в ") + s(e, "root"), DIM))));
                 for (JsonElement item : rows) {
                     JsonObject r = item.getAsJsonObject();
                     boolean dir = b(r, "dir");
@@ -75,22 +75,22 @@ final class WorkStyle {
             }
             case "projects" -> projects(e, out);
             case "project_opened" -> {
-                out.add(line("cc", lit("✦ Проект ", CODE_MODE).append(lit(s(e, "name"), TEXT).withStyle(st -> st.withBold(true)))
+                out.add(line("cc", lit(L.t("✦ Проект "), CODE_MODE).append(lit(s(e, "name"), TEXT).withStyle(st -> st.withBold(true)))
                     .append(lit("  " + s(e, "path"), DIM))));
-                out.add(line("cc", Component.literal("  ").append(button("☰ Чаты", "/cc chats", false, AQUA, null)).append(sp())
+                out.add(line("cc", Component.literal("  ").append(button(L.t("☰ Чаты"), "/cc chats", false, AQUA, null)).append(sp())
                     .append(button("⇄ Git", "/cc git", false, GREEN, null)).append(sp())
-                    .append(button("📁 Файлы", "/cc cd @", false, DIR, "Файловый менеджер в папке проекта")).append(sp())
-                    .append(button("◆ Агенты", "/cc agents", false, AQUA, null))));
+                    .append(button(L.t("📁 Файлы"), "/cc cd @", false, DIR, L.t("Файловый менеджер в папке проекта"))).append(sp())
+                    .append(button(L.t("◆ Агенты"), "/cc agents", false, AQUA, null))));
             }
             case "git_none" -> {
-                out.add(line(mode, lit("⇄ ", GOLD).append(lit("Папка проекта не git-репозиторий: " + s(e, "text"), DIM))));
-                out.add(line(mode, Component.literal("  ").append(button("git init", "/cc git init", false, GREEN, "Создать репозиторий"))
-                    .append(sp()).append(button("git clone …", "/cc git clone ", true, AQUA, "Склонировать в новый проект"))));
+                out.add(line(mode, lit("⇄ ", GOLD).append(lit(L.t("Папка проекта не git-репозиторий: ") + s(e, "text"), DIM))));
+                out.add(line(mode, Component.literal("  ").append(button("git init", "/cc git init", false, GREEN, L.t("Создать репозиторий")))
+                    .append(sp()).append(button("git clone …", "/cc git clone ", true, AQUA, L.t("Склонировать в новый проект")))));
             }
             case "git_status" -> gitStatus(e, out);
             case "diff" -> diff(e, mode, out);
             case "git_log" -> {
-                out.add(line(mode, lit("⇄ История", GOLD).withStyle(st -> st.withBold(true))));
+                out.add(line(mode, lit(L.t("⇄ История"), GOLD).withStyle(st -> st.withBold(true))));
                 for (JsonElement item : e.getAsJsonArray("rows")) {
                     JsonObject r = item.getAsJsonObject();
                     out.add(line(mode, lit("  " + s(r, "hash") + " ", GOLD).append(lit(s(r, "subject"), TEXT))
@@ -98,32 +98,32 @@ final class WorkStyle {
                 }
             }
             case "git_branches" -> {
-                out.add(line(mode, lit("⇄ Ветки", GOLD).withStyle(st -> st.withBold(true))));
+                out.add(line(mode, lit(L.t("⇄ Ветки"), GOLD).withStyle(st -> st.withBold(true))));
                 for (JsonElement item : e.getAsJsonArray("rows")) {
                     JsonObject r = item.getAsJsonObject();
                     boolean cur = b(r, "current");
                     out.add(line(mode, lit(cur ? "  ● " : "  ○ ", cur ? GREEN : FAINT)
-                        .append(cur ? lit(s(r, "name"), GREEN) : button(s(r, "name"), "/cc git switch " + s(r, "name"), false, AQUA, "Переключиться"))
+                        .append(cur ? lit(s(r, "name"), GREEN) : button(s(r, "name"), "/cc git switch " + s(r, "name"), false, AQUA, L.t("Переключиться")))
                         .append(lit(s(r, "upstream").isEmpty() ? "" : "  → " + s(r, "upstream"), FAINT))));
                 }
-                out.add(line(mode, Component.literal("  ").append(button("+ ветка", "/cc git branch ", true, GOLD, "Создать и выбрать ветку"))));
+                out.add(line(mode, Component.literal("  ").append(button(L.t("+ ветка"), "/cc git branch ", true, GOLD, L.t("Создать и выбрать ветку")))));
             }
             case "agents" -> agents(e, out);
             case "tasks" -> tasks(e, out);
             case "spawned" -> out.add(line(mode, lit("◆ ", CODE_MODE).append(lit(s(e, "text"), TEXT)).append(lit("  ", TEXT))
-                .append(button("открыть", "/cc select " + s(e, "target"), false, AQUA, "Переключиться на этот чат"))
-                .append(sp()).append(button("задачи", "/cc tasks", false, AQUA, null))));
+                .append(button(L.t("открыть"), "/cc select " + s(e, "target"), false, AQUA, L.t("Переключиться на этот чат")))
+                .append(sp()).append(button(L.t("задачи"), "/cc tasks", false, AQUA, null))));
             case "connectors" -> connectors(e, out);
             case "need_key" -> {
                 String id = s(e, "connector");
-                out.add(line(mode, lit("🔑 " + id + ": ", GOLD).append(lit("нужен ключ доступа", TEXT))));
+                out.add(line(mode, lit("🔑 " + id + ": ", GOLD).append(lit(L.t("нужен ключ доступа"), TEXT))));
                 for (JsonElement f : e.getAsJsonArray("fields")) {
                     JsonObject field = f.getAsJsonObject();
-                    out.add(line(mode, lit("  " + s(field, "var") + (b(field, "required") ? "" : " (необязательно)"), b(field, "set") ? GREEN : TEXT)
-                        .append(lit(b(field, "set") ? "  ✔ задан" : "  — " + s(field, "hint"), DIM))));
+                    out.add(line(mode, lit("  " + s(field, "var") + (b(field, "required") ? "" : L.t(" (необязательно)")), b(field, "set") ? GREEN : TEXT)
+                        .append(lit(b(field, "set") ? L.t("  ✔ задан") : "  — " + s(field, "hint"), DIM))));
                 }
-                out.add(line(mode, Component.literal("  ").append(button("🔑 Ввести ключ", "/claude key " + id, false, GOLD,
-                    "Откроется окно с полем ввода; ключ не попадёт в чат"))));
+                out.add(line(mode, Component.literal("  ").append(button(L.t("🔑 Ввести ключ"), "/claude key " + id, false, GOLD,
+                    L.t("Откроется окно с полем ввода; ключ не попадёт в чат")))));
             }
             case "chats" -> { return false; }
             default -> { return false; }
@@ -132,8 +132,8 @@ final class WorkStyle {
     }
 
     private static void projects(JsonObject e, List<Component> out) {
-        out.add(line("cc", lit("✦ Проекты", CODE_MODE).withStyle(st -> st.withBold(true))
-            .append(lit("   рабочая папка Claude = папка проекта", FAINT))));
+        out.add(line("cc", lit(L.t("✦ Проекты"), CODE_MODE).withStyle(st -> st.withBold(true))
+            .append(lit(L.t("   рабочая папка Claude = папка проекта"), FAINT))));
         for (JsonElement item : e.getAsJsonArray("rows")) {
             JsonObject r = item.getAsJsonObject();
             boolean cur = b(r, "current");
@@ -142,16 +142,16 @@ final class WorkStyle {
                     : button(s(r, "name"), "/cc project open " + s(r, "name"), false, AQUA, s(r, "path")));
             if (b(r, "git")) row.append(lit("  ⇄", GREEN));
             if (n(r, "running") > 0) row.append(lit("  ▶ " + n(r, "running"), GOLD));
-            row.append(lit("  " + n(r, "chats") + " чат.", FAINT));
-            if (!b(r, "exists")) row.append(lit("  нет папки!", RED));
+            row.append(lit("  " + n(r, "chats") + L.t(" чат."), FAINT));
+            if (!b(r, "exists")) row.append(lit(L.t("  нет папки!"), RED));
             out.add(line("cc", row));
             out.add(line("cc", lit("      " + s(r, "path"), FAINT)));
         }
         out.add(line("cc", Component.literal("  ")
-            .append(button("+ здесь", "/cc project here", false, GOLD, "Проект из папки обзора: " + s(e, "browsing"))).append(sp())
-            .append(button("+ новый", "/cc project new ", true, GOLD, "Создать папку в workspace")).append(sp())
-            .append(button("+ по пути", "/cc project add ", true, GOLD, "project add <имя> <путь>")).append(sp())
-            .append(button("⇄ clone", "/cc git clone ", true, GREEN, "git clone <url> [имя]"))));
+            .append(button(L.t("+ здесь"), "/cc project here", false, GOLD, L.t("Проект из папки обзора: ") + s(e, "browsing"))).append(sp())
+            .append(button(L.t("+ новый"), "/cc project new ", true, GOLD, L.t("Создать папку в workspace"))).append(sp())
+            .append(button(L.t("+ по пути"), "/cc project add ", true, GOLD, L.t("project add <имя> <путь>"))).append(sp())
+            .append(button("⇄ clone", "/cc git clone ", true, GREEN, L.t("git clone <url> [имя]")))));
     }
 
     private static void gitStatus(JsonObject e, List<Component> out) {
@@ -170,36 +170,36 @@ final class WorkStyle {
         } else if (!s(e, "remote").isEmpty()) {
             out.add(line("cc", lit("  origin " + s(e, "remote"), FAINT)));
         }
-        if (!s(e, "last").isEmpty()) out.add(line("cc", lit("  последний: " + s(e, "last"), FAINT)));
+        if (!s(e, "last").isEmpty()) out.add(line("cc", lit(L.t("  последний: ") + s(e, "last"), FAINT)));
         JsonArray files = e.getAsJsonArray("files");
-        if (files.isEmpty()) out.add(line("cc", lit("  ✔ всё закоммичено", GREEN)));
+        if (files.isEmpty()) out.add(line("cc", lit(L.t("  ✔ всё закоммичено"), GREEN)));
         for (JsonElement item : files) {
             JsonObject f = item.getAsJsonObject();
             String code = s(f, "code"), path = s(f, "path");
             int color = code.contains("?") ? DIM : code.contains("D") ? RED : code.charAt(0) != ' ' ? GREEN : GOLD;
             out.add(line("cc", lit("  " + code.replace(' ', '·') + " ", color).append(Component.literal(path).withStyle(st -> st
                 .withColor(TEXT).withClickEvent(new ClickEvent.RunCommand("/cc git diff " + path))
-                .withHoverEvent(new HoverEvent.ShowText(lit("Показать изменения", TEXT)))))));
+                .withHoverEvent(new HoverEvent.ShowText(lit(L.t("Показать изменения"), TEXT)))))));
         }
-        if (n(e, "more") > 0) out.add(line("cc", lit("  … и ещё " + n(e, "more"), DIM)));
+        if (n(e, "more") > 0) out.add(line("cc", lit(L.t("  … и ещё ") + n(e, "more"), DIM)));
         out.add(line("cc", Component.literal("  ")
-            .append(button("diff", "/cc git diff", false, AQUA, "Все изменения")).append(sp())
-            .append(button("✔ commit", "/cc git commit ", true, GREEN, "Впиши сообщение; пусто — Claude напишет сам")).append(sp())
-            .append(button("✦ commit", "/cc git commit", false, CODE_MODE, "Claude посмотрит diff и закоммитит")).append(sp())
+            .append(button("diff", "/cc git diff", false, AQUA, L.t("Все изменения"))).append(sp())
+            .append(button("✔ commit", "/cc git commit ", true, GREEN, L.t("Впиши сообщение; пусто — Claude напишет сам"))).append(sp())
+            .append(button("✦ commit", "/cc git commit", false, CODE_MODE, L.t("Claude посмотрит diff и закоммитит"))).append(sp())
             .append(button("↑ push", "/cc git push", false, GOLD, null)).append(sp())
             .append(button("↓ pull", "/cc git pull", false, AQUA, null)).append(sp())
-            .append(button("ветки", "/cc git branch", false, AQUA, null)).append(sp())
+            .append(button(L.t("ветки"), "/cc git branch", false, AQUA, null)).append(sp())
             .append(button("log", "/cc git log", false, AQUA, null))));
         if (s(e, "remote").isEmpty())
-            out.add(line("cc", Component.literal("  ").append(button("Создать на GitHub", "/cc git github", false, GOLD,
-                "gh repo create (private) + push; нужен gh auth login")).append(sp())
-                .append(button("origin …", "/cc git remote ", true, AQUA, "Привязать существующий репозиторий: git remote <url>"))));
+            out.add(line("cc", Component.literal("  ").append(button(L.t("Создать на GitHub"), "/cc git github", false, GOLD,
+                L.t("gh repo create (private) + push; нужен gh auth login"))).append(sp())
+                .append(button("origin …", "/cc git remote ", true, AQUA, L.t("Привязать существующий репозиторий: git remote <url>")))));
     }
 
     private static void diff(JsonObject e, String mode, List<Component> out) {
-        out.add(line(mode, lit("± ", GOLD).append(lit(s(e, "path").isEmpty() ? "все изменения" : s(e, "path"), TEXT))
-            .append(lit(b(e, "staged") ? "  (подготовленные)" : "", FAINT))));
-        if (b(e, "empty")) { out.add(line(mode, lit("  нет изменений", DIM))); return; }
+        out.add(line(mode, lit("± ", GOLD).append(lit(s(e, "path").isEmpty() ? L.t("все изменения") : s(e, "path"), TEXT))
+            .append(lit(b(e, "staged") ? L.t("  (подготовленные)") : "", FAINT))));
+        if (b(e, "empty")) { out.add(line(mode, lit(L.t("  нет изменений"), DIM))); return; }
         for (String raw : clean(s(e, "text")).split("\\R")) {
             if (raw.startsWith("diff --git") || raw.startsWith("index ") || raw.startsWith("--- ") || raw.startsWith("+++ ")) {
                 if (raw.startsWith("+++ ")) out.add(line(mode, lit("  " + raw.substring(4).replaceFirst("^b/", ""), GOLD).withStyle(st -> st.withBold(true))));
@@ -208,12 +208,12 @@ final class WorkStyle {
             int color = raw.startsWith("+") ? GREEN : raw.startsWith("-") ? RED : raw.startsWith("@@") ? AQUA : DIM;
             out.add(line(mode, lit("  " + raw, color)));
         }
-        if (b(e, "truncated")) out.add(line(mode, lit("  … diff длиннее, показано начало", DIM)));
+        if (b(e, "truncated")) out.add(line(mode, lit(L.t("  … diff длиннее, показано начало"), DIM)));
     }
 
     private static void agents(JsonObject e, List<Component> out) {
-        out.add(line("cc", lit("◆ Агенты", CODE_MODE).withStyle(st -> st.withBold(true))
-            .append(lit("   Claude сам поручает им задачи; можно и напрямую", FAINT))));
+        out.add(line("cc", lit(L.t("◆ Агенты"), CODE_MODE).withStyle(st -> st.withBold(true))
+            .append(lit(L.t("   Claude сам поручает им задачи; можно и напрямую"), FAINT))));
         for (JsonElement item : e.getAsJsonArray("rows")) {
             JsonObject r = item.getAsJsonObject();
             boolean on = b(r, "enabled");
@@ -221,40 +221,41 @@ final class WorkStyle {
             out.add(line("cc", lit(on ? "  ● " : "  ○ ", on ? GREEN : FAINT)
                 .append(button(name, "/cc agent " + name + " ", true, on ? AQUA : FAINT, s(r, "description")))
                 .append(lit("  " + s(r, "source"), FAINT)).append(sp())
-                .append(button(on ? "выкл" : "вкл", "/cc agent " + (on ? "off " : "on ") + name, false, on ? DIM : GREEN, null))
-                .append(sp()).append(button("∥", "/cc spawn @" + name + " ", true, CODE_MODE, "Запустить параллельно в отдельном чате"))));
+                .append(button(on ? L.t("выкл") : L.t("вкл"), "/cc agent " + (on ? "off " : "on ") + name, false, on ? DIM : GREEN, null))
+                .append(sp()).append(button("∥", "/cc spawn @" + name + " ", true, CODE_MODE, L.t("Запустить параллельно в отдельном чате")))));
         }
-        out.add(line("cc", Component.literal("  ").append(button("+ свой агент", "/cc agent new ", true, GOLD,
-            "agent new <имя> <чем занимается>")).append(lit("  или файлы .claude/agents/*.md в проекте", FAINT))));
+        out.add(line("cc", Component.literal("  ").append(button(L.t("+ свой агент"), "/cc agent new ", true, GOLD,
+            L.t("agent new <имя> <чем занимается>"))).append(lit(L.t("  или файлы .claude/agents/*.md в проекте"), FAINT))));
     }
 
     private static void tasks(JsonObject e, List<Component> out) {
         JsonArray rows = e.getAsJsonArray("rows");
-        out.add(line("cc", lit("▶ Задачи", GOLD).withStyle(st -> st.withBold(true)).append(lit("  " + rows.size() + " активных", FAINT))));
-        if (rows.isEmpty()) out.add(line("cc", lit("  сейчас ничего не выполняется", DIM)));
+        out.add(line("cc", lit(L.t("▶ Задачи"), GOLD).withStyle(st -> st.withBold(true)).append(lit("  " + rows.size() + L.t(" активных"), FAINT))));
+        if (rows.isEmpty()) out.add(line("cc", lit(L.t("  сейчас ничего не выполняется"), DIM)));
         for (JsonElement item : rows) {
             JsonObject r = item.getAsJsonObject();
             String state = s(r, "state");
-            int color = state.startsWith("ждёт") ? GOLD : state.equals("работает") ? GREEN : DIM;
+            String code = s(r, "code");  // language-independent state from the bridge
+            int color = code.equals("waiting") ? GOLD : code.equals("running") ? GREEN : DIM;
             MutableComponent row = lit("  ● ", color).append(lit(s(r, "title"), TEXT))
-                .append(lit("  " + (s(r, "project").isEmpty() ? "чат" : s(r, "project")), CODE_MODE))
-                .append(lit("  " + state + (n(r, "seconds") > 0 ? " " + n(r, "seconds") + " с" : ""), color));
+                .append(lit("  " + (s(r, "project").isEmpty() ? L.t("чат") : s(r, "project")), CODE_MODE))
+                .append(lit("  " + state + (n(r, "seconds") > 0 ? " " + n(r, "seconds") + L.t(" с") : ""), color));
             if (n(r, "queue") > 0) row.append(lit("  +" + n(r, "queue"), FAINT));
             out.add(line("cc", row));
             if (!s(r, "step").isEmpty()) out.add(line("cc", lit("      " + s(r, "step"), FAINT)));
             String m = s(r, "mode");
             out.add(line("cc", Component.literal("      ")
-                .append(button("открыть", "/" + m + " select " + s(r, "id"), false, AQUA, null)).append(sp())
-                .append(button("f …", "/" + m + " select " + s(r, "id"), false, AQUA, "Открой чат и напиши /" + m + " f <текст>")).append(sp())
-                .append(button("⏹ стоп", "/cc stop " + s(r, "id"), false, RED, "Остановить и очистить очередь"))));
+                .append(button(L.t("открыть"), "/" + m + " select " + s(r, "id"), false, AQUA, null)).append(sp())
+                .append(button("f …", "/" + m + " select " + s(r, "id"), false, AQUA, L.t("Открой чат и напиши /") + m + L.t(" f <текст>"))).append(sp())
+                .append(button(L.t("⏹ стоп"), "/cc stop " + s(r, "id"), false, RED, L.t("Остановить и очистить очередь")))));
         }
-        out.add(line("cc", Component.literal("  ").append(button("∥ новая параллельная задача", "/cc spawn ", true, CODE_MODE,
-            "Отдельный чат в этом проекте; текущий не прерывается"))));
+        out.add(line("cc", Component.literal("  ").append(button(L.t("∥ новая параллельная задача"), "/cc spawn ", true, CODE_MODE,
+            L.t("Отдельный чат в этом проекте; текущий не прерывается")))));
     }
 
     private static void connectors(JsonObject e, List<Component> out) {
-        out.add(line("cc", lit("⚙ Коннекторы", GOLD).withStyle(st -> st.withBold(true))
-            .append(lit("   включаются со следующего запроса /cc", FAINT))));
+        out.add(line("cc", lit(L.t("⚙ Коннекторы"), GOLD).withStyle(st -> st.withBold(true))
+            .append(lit(L.t("   включаются со следующего запроса /cc"), FAINT))));
         String group = "";
         for (JsonElement item : e.getAsJsonArray("rows")) {
             JsonObject r = item.getAsJsonObject();
@@ -269,12 +270,12 @@ final class WorkStyle {
                 .append(sp());
             if (on) {
                 if (!status.isEmpty()) row.append(lit(status.equals("connected") ? "✔ " : status + " ", status.equals("connected") ? GREEN : RED));
-                row.append(button("выкл", "/cc disconnect " + id, false, DIM, null));
+                row.append(button(L.t("выкл"), "/cc disconnect " + id, false, DIM, null));
             } else if (b(r, "needs_node")) {
-                row.append(lit("нужен Node.js", RED));
+                row.append(lit(L.t("нужен Node.js"), RED));
             } else {
                 boolean needsKey = r.has("missing") && !r.getAsJsonArray("missing").isEmpty();
-                row.append(button(needsKey ? "🔑 подключить" : "подключить", "/cc connect " + id, false, GREEN, s(r, "about")));
+                row.append(button(needsKey ? L.t("🔑 подключить") : L.t("подключить"), "/cc connect " + id, false, GREEN, s(r, "about")));
             }
             out.add(line("cc", row));
         }

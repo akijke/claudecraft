@@ -20,6 +20,7 @@ from backends.files import FileManager
 from backends.gitops import Git
 from backends.projects import DEFAULT as DEFAULT_PROJECT, Projects
 from backends.util import save_json  # noqa: F401  (re-exported for older imports)
+from backends.i18n import language, to_english, translate_event
 
 
 def uid():
@@ -169,8 +170,21 @@ class Bridge:
                  'project': chat.project, 'text': text[:24000], **extra}
         if extra.get('kind') == 'tool':
             chat.step = text[:120]
+        # The one place where bridge text gets the user's language (English by default).
+        event = translate_event(event, self.language())
         self.events.append(event)
         return event
+
+    def language(self):
+        return language(self.directory)
+
+    def prompt(self, text):
+        """A canned instruction for Claude plus the language to answer in."""
+        return text + (' Answer in Russian.' if self.language() == 'ru' else ' Answer in English.')
+
+    def tr(self, text):
+        """Bridge-written text in the user's language (errors, titles outside events)."""
+        return to_english(text) if self.language() == 'en' else text
 
     def current_chat(self, mode):
         return self.chats[self.selected[mode]]
@@ -481,6 +495,7 @@ class Bridge:
                 continue
             rows.append({'id': c.id, 'mode': c.mode, 'title': c.title, 'project': c.project,
                          'state': 'ждёт ответа' if waiting else ('работает' if c.task else 'в очереди'),
+                         'code': 'waiting' if waiting else ('running' if c.task else 'queued'),
                          'step': c.step, 'queue': len(c.queue),
                          'seconds': int(now - c.started) if c.task and c.started else 0,
                          'selected': self.selected.get(c.mode) == c.id})
@@ -636,7 +651,7 @@ class Bridge:
                 raise ValueError(f'Нет коннектора {cid}')
             self.emit(chat, f'{cid}: ключи', kind='need_key', connector=cid, fields=self.connectors.fields(cid))
         elif action == 'crash':
-            await self.enqueue(self.current_chat('cc'), CRASH_PROMPT)
+            await self.enqueue(self.current_chat('cc'), self.prompt(CRASH_PROMPT))
         elif action == 'clearqueue':
             chat.queue.clear()
             self.emit(chat, 'Очередь очищена.', kind='status')
@@ -750,9 +765,9 @@ AUTO_MODES = {
     'edits': 'Авторазрешение: чтение, поиск и правка файлов без вопросов; команды (Bash) и интернет спрашивают.',
     'all': 'Авторазрешение ВСЕГО: Claude выполняет любые команды без вопросов, с правами моста. Будь осторожен.',
 }
-CRASH_PROMPT = ('Разбери последний сбой Minecraft: через инструмент minecraft_logs прочитай свежий '
-                'crash-report (или хвост latest.log, если крэша нет), объясни причину простыми словами, '
-                'назови виновный мод/класс и предложи исправление. Если причина в коде этого проекта — исправь.')
+CRASH_PROMPT = ('Investigate the latest Minecraft failure: read the newest crash report with the '
+                'minecraft_logs tool (or the tail of latest.log if there is no crash), explain the cause in plain '
+                'words, name the responsible mod/class and propose a fix. If the cause is in this project, fix it.')
 
 
 def create_app(bridge, token):
@@ -765,7 +780,7 @@ def create_app(bridge, token):
         try:
             return await handler(request)
         except (ValueError, KeyError, TypeError, OSError) as e:
-            return web.json_response({'error': str(e)}, status=400)
+            return web.json_response({'error': bridge.tr(str(e))}, status=400)
         except Exception as e:
             return web.json_response({'error': str(e)[:1000]}, status=500)
     app = web.Application(middlewares=[authenticate], client_max_size=65536)
@@ -784,7 +799,7 @@ def create_app(bridge, token):
                                  'cursor': batch[-1]['seq'] if batch else max(cursor, 0)})
     async def state(request):
         """Snapshot for the conversation screen: chats, projects, selection."""
-        chats = [{'id': c.id, 'mode': c.mode, 'title': c.title, 'project': c.project, 'backend': c.backend,
+        chats = [{'id': c.id, 'mode': c.mode, 'title': bridge.tr(c.title), 'project': c.project, 'backend': c.backend,
                   'running': bool(c.task), 'queue': len(c.queue), 'updated': c.updated}
                  for c in bridge.chats.values()]
         return web.json_response({'chats': chats, 'selected': bridge.selected,

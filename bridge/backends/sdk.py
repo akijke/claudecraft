@@ -369,7 +369,8 @@ async def run(bridge, chat, text):
         agents=bridge.agents.definitions(effective) if chat.mode == 'cc' else None,
         # Echo accepted prompts so `f` messages can be matched against ResultMessage.
         extra_args={'replay-user-messages': None},
-        system_prompt=('You are Claude in Minecraft. Reply in the user language. '
+        system_prompt=('You are Claude in Minecraft. Reply in the language the user writes in; '
+                       + ('if unclear, use Russian. ' if bridge.language() == 'ru' else 'if unclear, use English. ') +
                        'The user may send extra messages while you work; take them into account. '
                        'Use AskUserQuestion for choices and minecraft open_browser when the user needs a browser. '
                        'Do not open browser using shell commands. ' +

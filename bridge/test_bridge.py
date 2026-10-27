@@ -137,7 +137,7 @@ class SdkTurnTests(unittest.IsolatedAsyncioTestCase):
                  self.result())
         await asyncio.wait_for(drive, 2)
         kinds = [(e['kind'], e['text']) for e in self.bridge.events if e['kind'] in ('tool', 'todo', 'tool_error')]
-        self.assertEqual(kinds, [('tool', 'ls -la'), ('todo', 'План'), ('tool_error', 'boom')])
+        self.assertEqual(kinds, [('tool', 'ls -la'), ('todo', 'Plan'), ('tool_error', 'boom')])
 
     async def test_inject_after_result_reports_closed(self):
         drive = asyncio.create_task(self.turn.drive('first'))
@@ -377,7 +377,7 @@ class WorkspaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(log['rows'][0]['subject'], 'first commit')
         await self.cmd('git', 'commit')  # no message: Claude writes the commit
         await asyncio.sleep(0)
-        self.assertIn('коммит', self.started[-1][1])
+        self.assertIn('commit', self.started[-1][1].lower())
 
     async def test_agents_presets_custom_and_project_files(self):
         listing = await self.cmd('agents')
@@ -389,8 +389,8 @@ class WorkspaceTests(unittest.IsolatedAsyncioTestCase):
         (folder / 'lint-fixer.md').write_text('---\nname: lint-fixer\ndescription: Fixes lint\n'
                                              'tools: Read, Edit\n---\nYou fix lint errors.\n', encoding='utf-8')
         rows = {r['name']: r for r in (await self.cmd('agents'))['rows']}
-        self.assertEqual(rows['api-checker']['source'], 'свой')
-        self.assertEqual(rows['lint-fixer']['source'], 'проект')
+        self.assertEqual(rows['api-checker']['source'], 'custom')
+        self.assertEqual(rows['lint-fixer']['source'], 'project')
         self.assertEqual(rows['lint-fixer']['tools'], ['Read', 'Edit'])
         await self.cmd('agent', 'off debugger')
         self.assertNotIn('debugger', self.bridge.agents.enabled())
@@ -501,8 +501,46 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
             self.client.out.put_nowait(m)
         await asyncio.wait_for(drive, 2)
         tools = [(e['text'], e.get('agent')) for e in self.bridge.events if e['kind'] == 'tool']
-        self.assertEqual(tools, [('Агент code-reviewer: Review diff', None), ('Читаю a.py', 'code-reviewer')])
+        self.assertEqual(tools, [('Agent code-reviewer: Review diff', None), ('Reading a.py', 'code-reviewer')])
         self.assertFalse([e for e in self.bridge.events if e['kind'] == 'text'])  # subagent text hidden
+
+
+class LanguageTests(unittest.IsolatedAsyncioTestCase):
+    """English by default; Russian when the mod's client.json says so."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.chat = self.bridge.current_chat('cc')
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    def test_templates_and_nesting(self):
+        from backends.i18n import to_english
+        self.assertEqual(to_english('Нет такой папки: C:/x'), 'No such folder: C:/x')
+        self.assertEqual(to_english('Ошибка: Нет такого файла: a.txt'), 'Error: No such file: a.txt')
+        self.assertEqual(to_english('Ищу «TODO» в src'), 'Searching “TODO” in src')
+        self.assertEqual(to_english('Ошибка: x\nПроверь вход в аккаунт Claude: /c settings'),
+                         'Error: x\nCheck your Claude login: /c settings')
+        self.assertEqual(to_english('Привет, Claude'), 'Привет, Claude')  # unknown text is left alone
+
+    async def test_default_english_then_russian(self):
+        event = self.bridge.emit(self.chat, 'Очередь очищена.', kind='status')
+        self.assertEqual(event['text'], 'Queue cleared.')
+        answer = self.bridge.emit(self.chat, 'Готово', kind='text')  # Claude's words are never touched
+        self.assertEqual(answer['text'], 'Готово')
+        (Path(self.temp.name) / 'client.json').write_text(json.dumps({'language': 'ru'}), encoding='utf-8')
+        self.assertEqual(self.bridge.emit(self.chat, 'Очередь очищена.', kind='status')['text'], 'Очередь очищена.')
+
+    async def test_http_errors_translated(self):
+        app = create_app(self.bridge, 't')
+        request = make_mocked_request('POST', '/command', headers={'Authorization': 'Bearer t'})
+        request.json = AsyncMock(return_value={'mode': 'cc', 'action': 'cd', 'text': 'missing'})
+        route = await app.router.resolve(request)
+        response = await app.middlewares[0](request, route.handler)
+        self.assertEqual(response.status, 400)
+        self.assertTrue(json.loads(response.text)['error'].startswith('No such folder: '))
 
 
 class AccountTests(unittest.IsolatedAsyncioTestCase):

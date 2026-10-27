@@ -27,6 +27,7 @@ final class BridgeLauncher {
         STARTING("запуск…"), RUNNING("работает"), STOPPED("остановлен"), FAILED("ошибка");
         final String label;
         State(String label) { this.label = label; }
+        String text() { return L.t(label); }
     }
 
     private final Path gameDir = FabricLoader.getInstance().getGameDir().toAbsolutePath();
@@ -51,6 +52,13 @@ final class BridgeLauncher {
     Path logFile() { return runtime.resolve("bridge.log"); }
     boolean autoStart() { return !settings.has("autoStart") || settings.get("autoStart").getAsBoolean(); }
     String pythonSetting() { return settings.has("python") ? settings.get("python").getAsString() : ""; }
+    /** "en" (default) or "ru"; the bridge reads the same client.json. */
+    String language() { return settings.has("language") && settings.get("language").getAsString().equals("ru") ? "ru" : "en"; }
+
+    void setLanguage(String language) {
+        settings.addProperty("language", language);
+        write();
+    }
 
     private void set(State state, String detail) { this.state = state; this.detail = detail == null ? "" : detail; }
 
@@ -64,10 +72,14 @@ final class BridgeLauncher {
     void saveSettings(boolean autoStart, String python) {
         settings.addProperty("autoStart", autoStart);
         settings.addProperty("python", python.strip());
+        write();
+    }
+
+    private void write() {
         try {
             Files.createDirectories(configDir);
             Files.writeString(settingsFile, new GsonBuilder().setPrettyPrinting().create().toJson(settings));
-        } catch (IOException e) { set(state, "не удалось сохранить настройки: " + e.getMessage()); }
+        } catch (IOException e) { set(state, L.t("не удалось сохранить настройки: ") + e.getMessage()); }
     }
 
     synchronized void start() {
@@ -110,9 +122,9 @@ final class BridgeLauncher {
     private void run() {
         try {
             if (bridgeAnswers.getAsBoolean()) { set(State.EXTERNAL, ""); return; }
-            set(State.INSTALLING, "распаковка моста");
+            set(State.INSTALLING, L.t("распаковка моста"));
             Path bridgeDir = extract();
-            set(State.INSTALLING, "поиск Python 3.11+");
+            set(State.INSTALLING, L.t("поиск Python 3.11+"));
             List<String> python = findPython();
             Path venvPython = venv(python);
             installRequirements(venvPython, bridgeDir.resolve("requirements.txt"));
@@ -134,11 +146,11 @@ final class BridgeLauncher {
             long deadline = System.currentTimeMillis() + 60000;
             while (System.currentTimeMillis() < deadline && started.isAlive() && !bridgeAnswers.getAsBoolean())
                 Thread.sleep(300);
-            if (!started.isAlive()) throw new IllegalStateException("мост завершился: " + lastLogLine());
-            if (!bridgeAnswers.getAsBoolean()) throw new IllegalStateException("мост не ответил за 60 с: " + lastLogLine());
+            if (!started.isAlive()) throw new IllegalStateException(L.t("мост завершился: ") + lastLogLine());
+            if (!bridgeAnswers.getAsBoolean()) throw new IllegalStateException(L.t("мост не ответил за 60 с: ") + lastLogLine());
             set(State.RUNNING, "");
             int code = started.waitFor();
-            if (!stopping) set(State.FAILED, "мост завершился (код " + code + "): " + lastLogLine());
+            if (!stopping) set(State.FAILED, L.t("мост завершился (код ") + code + "): " + lastLogLine());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
@@ -150,7 +162,7 @@ final class BridgeLauncher {
     private Path extract() throws IOException {
         Path source = FabricLoader.getInstance().getModContainer("claude_chat")
             .flatMap(c -> c.findPath("claudecraft/bridge"))
-            .orElseThrow(() -> new IOException("в JAR нет claudecraft/bridge"));
+            .orElseThrow(() -> new IOException(L.t("в JAR нет claudecraft/bridge")));
         Path target = runtime.resolve("bridge");
         if (Files.isDirectory(target)) {
             try (Stream<Path> old = Files.walk(target)) {
@@ -186,8 +198,8 @@ final class BridgeLauncher {
                 if (result.code == 0 && result.output.strip().endsWith("True")) return candidate;
             } catch (IOException ignored) { }
         }
-        throw new IOException("не найден Python 3.11+. Установи его с python.org (галочка «Add to PATH») "
-            + "или укажи путь к python.exe в /c settings");
+        throw new IOException(L.t("не найден Python 3.11+. Установи его с python.org (галочка «Add to PATH») ")
+            + L.t("или укажи путь к python.exe в /c settings"));
     }
 
     private Path venv(List<String> python) throws IOException, InterruptedException {
@@ -195,12 +207,12 @@ final class BridgeLauncher {
         boolean windows = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");
         Path exe = windows ? venv.resolve("Scripts/python.exe") : venv.resolve("bin/python3");
         if (Files.isRegularFile(exe)) return exe;
-        set(State.INSTALLING, "создание окружения Python");
+        set(State.INSTALLING, L.t("создание окружения Python"));
         List<String> command = new ArrayList<>(python);
         command.addAll(List.of("-m", "venv", venv.toString()));
         Result result = exec(command, 300);
         if (result.code != 0 || !Files.isRegularFile(exe))
-            throw new IOException("не удалось создать venv: " + tail(result.output));
+            throw new IOException(L.t("не удалось создать venv: ") + tail(result.output));
         return exe;
     }
 
@@ -209,10 +221,10 @@ final class BridgeLauncher {
             .digest(Files.readAllBytes(requirements)));
         Path marker = runtime.resolve("venv/.claudecraft-requirements");
         if (Files.isRegularFile(marker) && Files.readString(marker).strip().equals(hash)) return;
-        set(State.INSTALLING, "установка зависимостей (первый раз до пары минут)");
+        set(State.INSTALLING, L.t("установка зависимостей (первый раз до пары минут)"));
         Result result = exec(List.of(venvPython.toString(), "-m", "pip", "install",
             "--disable-pip-version-check", "-r", requirements.toString()), 900);
-        if (result.code != 0) throw new IOException("pip install не удался: " + tail(result.output));
+        if (result.code != 0) throw new IOException(L.t("pip install не удался: ") + tail(result.output));
         Files.writeString(marker, hash);
     }
 
@@ -229,7 +241,7 @@ final class BridgeLauncher {
         reader.start();
         if (!p.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
             p.destroyForcibly();
-            throw new IOException("команда не завершилась за " + timeoutSeconds + " с: " + command.get(0));
+            throw new IOException(L.t("команда не завершилась за ") + timeoutSeconds + L.t(" с: ") + command.get(0));
         }
         reader.join(2000);
         return new Result(p.exitValue(), out.toString(StandardCharsets.UTF_8));
@@ -247,7 +259,7 @@ final class BridgeLauncher {
             for (int i = lines.size() - 1; i >= 0; i--)
                 if (!lines.get(i).isBlank()) return lines.get(i).strip();
         } catch (IOException ignored) { }
-        return "см. " + logFile();
+        return L.t("см. ") + logFile();
     }
 
     private static String tail(String text) {

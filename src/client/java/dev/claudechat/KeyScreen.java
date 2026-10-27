@@ -27,7 +27,7 @@ final class KeyScreen extends Screen {
     private int top;
 
     KeyScreen(ClaudeChat mod, String connector, JsonArray fields) {
-        super(Component.literal("Ключ: " + connector));
+        super(Component.literal(L.t("Ключ: ") + connector));
         this.mod = mod;
         this.connector = connector;
         this.fields = fields;
@@ -43,7 +43,7 @@ final class KeyScreen extends Screen {
             JsonObject field = f.getAsJsonObject();
             EditBox box = new EditBox(font, x, y + 12, w, 18, Component.literal(field.get("var").getAsString()));
             box.setMaxLength(4000);
-            box.setHint(Component.literal(field.get("set").getAsBoolean() ? "задан — оставь пустым, чтобы не менять"
+            box.setHint(Component.literal(field.get("set").getAsBoolean() ? L.t("задан — оставь пустым, чтобы не менять")
                 : field.get("hint").getAsString()));
             box.addFormatter((text, offset) -> FormattedCharSequence.forward("•".repeat(text.length()), Style.EMPTY));
             addRenderableWidget(box);
@@ -51,7 +51,7 @@ final class KeyScreen extends Screen {
             vars.add(field.get("var").getAsString());
             y += 34;
         }
-        addRenderableWidget(Button.builder(Component.literal("✔ Сохранить и подключить"), b -> save())
+        addRenderableWidget(Button.builder(Component.literal(L.t("✔ Сохранить и подключить")), b -> save())
             .bounds(x, y + 8, w / 2 - 2, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
             .bounds(x + w / 2 + 2, y + 8, w / 2 - 2, 20).build());
@@ -74,14 +74,14 @@ final class KeyScreen extends Screen {
         super.extractRenderState(g, mouseX, mouseY, delta);
         int w = Math.min(320, width - 40), x = width / 2 - w / 2;
         g.centeredText(font, Component.literal("🔑 " + connector).withColor(0xF2C14E), width / 2, top, 0xFFFFFFFF);
-        g.centeredText(font, "Ключ хранится только в config/claude-chat/secrets.json", width / 2, top + 11, 0xFF8A8A8A);
+        g.centeredText(font, L.t("Ключ хранится только в config/claude-chat/secrets.json"), width / 2, top + 11, 0xFF8A8A8A);
         int y = top + 24;
         for (JsonElement f : fields) {
             JsonObject field = f.getAsJsonObject();
-            g.text(font, field.get("var").getAsString() + (field.get("required").getAsBoolean() ? "" : "  (необязательно)"),
+            g.text(font, field.get("var").getAsString() + (field.get("required").getAsBoolean() ? "" : L.t("  (необязательно)")),
                 x, y, field.get("set").getAsBoolean() ? 0xFF6BD08B : 0xFFE8E8E8);
             y += 34;
         }
-        if (fields.isEmpty()) g.centeredText(font, "Открой /cc connectors и нажми «подключить» ещё раз", width / 2, top + 40, 0xFFA0A0A0);
+        if (fields.isEmpty()) g.centeredText(font, L.t("Открой /cc connectors и нажми «подключить» ещё раз"), width / 2, top + 40, 0xFFA0A0A0);
     }
 }

@@ -82,19 +82,26 @@ final class SettingsScreen extends Screen {
         int cw = columnWidth;
 
         // ---- left: bridge ----
-        addRenderableWidget(Button.builder(Component.literal("⟳ Перезапустить мост"), b -> restartBridge())
+        addRenderableWidget(Button.builder(Component.literal(L.t("⟳ Перезапустить мост")), b -> restartBridge())
             .bounds(leftX, top + 34, cw, 20).build());
         addRenderableWidget(Button.builder(autoLabel(), b -> { autoStart = !autoStart; b.setMessage(autoLabel()); })
-            .bounds(leftX, top + 58, cw, 20)
-            .tooltip(Tooltip.create(Component.literal("Запускать мост вместе с игрой"))).build());
+            .bounds(leftX, top + 58, cw / 2 - 2, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("Запускать мост вместе с игрой")))).build());
+        // Language of the mod and of bridge messages (Claude answers in the language you write in).
+        addRenderableWidget(Button.builder(Component.literal("Lang: " + (L.russian() ? "RU" : "EN")), b -> {
+                mod.launcher.saveSettings(autoStart, python.getValue());
+                mod.launcher.setLanguage(L.russian() ? "en" : "ru");
+                rebuildWidgets();
+            }).bounds(leftX + cw / 2 + 2, top + 58, cw / 2 - 2, 20)
+            .tooltip(Tooltip.create(Component.literal("Language / Язык: English ⇄ Русский"))).build());
         python = new EditBox(font, leftX, top + 82, cw, 18, Component.literal("Python"));
         python.setMaxLength(500);
-        python.setHint(Component.literal("путь к python.exe (пусто = авто)"));
+        python.setHint(Component.literal(L.t("путь к python.exe (пусто = авто)")));
         python.setValue(pythonValue == null ? "" : pythonValue);
         addRenderableWidget(python);
 
         // ---- left: API key ----
-        apiKey = new EditBox(font, leftX, top + 136, cw - 66, 18, Component.literal("API-ключ"));
+        apiKey = new EditBox(font, leftX, top + 136, cw - 66, 18, Component.literal(L.t("API-ключ")));
         apiKey.setMaxLength(300);
         apiKey.setHint(Component.literal("sk-ant-…"));
         apiKey.addFormatter((text, offset) -> FormattedCharSequence.forward("•".repeat(text.length()), Style.EMPTY));
@@ -103,23 +110,23 @@ final class SettingsScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("✔"), b -> {
             String key = apiKey.getValue().strip();
             if (!key.isEmpty()) { action("apikey", key); keyValue = ""; apiKey.setValue(""); }
-        }).bounds(leftX + cw - 62, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal("Сохранить ключ"))).build());
+        }).bounds(leftX + cw - 62, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal(L.t("Сохранить ключ")))).build());
         addRenderableWidget(Button.builder(Component.literal("✖"), b -> action("apikey", ""))
-            .bounds(leftX + cw - 30, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal("Удалить ключ"))).build());
+            .bounds(leftX + cw - 30, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal(L.t("Удалить ключ")))).build());
 
         // ---- right: account ----
         if (waitingForCode()) {
             String url = str(status.getAsJsonObject("login"), "url");
-            Button open = addRenderableWidget(Button.builder(Component.literal("1. Открыть страницу входа"), b -> {
+            Button open = addRenderableWidget(Button.builder(Component.literal(L.t("1. Открыть страницу входа")), b -> {
                 if (url != null) ConfirmLinkScreen.confirmLinkNow(this, URI.create(url));
             }).bounds(rightX, top + 34, cw, 20).build());
             open.active = url != null;
-            code = new EditBox(font, rightX, top + 59, cw, 18, Component.literal("Код"));
+            code = new EditBox(font, rightX, top + 59, cw, 18, Component.literal(L.t("Код")));
             code.setMaxLength(2000);
-            code.setHint(Component.literal("2. вставь код (Ctrl+V)"));
+            code.setHint(Component.literal(L.t("2. вставь код (Ctrl+V)")));
             code.setValue(codeValue);
             addRenderableWidget(code);
-            addRenderableWidget(Button.builder(Component.literal("3. Отправить код"), b -> {
+            addRenderableWidget(Button.builder(Component.literal(L.t("3. Отправить код")), b -> {
                 action("login_code", code.getValue().strip());
                 codeValue = "";
                 code.setValue("");
@@ -129,15 +136,15 @@ final class SettingsScreen extends Screen {
         } else {
             code = null;
             if (loggedIn()) {
-                addRenderableWidget(Button.builder(Component.literal("Выйти из аккаунта"), b -> action("logout", ""))
+                addRenderableWidget(Button.builder(Component.literal(L.t("Выйти из аккаунта")), b -> action("logout", ""))
                     .bounds(rightX, top + 34, cw, 20).build());
             } else {
-                addRenderableWidget(Button.builder(Component.literal("Войти: подписка Claude"), b -> action("login", ""))
+                addRenderableWidget(Button.builder(Component.literal(L.t("Войти: подписка Claude")), b -> action("login", ""))
                     .bounds(rightX, top + 34, cw, 20)
-                    .tooltip(Tooltip.create(Component.literal("Pro / Max — как claude auth login"))).build());
-                addRenderableWidget(Button.builder(Component.literal("Войти: Console (API)"), b -> action("login", "console"))
+                    .tooltip(Tooltip.create(Component.literal(L.t("Pro / Max — как claude auth login")))).build());
+                addRenderableWidget(Button.builder(Component.literal(L.t("Войти: Console (API)")), b -> action("login", "console"))
                     .bounds(rightX, top + 58, cw, 20)
-                    .tooltip(Tooltip.create(Component.literal("Оплата по API через console.anthropic.com"))).build());
+                    .tooltip(Tooltip.create(Component.literal(L.t("Оплата по API через console.anthropic.com")))).build());
             }
         }
 
@@ -147,7 +154,7 @@ final class SettingsScreen extends Screen {
     }
 
     private Component autoLabel() {
-        return Component.literal("Автозапуск: " + (autoStart ? "вкл" : "выкл"));
+        return Component.literal(L.t("Автозапуск") + ": " + (autoStart ? L.t("вкл") : L.t("выкл")));
     }
 
     private String layoutKey() {
@@ -169,9 +176,9 @@ final class SettingsScreen extends Screen {
             String before = loginState();
             status = result;
             String after = loginState();
-            if (before.equals("checking") && after.equals("done")) say("Вход выполнен.", GREEN);
+            if (before.equals("checking") && after.equals("done")) say(L.t("Вход выполнен."), GREEN);
             if (after.equals("failed") && !before.equals("failed"))
-                say("Вход не удался: " + str(status.getAsJsonObject("login"), "error"), RED);
+                say(L.t("Вход не удался: ") + str(status.getAsJsonObject("login"), "error"), RED);
             if (!layoutKey().equals(layoutKey)) rebuildWidgets();
         }));
     }
@@ -193,18 +200,18 @@ final class SettingsScreen extends Screen {
 
     private static String done(String action) {
         return switch (action) {
-            case "login" -> "Открой страницу входа, войди и вставь код.";
-            case "login_code" -> "Код отправлен, проверяю…";
-            case "logout" -> "Выход выполнен.";
-            case "apikey" -> "API-ключ обновлён.";
-            default -> "Готово.";
+            case "login" -> L.t("Открой страницу входа, войди и вставь код.");
+            case "login_code" -> L.t("Код отправлен, проверяю…");
+            case "logout" -> L.t("Выход выполнен.");
+            case "apikey" -> L.t("API-ключ обновлён.");
+            default -> L.t("Готово.");
         };
     }
 
     private void restartBridge() {
         if (preview) return;
         mod.launcher.saveSettings(autoStart, python.getValue());
-        say("Перезапуск моста…", GRAY);
+        say(L.t("Перезапуск моста…"), GRAY);
         Thread t = new Thread(mod.launcher::restart, "claude-bridge-restart");
         t.setDaemon(true);
         t.start();
@@ -226,7 +233,7 @@ final class SettingsScreen extends Screen {
         g.centeredText(font, Component.literal("✦ Claudecraft").withColor(0xD97757), width / 2, top - 20, WHITE);
 
         // left: bridge
-        g.text(font, "Мост", leftX, top, GOLD);
+        g.text(font, L.t("Мост"), leftX, top, GOLD);
         BridgeLauncher.State state = preview ? BridgeLauncher.State.RUNNING : mod.launcher.state();
         int color = switch (state) {
             case RUNNING, EXTERNAL -> GREEN;
@@ -234,34 +241,34 @@ final class SettingsScreen extends Screen {
             case INSTALLING, STARTING -> GOLD;
             default -> GRAY;
         };
-        g.text(font, "● " + state.label, leftX, top + 12, color);
+        g.text(font, "● " + state.text(), leftX, top + 12, color);
         String detail = preview ? "" : mod.launcher.detail();
         if (!detail.isEmpty()) g.text(font, fit(detail, cw), leftX, top + 22, DARK);
 
         // left: API key
-        g.text(font, "API-ключ для /c new api", leftX, top + 112, GOLD);
+        g.text(font, L.t("API-ключ для /c new api"), leftX, top + 112, GOLD);
         String key = status == null ? null : str(status, "api_key");
-        g.text(font, key == null ? "не задан" : key, leftX, top + 124, key == null ? DARK : GRAY);
+        g.text(font, key == null ? L.t("не задан") : key, leftX, top + 124, key == null ? DARK : GRAY);
 
         // right: account
-        g.text(font, "Аккаунт Claude", rightX, top, GOLD);
+        g.text(font, L.t("Аккаунт Claude"), rightX, top, GOLD);
         JsonObject account = account();
         if (status == null) {
-            g.text(font, "● мост недоступен", rightX, top + 12, DARK);
+            g.text(font, L.t("● мост недоступен"), rightX, top + 12, DARK);
         } else if (loggedIn()) {
             String email = str(account, "email");
-            g.text(font, "● " + fit(email != null ? email : "вход выполнен", cw - 10), rightX, top + 12, GREEN);
+            g.text(font, "● " + fit(email != null ? email : L.t("вход выполнен"), cw - 10), rightX, top + 12, GREEN);
             String method = str(account, "method");
             if (method != null) g.text(font, method, rightX, top + 22, DARK);
         } else {
-            g.text(font, "● вход не выполнен", rightX, top + 12, GOLD);
+            g.text(font, L.t("● вход не выполнен"), rightX, top + 12, GOLD);
         }
         if (waitingForCode()) {
-            g.text(font, fit("Войди на странице, скопируй код", cw), rightX, top + 108, DARK);
-            g.text(font, fit("и вставь его в поле выше.", cw), rightX, top + 118, DARK);
+            g.text(font, fit(L.t("Войди на странице, скопируй код"), cw), rightX, top + 108, DARK);
+            g.text(font, fit(L.t("и вставь его в поле выше."), cw), rightX, top + 118, DARK);
         } else if (!loggedIn()) {
-            g.text(font, fit("Вход сохраняется как у Claude Code", cw), rightX, top + 84, DARK);
-            g.text(font, fit("в терминале (claude auth login).", cw), rightX, top + 94, DARK);
+            g.text(font, fit(L.t("Вход сохраняется как у Claude Code"), cw), rightX, top + 84, DARK);
+            g.text(font, fit(L.t("в терминале (claude auth login)."), cw), rightX, top + 94, DARK);
         }
 
         if (!message.isEmpty()) g.centeredText(font, fit(message, width - 20), width / 2, top + 170, messageColor);

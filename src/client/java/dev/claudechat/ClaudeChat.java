@@ -163,7 +163,7 @@ public final class ClaudeChat implements ClientModInitializer {
             switch (parts[0]) {
                 case "c", "cc" -> { if (rest.isBlank()) help(parts[0]); else dispatch(parts[0], rest); }
                 case "claude" -> { if (rest.isBlank()) open(() -> new SettingsScreen(this, null)); else claudeCommand(rest); }
-                default -> notice = "Неизвестная команда: /" + parts[0];
+                default -> notice = L.t("Неизвестная команда: /") + parts[0];
             }
             return;
         }
@@ -181,12 +181,12 @@ public final class ClaudeChat implements ClientModInitializer {
         JsonObject data = command(mode, action, text);
         if (action.equals("reply")) {
             String[] answer = text.split("\\s+", 2);
-            if (answer.length != 2) { say(mode, "Формат: /" + mode + " reply <id> <ответ>"); return; }
+            if (answer.length != 2) { say(mode, L.t("Формат: /") + mode + L.t(" reply <id> <ответ>")); return; }
             data.addProperty("request", answer[0]);
             data.addProperty("text", answer[1]);
         }
         if (needsText.contains(action) && text.isBlank()) {
-            say(mode, "Нужен аргумент: /" + mode + " " + action + " …"); return;
+            say(mode, L.t("Нужен аргумент: /") + mode + " " + action + " …"); return;
         }
         send(mode, data);
     }
@@ -194,10 +194,10 @@ public final class ClaudeChat implements ClientModInitializer {
     /** Explains why the bridge does not answer, based on the launcher state. */
     private String bridgeProblem() {
         return switch (launcher.state()) {
-            case INSTALLING, STARTING -> "Мост запускается: " + launcher.detail();
-            case FAILED -> "Мост не запустился: " + launcher.detail() + " — /c settings";
-            case OFF, STOPPED -> "Мост выключен. Включи автозапуск или перезапусти в /c settings.";
-            default -> "Мост не отвечает. /c settings — перезапуск и лог.";
+            case INSTALLING, STARTING -> L.t("Мост запускается: ") + launcher.detail();
+            case FAILED -> L.t("Мост не запустился: ") + launcher.detail() + " — /c settings";
+            case OFF, STOPPED -> L.t("Мост выключен. Включи автозапуск или перезапусти в /c settings.");
+            default -> L.t("Мост не отвечает. /c settings — перезапуск и лог.");
         };
     }
 
@@ -218,24 +218,24 @@ public final class ClaudeChat implements ClientModInitializer {
             try { request("/command", data); }
             catch (Exception e) {
                 Minecraft.getInstance().execute(() -> {
-                    if (ticket == epoch) say(mode, "Ошибка: " + e.getMessage());
+                    if (ticket == epoch) say(mode, L.t("Ошибка: ") + e.getMessage());
                 });
             }
         });
     }
 
     JsonObject request(String path, JsonObject body) throws Exception {
-        if (!Files.isRegularFile(connection)) throw new IllegalStateException("Мост ещё не запущен (нет connection.json)");
+        if (!Files.isRegularFile(connection)) throw new IllegalStateException(L.t("Мост ещё не запущен (нет connection.json)"));
         JsonObject config = JsonParser.parseString(Files.readString(connection)).getAsJsonObject();
         int port = config.get("port").getAsInt();
-        if (port < 1024 || port > 65535) throw new IllegalArgumentException("Некорректный порт моста");
+        if (port < 1024 || port > 65535) throw new IllegalArgumentException(L.t("Некорректный порт моста"));
         // The host is never taken from configuration or a server chat message.
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
             .timeout(Duration.ofSeconds(15)).header("Authorization", "Bearer " + config.get("token").getAsString());
         if (body == null) builder.GET();
         else builder.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString()));
         HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
-        if (response.body().length() > 4000000) throw new IllegalStateException("Слишком большой ответ моста");
+        if (response.body().length() > 4000000) throw new IllegalStateException(L.t("Слишком большой ответ моста"));
         JsonObject result = JsonParser.parseString(response.body()).getAsJsonObject();
         if (response.statusCode() != 200) throw new IllegalStateException(
             result.has("error") ? result.get("error").getAsString() : "HTTP " + response.statusCode());
@@ -287,29 +287,29 @@ public final class ClaudeChat implements ClientModInitializer {
         String c = "/" + mode + " ";
         int accent = mode.equals("cc") ? ChatStyle.CODE_MODE : ChatStyle.CLAUDE;
         show(ChatStyle.line(mode, ChatStyle.lit(mode.equals("cc") ? "✦ Claude Code" : "✦ Claude", accent)
-            .withStyle(s -> s.withBold(true)).append(ChatStyle.lit("   мост: " + launcher.state().label
-                + " · окно переписки: K", ChatStyle.DIM))));
+            .withStyle(s -> s.withBold(true)).append(ChatStyle.lit(L.t("   мост: ") + launcher.state().text()
+                + L.t(" · окно переписки: K"), ChatStyle.DIM))));
         String[][] rows = {
-            {c + "<запрос>", "в очередь (q, queue) · f/force — дописать в работу · cq — очистить очередь"},
-            {c + "c", "чаты · new · rename · status · cancel · restart · tokens · auto"},
-            {"/cc project", "проекты = рабочая папка Claude (open, here, new, add)"},
-            {c + "ls", "файлы: cd · pwd · cat · tree · find · mkdir · mv · cp · rm · open · code"},
-            {"/cc git", "статус · diff · commit · push · pull · branch · log · clone · github"},
-            {"/cc agents", "агенты · agent <имя> <задача> · spawn — параллельно · tasks"},
-            {"/cc connectors", "GitHub, Playwright, Context7, БД, Sentry, Notion…"},
-            {"/cc crash", "разобрать последний крэш / latest.log Minecraft"},
-            {"/claude", "настройки, вход в аккаунт, API-ключ"},
+            {c + L.t("<запрос>"), L.t("в очередь (q, queue) · f/force — дописать в работу · cq — очистить очередь")},
+            {c + "c", L.t("чаты · new · rename · status · cancel · restart · tokens · auto")},
+            {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},
+            {c + "ls", L.t("файлы: cd · pwd · cat · tree · find · mkdir · mv · cp · rm · open · code")},
+            {"/cc git", L.t("статус · diff · commit · push · pull · branch · log · clone · github")},
+            {"/cc agents", L.t("агенты · agent <имя> <задача> · spawn — параллельно · tasks")},
+            {"/cc connectors", L.t("GitHub, Playwright, Context7, БД, Sentry, Notion…")},
+            {"/cc crash", L.t("разобрать последний крэш / latest.log Minecraft")},
+            {"/claude", L.t("настройки, вход в аккаунт, API-ключ")},
         };
         for (String[] row : rows)
             show(ChatStyle.line(mode, Component.literal("  ").append(Component.literal(row[0]).withStyle(s -> s
                 .withColor(ChatStyle.AQUA).withClickEvent(new ClickEvent.SuggestCommand(row[0].split(" [<·|]")[0] + " "))))
                 .append(ChatStyle.lit("  " + row[1], ChatStyle.DIM))));
         show(ChatStyle.line(mode, Component.literal("  ")
-            .append(ChatStyle.button("▣ Окно (K)", c + "ui", false, ChatStyle.CODE_MODE, "Отдельный экран переписки")).append(" ")
-            .append(ChatStyle.button("⚙ Настройки", c + "settings", false, ChatStyle.GOLD, null)).append(" ")
-            .append(ChatStyle.button("✦ Проекты", "/cc project", false, ChatStyle.CODE_MODE, null)).append(" ")
+            .append(ChatStyle.button(L.t("▣ Окно (K)"), c + "ui", false, ChatStyle.CODE_MODE, L.t("Отдельный экран переписки"))).append(" ")
+            .append(ChatStyle.button(L.t("⚙ Настройки"), c + "settings", false, ChatStyle.GOLD, null)).append(" ")
+            .append(ChatStyle.button(L.t("✦ Проекты"), "/cc project", false, ChatStyle.CODE_MODE, null)).append(" ")
             .append(ChatStyle.button("⇄ Git", "/cc git", false, ChatStyle.GREEN, null)).append(" ")
-            .append(ChatStyle.button("▶ Задачи", "/cc tasks", false, ChatStyle.AQUA, null)).append(" ")
-            .append(ChatStyle.button("📁 Файлы", c + "ls", false, ChatStyle.AQUA, null))));
+            .append(ChatStyle.button(L.t("▶ Задачи"), "/cc tasks", false, ChatStyle.AQUA, null)).append(" ")
+            .append(ChatStyle.button(L.t("📁 Файлы"), c + "ls", false, ChatStyle.AQUA, null))));
     }
 }

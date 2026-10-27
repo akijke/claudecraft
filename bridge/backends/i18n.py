@@ -1,0 +1,239 @@
+"""Language of bridge messages (English by default, Russian optional).
+
+Bridge code writes its messages in Russian; they are translated in ONE place,
+when an event or an error leaves the bridge. Templates use {} for variable parts;
+variable parts are translated recursively (e.g. "Ошибка: Нет такой папки: X").
+Claude's own answers, file contents, diffs and paths are never translated.
+The language comes from the mod's settings file (config/claude-chat/client.json).
+"""
+import json
+import re
+
+EN = {
+    # --- generic -----------------------------------------------------------
+    'Новый чат': 'New chat', 'Думаю…': 'Thinking…', 'думает…': 'thinking…', 'Готово': 'Done',
+    'Отмена': 'Cancel', 'нет': 'none', 'чат': 'chat', 'ошибка': 'error', 'готово': 'done',
+    'Ошибка: {}': 'Error: {}', 'Проверь вход в аккаунт Claude: /c settings': 'Check your Claude login: /c settings',
+    'Текущий запрос прерван.': 'Current request stopped.',
+    'Остановлено; очередь очищена. История сохранена.': 'Stopped; queue cleared. History kept.',
+    'Очередь очищена.': 'Queue cleared.', 'В очереди: {}': 'Queued: {}', 'Новый чат создан.': 'New chat created.',
+    'Выбери чат:': 'Pick a chat:', 'Question must contain 1..8000 characters': 'Message must be 1..8000 characters',
+    'Queue is full (20)': 'Queue is full (20)',
+    'Расширения и коннекторы перезагружены для следующих запросов: {}':
+        'Extensions and connectors reloaded for the next requests: {}',
+    'Claude перезагрузил расширения: {}': 'Claude reloaded extensions: {}',
+    'Чат не найден (нужен id из /cc tasks)': 'Chat not found (use an id from /cc tasks)',
+    # --- status line -------------------------------------------------------
+    '{} | {} | {} | очередь {} | auto {} | {}': '{} | {} | {} | queue {} | auto {} | {}',
+    'ожидание': 'idle', 'работает': 'working', 'работает, f доступно': 'working, f available',
+    'проект {} · {}': 'project {} · {}', 'ждёт ответа': 'waiting for you', 'в очереди': 'queued',
+    # --- f / queue ---------------------------------------------------------
+    'Messages API: уже отправленный HTTP-запрос нельзя дополнить сообщением. Текущий ответ НЕ отменён и '
+    'продолжается. Используй q (очередь) или cancel, затем новый запрос. Для f выбери локальный чат: /c new local.':
+        'Messages API: a request already sent cannot be extended. The current answer was NOT cancelled and '
+        'continues. Use q (queue) or cancel and send again. For f, use a local chat: /c new local.',
+    'Сейчас нет живой сессии для f: сообщение выполнится следующим, без отмены текущей работы.':
+        'No live session for f right now: the message runs next, the current work is not cancelled.',
+    'Сообщение передано Claude, работа продолжается.': 'Message delivered to Claude, work continues.',
+    'Claude уже закончил ответ до получения f: сообщение выполнится следующим запросом в этой же сессии.':
+        'Claude finished before f arrived: it runs as the next request in the same session.',
+    'f не доставлено: {}': 'f not delivered: {}',
+    'f будет передано, как только Claude начнёт отвечать…': 'f will be delivered as soon as Claude starts answering…',
+    'Этот Claude CLI не подтверждает сообщения f; ответ на уже отправленные f может не показаться. Обнови Claude Code.':
+        'This Claude CLI does not acknowledge f messages; answers to them may not show. Update Claude Code.',
+    'Этот Claude CLI не подтверждает входящие сообщения (--replay-user-messages), поэтому f нельзя доставить без '
+    'риска потерять ответ. Обнови claude-agent-sdk / Claude Code или используй q. Текущая работа продолжается.':
+        'This Claude CLI does not acknowledge incoming messages (--replay-user-messages), so f cannot be delivered '
+        'safely. Update claude-agent-sdk / Claude Code or use q. Current work continues.',
+    'Обрабатываю дополнительное сообщение…': 'Handling the extra message…',
+    # --- permissions & questions -------------------------------------------
+    'Разрешить': 'Allow', 'Отклонить': 'Deny', 'Всегда разрешать {}': 'Always allow {}',
+    'Нет ответа 10 минут — {} отклонён.': 'No answer for 10 minutes — {} denied.',
+    '{} теперь разрешается без вопроса в этом чате (/cc auto off — сбросить).':
+        '{} is now allowed without asking in this chat (/cc auto off to reset).',
+    'Открой ссылку во внешнем браузере, затем нажми «Готово».': 'Open the link in your browser, then press “Done”.',
+    'Завершил действие в браузере?': 'Done in the browser?',
+    'Авторазрешение выключено: каждое действие спрашивает подтверждение.':
+        'Auto-approve is off: every action asks first.',
+    'Авторазрешение: чтение, поиск и правка файлов без вопросов; команды (Bash) и интернет спрашивают.':
+        'Auto-approve: reading, searching and editing files without asking; commands (Bash) and web still ask.',
+    'Авторазрешение ВСЕГО: Claude выполняет любые команды без вопросов, с правами моста. Будь осторожен.':
+        'Auto-approve EVERYTHING: Claude runs any command without asking, with the bridge\'s rights. Be careful.',
+    'Лимит подписки: {}': 'Subscription limit: {}', 'почти исчерпан': 'almost used up', 'исчерпан': 'used up',
+    # --- tokens ------------------------------------------------------------
+    'Токены': 'Tokens', 'Этот чат: {}': 'This chat: {}', 'Проект {}': 'Project {}', 'Все чаты': 'All chats',
+    'Стоимость — оценка Claude Code по ценам API; на подписке списывается лимит, а не деньги.':
+        'Cost is Claude Code\'s estimate at API prices; a subscription uses its limits, not money.',
+    'Токены из ответов Messages API.': 'Tokens from Messages API responses.',
+    # --- progress lines (describe.py) --------------------------------------
+    'Читаю {}': 'Reading {}', 'Создаю {}': 'Creating {}', 'Редактирую {}': 'Editing {}',
+    'Редактирую блокнот {}': 'Editing notebook {}', 'Ищу файлы {} в {}': 'Finding files {} in {}',
+    'Ищу файлы {}': 'Finding files {}', 'Ищу «{}» в {}': 'Searching “{}” in {}', 'Ищу «{}»': 'Searching “{}”',
+    'Смотрю папку {}': 'Listing {}', 'Ищу в интернете: {}': 'Web search: {}', 'Открываю {}': 'Fetching {}',
+    'Обновляю план': 'Updating the plan', 'План': 'Plan', 'Агент {}: {}': 'Agent {}: {}', 'помощник': 'helper',
+    'агент': 'agent', 'Задаю вопрос': 'Asking a question', 'Предлагаю открыть {}': 'Suggesting to open {}',
+    'Перезагружаю расширения': 'Reloading extensions',
+    # --- projects ----------------------------------------------------------
+    'Проекты': 'Projects', 'Нет проекта {}. Список: /cc project': 'No project {}. List: /cc project',
+    'Нет проекта {}': 'No project {}', 'Проект «{}» открыт. Claude работает в {}': 'Project “{}” opened. Claude works in {}',
+    'Проект «{}» создан и открыт: {}': 'Project “{}” created and opened: {}', 'Новый проект «{}»: {}': 'New project “{}”: {}',
+    'В проекте идёт работа — сначала cancel': 'Work is running in this project — cancel it first',
+    'Проект «{}» убран из списка (файлы на диске не тронуты).': 'Project “{}” removed from the list (files untouched).',
+    'project: list | open <имя> | here [имя] | add <имя> [путь] | new <имя> | rename <старое> <новое> | remove <имя>':
+        'project: list | open <name> | here [name] | add <name> [path] | new <name> | rename <old> <new> | remove <name>',
+    'Имя проекта: 1–40 символов, буквы, цифры, . _ -': 'Project name: 1–40 characters, letters, digits, . _ -',
+    'Проект {} уже есть': 'Project {} already exists', 'Эта папка уже проект «{}»': 'This folder is already project “{}”',
+    'Этот проект нельзя убрать': 'This project cannot be removed', 'workspace не переименовывается': 'workspace cannot be renamed',
+    # --- files -------------------------------------------------------------
+    'Нет такой папки: {}': 'No such folder: {}', 'Нет доступа: {}': 'Access denied: {}',
+    'Формат: cat <файл> [начало-конец]': 'Usage: cat <file> [start-end]', 'Нет такого файла: {}': 'No such file: {}',
+    'Это двоичный файл — не показываю': 'Binary file — not shown',
+    'Формат: find <шаблон>, например find *.java или find Main': 'Usage: find <pattern>, e.g. find *.java or find Main',
+    'Папка создана: {}': 'Folder created: {}', 'Файл создан: {}': 'File created: {}', 'Нет такого пути: {}': 'No such path: {}',
+    'Уже существует: {}': 'Already exists: {}', 'Скопировано: {} → {}': 'Copied: {} → {}', 'Перемещено: {} → {}': 'Moved: {} → {}',
+    'Слишком опасно удалять {}': 'Too dangerous to delete {}', 'Удалить {}? (внутри {} объектов)': 'Delete {}? ({} items inside)',
+    'Удалить {}?': 'Delete {}?', 'Удалено: {}': 'Deleted: {}', 'Открыто в {}: {}': 'Opened in {}: {}', 'Открыто: {}': 'Opened: {}',
+    'Не найден редактор (code, cursor, idea, subl) в PATH': 'No editor (code, cursor, idea, subl) found in PATH',
+    'Нужны два пути: откуда и куда': 'Two paths are needed: from and to',
+    # --- git -----------------------------------------------------------------
+    'git не найден в PATH — установи Git: git-scm.com': 'git not found in PATH — install Git: git-scm.com',
+    'gh не найден в PATH — установи GitHub CLI: cli.github.com': 'gh not found in PATH — install GitHub CLI: cli.github.com',
+    'Папки проекта нет: {}': 'Project folder is missing: {}', 'Создан git-репозиторий в {}': 'Git repository created in {}',
+    'Claude посмотрит изменения и сделает коммит.': 'Claude will review the changes and commit.',
+    'Коммит создан': 'Commit created', 'Создана и выбрана ветка {}': 'Created and switched to branch {}', 'Ветки': 'Branches',
+    'Формат: git switch <ветка>': 'Usage: git switch <branch>', 'stash: готово': 'stash: done',
+    'Формат: git clone <url> [имя проекта]': 'Usage: git clone <url> [project name]', 'Папка уже есть: {}': 'Folder already exists: {}',
+    'Склонировано в {}; проект «{}» открыт.': 'Cloned into {}; project “{}” opened.',
+    'Сначала открой проект: /cc project open <имя>': 'Open a project first: /cc project open <name>',
+    'gh не авторизован: выполни gh auth login в терминале': 'gh is not logged in: run gh auth login in a terminal',
+    'У проекта уже есть origin — используй git push': 'The project already has an origin — use git push',
+    'репозиторий создан': 'repository created', '{} {}: не завершилось за {} с': '{} {}: did not finish in {} s',
+    # --- agents & tasks ----------------------------------------------------
+    'Агенты': 'Agents', 'Задачи': 'Tasks', 'встроенный': 'built-in', 'свой': 'custom', 'проект': 'project', 'все': 'all',
+    'Имя агента: латиница в нижнем регистре, цифры, дефис (например my-helper)':
+        'Agent name: lowercase latin letters, digits, dash (e.g. my-helper)',
+    'Формат: agent new <имя> <чем занимается агент>': 'Usage: agent new <name> <what the agent does>',
+    'Удалить можно только своего агента; встроенный — выключить: agent off <имя>':
+        'Only custom agents can be removed; turn a built-in one off: agent off <name>',
+    'Нет агента {}': 'No agent {}', 'Нет включённого агента {}: /cc agents': 'No enabled agent {}: /cc agents',
+    'Запущено параллельно: {}': 'Started in parallel: {}', 'Формат: agent {} <задача>': 'Usage: agent {} <task>',
+    'agent <имя> <задача> | new <имя> <описание> | on/off <имя> | rm <имя>':
+        'agent <name> <task> | new <name> <description> | on/off <name> | rm <name>',
+    'Остановлено из менеджера задач.': 'Stopped from the task manager.',
+    # --- connectors ----------------------------------------------------------
+    'Коннекторы': 'Connectors', '{}: нужен ключ': '{}: key needed', '{}: ключи': '{}: keys',
+    'Коннектор {} подключён — заработает со следующего запроса /cc.': 'Connector {} enabled — active from the next /cc request.',
+    'Нет коннектора {}': 'No connector {}', 'Нет коннектора {}. Список: /cc connectors': 'No connector {}. List: /cc connectors',
+    '{}: неизвестный параметр {}': '{}: unknown parameter {}', '{}: слишком длинное или многострочное значение': '{}: value too long or multi-line',
+    'Нужен Node.js (npx) — установи с nodejs.org и перезапусти мост': 'Node.js (npx) is required — install it from nodejs.org and restart the bridge',
+    'Код и git': 'Code & git', 'Браузер и веб': 'Browser & web', 'Документация и поиск': 'Docs & search',
+    'Мышление и память': 'Thinking & memory', 'Базы данных': 'Databases', 'Облака и DevOps': 'Cloud & DevOps',
+    'Работа и дизайн': 'Work & design',
+    'github.com/settings/tokens (или берётся из gh auth token)': 'github.com/settings/tokens (or taken from gh auth token)',
+    'Issues, PR, ревью, Actions, поиск по репозиториям': 'Issues, PRs, reviews, Actions, repository search',
+    'для своего сервера, напр. https://git.company/api/v4': 'for a self-hosted server, e.g. https://git.company/api/v4',
+    'Проекты, merge requests, issues': 'Projects, merge requests, issues', 'Ошибки и трейсы из продакшена': 'Production errors and traces',
+    'Логи падений сборок CI': 'Logs of failed CI builds', 'порт встроенного веб-сервера IDE (обычно не нужен)': 'IDE built-in web server port (usually not needed)',
+    'Связь с открытой IntelliJ IDEA/PyCharm (нужен плагин MCP Server в IDE)': 'Talk to an open IntelliJ IDEA/PyCharm (needs the MCP Server plugin)',
+    'Управление браузером: открыть сайт, кликать, заполнять, скриншоты': 'Drive a browser: open sites, click, fill forms, screenshots',
+    'Отладка веб-страниц: консоль, сеть, производительность': 'Debug web pages: console, network, performance',
+    'Скачивание и разбор сайтов целиком': 'Crawl and extract whole websites',
+    'context7.com (необязательно, выше лимиты)': 'context7.com (optional, higher limits)',
+    'Актуальная документация библиотек и фреймворков': 'Up-to-date docs for libraries and frameworks',
+    'Веб-поиск': 'Web search', 'Поиск по коду и статьям для разработчиков': 'Search code and developer articles',
+    'Пошаговое решение сложных задач': 'Step-by-step reasoning for hard problems',
+    'Долгая память: факты о проектах между сессиями': 'Long-term memory: project facts across sessions',
+    'Схема и SELECT-запросы (только чтение)': 'Schema and SELECT queries (read-only)', 'Коллекции и запросы': 'Collections and queries',
+    'Проекты, таблицы, миграции, edge-функции': 'Projects, tables, migrations, edge functions',
+    'Serverless Postgres: базы, ветки, запросы': 'Serverless Postgres: databases, branches, queries',
+    'Кластеры из ~/.kube/config: поды, логи, деплой': 'Clusters from ~/.kube/config: pods, logs, deploys',
+    'Деплой на Railway (нужен railway login)': 'Deploy to Railway (needs railway login)', 'Приложения, логи, dyno': 'Apps, logs, dynos',
+    'dashboard.stripe.com/apikeys (лучше тестовый ключ)': 'dashboard.stripe.com/apikeys (a test key is safer)',
+    'Платежи, клиенты, подписки': 'Payments, customers, subscriptions', 'Страницы и базы Notion': 'Notion pages and databases',
+    'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
+    'Макеты Figma для вёрстки': 'Figma designs for implementation',
+    # --- account -------------------------------------------------------------
+    'Claude Code CLI не найден: установи claude-agent-sdk или укажи cli_path': 'Claude Code CLI not found: install claude-agent-sdk or set cli_path',
+    'API-ключ выглядит неверно': 'The API key looks wrong', 'Claude CLI не ответил вовремя': 'Claude CLI did not answer in time',
+    'код выхода {}': 'exit code {}', 'Вставь код со страницы входа одной строкой': 'Paste the code from the sign-in page as one line',
+    'Вход не запущен: нажми «Войти»': 'Sign-in is not running: press “Sign in”', 'Выход не удался: {}': 'Sign-out failed: {}',
+    'Нет API-ключа: добавь его в /c settings (или ANTHROPIC_API_KEY в окружении моста)':
+        'No API key: add it in /c settings (or ANTHROPIC_API_KEY in the bridge environment)',
+}
+
+_SETTINGS = {'mtime': None, 'lang': 'en'}
+_PATTERNS = []
+
+
+def _compile():
+    """Templates with {} become anchored regexes; more specific (longer) ones first."""
+    items = sorted((k for k in EN if '{}' in k), key=lambda k: -len(k.replace('{}', '')))
+    for key in items:
+        regex = '^' + '(.+?)'.join(re.escape(part) for part in key.split('{}')) + '$'
+        _PATTERNS.append((re.compile(regex, re.S), EN[key]))
+
+
+_compile()
+CYRILLIC = re.compile('[А-Яа-яЁё]')
+
+
+def language(directory):
+    """'en' (default) or 'ru', from the mod's client.json (re-read when it changes)."""
+    path = directory / 'client.json'
+    try:
+        mtime = path.stat().st_mtime
+        if mtime != _SETTINGS['mtime']:
+            _SETTINGS['mtime'] = mtime
+            _SETTINGS['lang'] = 'ru' if json.loads(path.read_text(encoding='utf-8')).get('language') == 'ru' else 'en'
+    except (OSError, ValueError):
+        _SETTINGS['lang'] = 'en'
+    return _SETTINGS['lang']
+
+
+def to_english(text, depth=0):
+    if not isinstance(text, str) or not CYRILLIC.search(text) or depth > 4:
+        return text
+    if '\n' in text:
+        return '\n'.join(to_english(line, depth) for line in text.split('\n'))
+    if text in EN:
+        return EN[text]
+    for regex, target in _PATTERNS:
+        m = regex.match(text)
+        if m:
+            return _fill(target, [to_english(g, depth + 1) for g in m.groups()])
+    return text
+
+
+def _fill(target, parts):
+    pieces = target.split('{}')
+    out = pieces[0]
+    for part, piece in zip(parts, pieces[1:]):
+        out += part + piece
+    return out
+
+
+# Event fields that carry bridge-written UI text (never Claude content or paths).
+UI_KEYS = {'note', 'summary', 'step', 'state', 'source', 'group', 'about', 'hint', 'label', 'title'}
+CONTENT_KINDS = {'text', 'text_part', 'file', 'diff', 'history', 'tool_error', 'listing', 'tree', 'found',
+                 'cwd', 'git_status', 'git_log', 'git_branches', 'git_none'}
+
+
+def translate_event(event, lang):
+    if lang != 'en':
+        return event
+    out = dict(event)
+    if out.get('kind') not in CONTENT_KINDS and out.get('kind') != 'question':
+        out['text'] = to_english(out.get('text', ''))
+    if out.get('kind') == 'permission' and isinstance(out.get('choices'), list):
+        out['choices'] = [to_english(c) for c in out['choices']]
+    if out.get('kind') == 'question' and out.get('text') == 'Завершил действие в браузере?':
+        out['text'] = to_english(out['text'])
+        out['choices'] = [to_english(c) for c in out.get('choices', [])]
+    for key in UI_KEYS & out.keys():
+        out[key] = to_english(out[key])
+    if isinstance(out.get('rows'), list) and out.get('kind') in ('tokens', 'tasks', 'agents', 'connectors', 'chats', 'projects'):
+        out['rows'] = [{k: (to_english(v) if k in UI_KEYS else v) for k, v in r.items()} if isinstance(r, dict) else r
+                       for r in out['rows']]
+    if isinstance(out.get('fields'), list):
+        out['fields'] = [{k: (to_english(v) if k in UI_KEYS else v) for k, v in f.items()} for f in out['fields']]
+    return out

@@ -82,7 +82,7 @@ final class ConversationScreen extends Screen {
             catch (Exception e) { return null; }
         }, mod.io).thenAccept(result -> minecraft.execute(() -> {
             fetching = false;
-            if (result == null) { mod.notice = "Мост недоступен — /claude"; return; }
+            if (result == null) { mod.notice = L.t("Мост недоступен — /claude"); return; }
             String before = selectedChat() + "|" + chatsKey(state);
             state = result;
             String chat = selectedChat();
@@ -151,7 +151,7 @@ final class ConversationScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal("✦ " + project).withColor(ChatStyle.CODE_MODE),
                     b -> mod.runLine(mode, "/cc project"))
                 .bounds(left, y, panel, 20)
-                .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + "\nСменить проект"))).build());
+                .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + L.t("\nСменить проект")))).build());
             y += 24;
         }
         String selected = selectedChat();
@@ -170,22 +170,22 @@ final class ConversationScreen extends Screen {
             addRenderableWidget(b);
             y += 22;
         }
-        addRenderableWidget(Button.builder(Component.literal("+ Новый чат"), b -> { mod.dispatch(mode, "new"); nextState = 0; })
+        addRenderableWidget(Button.builder(Component.literal(L.t("+ Новый чат")), b -> { mod.dispatch(mode, "new"); nextState = 0; })
             .bounds(left, y, panel, 20).build());
 
         int bw = (panel - 2) / 2;  // two per row so labels are not cut
-        addRenderableWidget(small("Файлы", "/" + mode + " ls", "Файловый менеджер", left, height - 70, bw));
-        addRenderableWidget(small("Агенты", "/cc agents", "Агенты-помощники", left + bw + 2, height - 70, bw));
-        addRenderableWidget(small("Задачи", "/cc tasks", "Все работающие задачи и агенты", left, height - 48, bw));
-        addRenderableWidget(small("Git", "/cc git", "Git текущего проекта", left + bw + 2, height - 48, bw));
-        addRenderableWidget(small("MCP", "/cc connectors", "Коннекторы", left, height - 26, bw));
+        addRenderableWidget(small(L.t("Файлы"), "/" + mode + " ls", L.t("Файловый менеджер"), left, height - 70, bw));
+        addRenderableWidget(small(L.t("Агенты"), "/cc agents", L.t("Агенты-помощники"), left + bw + 2, height - 70, bw));
+        addRenderableWidget(small(L.t("Задачи"), "/cc tasks", L.t("Все работающие задачи и агенты"), left, height - 48, bw));
+        addRenderableWidget(small("Git", "/cc git", L.t("Git текущего проекта"), left + bw + 2, height - 48, bw));
+        addRenderableWidget(small("MCP", "/cc connectors", L.t("Коннекторы"), left, height - 26, bw));
         addRenderableWidget(Button.builder(Component.literal("⚙"), b -> mod.runLine(mode, "/claude"))
-            .bounds(left + bw + 2, height - 26, bw, 20).tooltip(Tooltip.create(Component.literal("Настройки"))).build());
+            .bounds(left + bw + 2, height - 26, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Настройки")))).build());
 
         int inputW = mainW - 92;
         input = new MultiLineEditBox.Builder()
-            .setPlaceholder(Component.literal(mode.equals("cc") ? "Задача для Claude Code… (Ctrl+Enter — отправить, /cc … — команда)"
-                : "Сообщение Claude… (Ctrl+Enter — отправить)"))
+            .setPlaceholder(Component.literal(mode.equals("cc") ? L.t("Задача для Claude Code… (Ctrl+Enter — отправить, /cc … — команда)")
+                : L.t("Сообщение Claude… (Ctrl+Enter — отправить)")))
             .build(font, inputW, 52, Component.literal("input"));
         input.setX(mainX);
         input.setY(height - 58);
@@ -193,12 +193,12 @@ final class ConversationScreen extends Screen {
         input.setValue(draft);
         addRenderableWidget(input);
         int bx = mainX + inputW + 4;
-        addRenderableWidget(Button.builder(Component.literal("Отправить"), b -> submit(""))
-            .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal("В очередь (Ctrl+Enter)"))).build());
+        addRenderableWidget(Button.builder(Component.literal(L.t("Отправить")), b -> submit(""))
+            .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal(L.t("В очередь (Ctrl+Enter)")))).build());
         addRenderableWidget(Button.builder(Component.literal("f"), b -> submit("f "))
-            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal("Дописать в текущую работу, без отмены"))).build());
+            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Дописать в текущую работу, без отмены")))).build());
         addRenderableWidget(Button.builder(Component.literal("⏹"), b -> mod.dispatch(mode, "cancel"))
-            .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal("Остановить и очистить очередь"))).build());
+            .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Остановить и очистить очередь")))).build());
         setInitialFocus(input);
         dirty = true;
     }
@@ -251,7 +251,7 @@ final class ConversationScreen extends Screen {
             if (line == null) return true;
             if (event.button() == 1) {  // right click: copy the line
                 minecraft.keyboardHandler.setClipboard(plain(line));
-                mod.notice = "Строка скопирована";
+                mod.notice = L.t("Строка скопирована");
                 return true;
             }
             Style style = styleAt(line, (int) x - mainX - 4);
@@ -316,10 +316,10 @@ final class ConversationScreen extends Screen {
             y += 9;
         }
         if (lines.isEmpty())
-            g.centeredText(font, mode.equals("cc") ? "Напиши задачу внизу или открой проект слева" : "Напиши сообщение внизу",
+            g.centeredText(font, mode.equals("cc") ? L.t("Напиши задачу внизу или открой проект слева") : L.t("Напиши сообщение внизу"),
                 mainX + mainW / 2, mainY + mainH / 2, 0xFF707070);
         if (scroll > 0)
-            g.text(font, "↓ ещё " + scroll + " строк ниже (колесо мыши)", mainX + mainW - 170, mainY + mainH - 11, 0xFFF2C14E);
+            g.text(font, L.t("↓ ещё ") + scroll + L.t(" строк ниже (колесо мыши)"), mainX + mainW - 170, mainY + mainH - 11, 0xFFF2C14E);
         // Hover text of buttons inside the log.
         if (mouseX >= mainX && mouseX < mainX + mainW && mouseY >= mainY && mouseY < mainY + mainH) {
             FormattedCharSequence line = lineAt(mouseY);

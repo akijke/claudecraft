@@ -10,8 +10,8 @@ from pathlib import Path
 import re
 import shutil
 
-COMMIT_PROMPT = ('Посмотри изменения в этом проекте (git status, git diff) и сделай git-коммит '
-                 'с понятным сообщением (conventional commits, по-английски). Не делай push.')
+COMMIT_PROMPT = ('Review the changes in this project (git status, git diff) and make a git commit with a '
+                 'clear message (conventional commits, in English). Do not push.')
 
 
 def https_url(remote):
@@ -156,7 +156,7 @@ class Git:
         if not message:
             # "Write the message for me": hand it to Claude in the current project chat.
             chat = self.bridge.current_chat('cc')
-            await self.bridge.enqueue(chat, COMMIT_PROMPT)
+            await self.bridge.enqueue(chat, self.bridge.prompt(COMMIT_PROMPT))
             self.emit(mode, 'Claude посмотрит изменения и сделает коммит.', kind='status')
             return
         await self.ok('add', '-A')
