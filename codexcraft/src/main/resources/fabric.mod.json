@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "codexcraft",
+  "version": "${version}",
+  "name": "Codexcraft",
+  "description": "Codex addon for Claudecraft: /gpt conversations and /codex development.",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.codexcraft.ClaudeChat"],
+    "modmenu": ["dev.codexcraft.ModMenuEntry"]
+  },
+  "depends": {
+    "claude_chat": ">=1.1.0",
+    "fabricloader": ">=0.20.1",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": { "modmenu": "*" }
+}

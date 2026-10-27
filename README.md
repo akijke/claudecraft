@@ -1,6 +1,9 @@
 # claudecraft
 open source claude integration for minecraft
 
+Аддон **[Codexcraft](codexcraft/README.md)** добавляет `/gpt` и `/codex`, отдельное
+окно на J и подключение официального Codex CLI. Сборка: `gradlew :codexcraft:build`.
+
 Claudecraft 1.1 — Minecraft Java 26.3 / Fabric. Инструмент программиста внутри
 Minecraft: Claude и Claude Code с проектами, файловым менеджером, git, агентами
 и MCP-коннекторами.

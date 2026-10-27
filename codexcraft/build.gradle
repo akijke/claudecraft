@@ -1,0 +1,147 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+version = rootProject.mod_version
+group = 'dev.codexcraft'
+base { archivesName = 'codexcraft' }
+
+loom {
+    splitEnvironmentSourceSets()
+    runs {
+        shots {
+            client()
+            name = 'Codexcraft screenshots'
+            vmArg '-Dcodexcraft.devshots=true'
+            runDir 'run'
+        }
+    }
+    mods {
+        codexcraft {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+repositories { maven { url = 'https://maven.terraformersmc.com/releases/' } }
+dependencies {
+    runtimeOnly files(rootProject.tasks.named('jar').flatMap { it.archiveFile })
+    minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+    compileOnly "com.terraformersmc:modmenu:${rootProject.modmenu_version}"
+}
+
+// Reuse the tested UI and workspace implementation without maintaining a fork.
+// Generated copies have private packages, config, resources and commands; they
+// never register Claudecraft's shortcuts or share its session store.
+def branded = { String s ->
+    s.replace('ClaudeChat', '__SharedClient__').replace('dev.claudechat', 'dev.codexcraft')
+        .replace('claude_chat', 'codexcraft').replace('claude-chat', 'codexcraft')
+        .replace('claudecraft', 'codexcraft').replace('Claudecraft', 'Codexcraft')
+        .replace('Claude Code', 'Codex').replace('Claude', 'GPT')
+        .replaceAll('/cc\\b', '/codex').replaceAll('/c\\b', '/gpt')
+        .replace('/claude', '/codexcraft')
+        .replace('(K)', '(J)')
+        .replace('__SharedClient__', 'ClaudeChat')
+}
+def generated = layout.buildDirectory.dir('generated/shared')
+// Applied only to generated addon Java; the shared Claude UI keeps its palette.
+def codexColours = { String s ->
+    def palette = [
+        'D97757': '53E0BA', 'B48EF0': '64B5FF', 'E8E8E8': 'E0EEF5',
+        '8A8A8A': '92AFBF', '5E5E5E': '607E91', '6BD08B': '7CE1B7',
+        'F0626A': 'FF7D8A', 'F2C14E': 'F3CC78', '5CC8E6': '70D9EF',
+        'E5C07B': 'A5D9ED', '9CDCFE': 'C2E8FF', '6CA8FF': '64B5FF'
+    ]
+    palette.each { before, after ->
+        s = s.replace("0x${before}", "0x${after}").replace("0xFF${before}", "0xFF${after}")
+    }
+    s
+}
+tasks.register('generateShared') {
+    inputs.dir rootProject.file('src/client/java/dev/claudechat')
+    inputs.dir rootProject.file('src/main/resources/assets/claude_chat')
+    inputs.dir rootProject.file('bridge')
+    outputs.dir generated
+    doLast {
+        def out = generated.get().asFile
+        rootProject.fileTree('src/client/java/dev/claudechat').matching {
+            include '*.java'; exclude 'SettingsScreen.java'
+        }.each { source ->
+            def target = new File(out, "java/dev/codexcraft/${source.name}")
+            target.parentFile.mkdirs()
+            def code = codexColours(branded(source.getText('UTF-8')))
+                .replace('"/" + mode', '"/" + (mode.equals("c") ? "gpt" : "codex")')
+            if (source.name == 'ClaudeChat.java') {
+                code = code.replace('literal(mode)', 'literal(mode.equals("c") ? "gpt" : "codex")')
+                    .replace('literal("claude")', 'literal("codexcraft")')
+                    .replace('SHORTCUTS.entrySet()', 'java.util.Collections.<String, String>emptyMap().entrySet()')
+                    .replace('case "c", "cc" ->', 'case "gpt", "codex" ->')
+                    .replace('help(parts[0]); else dispatch(parts[0], rest);',
+                        'help(parts[0].equals("gpt") ? "c" : "cc"); else dispatch(parts[0].equals("gpt") ? "c" : "cc", rest);')
+                    .replace('case "claude" ->', 'case "codexcraft" ->')
+                    .replace('InputConstants.KEY_K', 'InputConstants.KEY_J')
+                    .replace('"tokens", "usage", "auto",', '"tokens", "usage", "auto", "model",')
+                    .replace('{"/codex agents", L.t("агенты · agent <имя> <задача> · spawn — параллельно · tasks")}',
+                        '{"/codex spawn", L.t("параллельная задача · tasks — список задач")}')
+                    .replace('настройки, вход в аккаунт, API-ключ', 'настройки и вход через ChatGPT')
+            }
+            if (source.name == 'ConversationScreen.java') {
+                code = code.replace('tab("GPT",', 'tab("GPT",').replace('tab("Code",', 'tab("Codex",')
+                    .replace('"/" + mode + " ls"', '"/" + (mode.equals("c") ? "gpt" : "codex") + " ls"')
+                    .replace('small(L.t("Агенты"), "/codex agents", L.t("Агенты-помощники")',
+                        'small("Model", "/codex model", "Codex model"')
+                    .replace('g.fill(0, 0, width, height, 0xB0101014);',
+                        'g.fill(0, 0, width, height, CodexTheme.BACKDROP);\n' +
+                        '        CodexTheme.panel(g, left - 2, 19, mainX - left - 4, height - 23, CodexTheme.GPT);')
+                    .replace('g.fill(mainX - 2, mainY - 2, mainX + mainW, mainY + mainH, 0x90000000);',
+                        'CodexTheme.panel(g, mainX - 2, mainY - 2, mainW + 2, mainH + 2, mode.equals("cc") ? CodexTheme.CODEX : CodexTheme.GPT);')
+                    .replace('Button.builder(Component.literal(label), b -> mod.runLine',
+                        'Button.builder(Component.literal(label).withColor(CodexTheme.LINK), b -> mod.runLine')
+            }
+            if (source.name == 'ChatStyle.java') {
+                code = code.replace('lit("✦ GPT", CLAUDE)',
+                    'lit(mode.equals("cc") ? "✦ Codex" : "✦ GPT", mode.equals("cc") ? CODE_MODE : CLAUDE)')
+            }
+            target.setText(code, 'UTF-8')
+        }
+        rootProject.fileTree('src/main/resources/assets/claude_chat').each { source ->
+            def rel = rootProject.file('src/main/resources/assets/claude_chat').toPath().relativize(source.toPath())
+            def target = new File(out, "resources/assets/codexcraft/${rel.toString().replace('claudecraft_en', 'codexcraft_en')}")
+            target.parentFile.mkdirs()
+            target.setText(branded(source.getText('UTF-8')), 'UTF-8')
+        }
+        def core = new File(out, 'resources/codexcraft/bridge/core.py')
+        core.parentFile.mkdirs()
+        core.setText(branded(rootProject.file('bridge/bridge.py').getText('UTF-8'))
+            .replace("default=18741", "default=18742"), 'UTF-8')
+        rootProject.fileTree('bridge/backends').matching { include '*.py'; exclude 'account.py' }.each { source ->
+            def target = new File(core.parentFile, "backends/${source.name}")
+            target.parentFile.mkdirs()
+            // Keep SDK protocol identifiers intact: this module only supplies TurnClosed.
+            target.setText(source.getText('UTF-8'), 'UTF-8')
+        }
+    }
+}
+sourceSets.client.java.srcDir(generated.map { it.dir('java') })
+sourceSets.main.resources.srcDir(generated.map { it.dir('resources') })
+tasks.named('compileClientJava') { dependsOn 'generateShared' }
+processResources {
+    dependsOn 'generateShared'
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
+    from('bridge') {
+        into 'codexcraft/bridge'
+        include '*.py', 'requirements.txt', 'backends/*.py'
+    }
+}
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
+tasks.named('sourcesJar') { dependsOn 'generateShared' }
+tasks.withType(Jar).configureEach {
+    exclude '**/__pycache__/**', '**/*.pyc'
+}
