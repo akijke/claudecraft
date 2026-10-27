@@ -77,6 +77,8 @@ final class WorkStyle {
             case "project_opened" -> {
                 out.add(line("cc", lit(L.t("✦ Проект "), CODE_MODE).append(lit(s(e, "name"), TEXT).withStyle(st -> st.withBold(true)))
                     .append(lit("  " + s(e, "path"), DIM))));
+                if (n(e, "synced") > 0)
+                    out.add(line("cc", lit("  ⇄ " + L.t("С ПК подтянуто сессий: ") + n(e, "synced"), GREEN)));
                 out.add(line("cc", Component.literal("  ").append(button(L.t("☰ Чаты"), "/cc chats", false, AQUA, null)).append(sp())
                     .append(button("⇄ Git", "/cc git", false, GREEN, null)).append(sp())
                     .append(button(L.t("📁 Файлы"), "/cc cd @", false, DIR, L.t("Файловый менеджер в папке проекта"))).append(sp())
@@ -125,6 +127,32 @@ final class WorkStyle {
                 out.add(line(mode, Component.literal("  ").append(button(L.t("🔑 Ввести ключ"), "/claude key " + id, false, GOLD,
                     L.t("Откроется окно с полем ввода; ключ не попадёт в чат")))));
             }
+            case "shell_start" -> out.add(line(mode, lit("$ ", GREEN).append(lit(s(e, "text"), TEXT).withStyle(st -> st.withBold(true)))
+                .append(lit("  " + s(e, "shell") + " · " + s(e, "cwd"), FAINT)).append(sp())
+                .append(button("⏹", "/kill " + s(e, "job"), false, RED, L.t("Остановить команду")))));
+            case "shell_out" -> {
+                for (String raw : clean(s(e, "text")).split("\\R", -1))
+                    out.add(line(mode, lit("│ ", FAINT).append(lit(raw, 0xD0D0D0))));
+            }
+            case "shell_end" -> {
+                boolean killed = b(e, "killed");
+                Integer code = e.has("code") && !e.get("code").isJsonNull() ? e.get("code").getAsInt() : null;
+                boolean ok = code != null && code == 0;
+                MutableComponent c = lit(killed ? "⏹ " + L.t("остановлено") : ok ? "✔ exit 0" : "✖ exit " + code,
+                    killed ? GOLD : ok ? GREEN : RED);
+                if (e.has("seconds")) c.append(lit("  " + e.get("seconds").getAsDouble() + L.t(" с"), FAINT));
+                if (n(e, "cut") > 0) c.append(lit("  " + L.t("вывод обрезан: ещё ") + n(e, "cut"), DIM));
+                c.append(sp()).append(button("↻", "/sh " + s(e, "text"), true, AQUA, L.t("Повторить (можно изменить)")));
+                out.add(line(mode, c));
+            }
+            case "terminal" -> {
+                out.add(line("cc", lit("▶ ", GREEN).append(lit(L.t("Открыт терминал на ПК: "), TEXT))
+                    .append(Component.literal(s(e, "command")).withStyle(st -> st.withColor(ChatStyle.CODE)
+                        .withClickEvent(new ClickEvent.CopyToClipboard(s(e, "command")))
+                        .withHoverEvent(new HoverEvent.ShowText(lit(L.t("Клик — скопировать команду"), TEXT)))))));
+                out.add(line("cc", lit("  " + L.t("Та же сессия: в игре и на ПК видно одно и то же. Не пиши в неё в двух местах одновременно."),
+                    b(e, "busy") ? GOLD : FAINT)));
+            }
             case "chats" -> { return false; }
             default -> { return false; }
         }
@@ -148,6 +176,8 @@ final class WorkStyle {
             out.add(line("cc", lit("      " + s(r, "path"), FAINT)));
         }
         out.add(line("cc", Component.literal("  ")
+            .append(button(L.t("📁 Выбрать папку…"), "/cc project pick", false, GREEN,
+                L.t("Окно выбора папки на ПК; сессии Claude Code этой папки подтянутся сами"))).append(sp())
             .append(button(L.t("+ здесь"), "/cc project here", false, GOLD, L.t("Проект из папки обзора: ") + s(e, "browsing"))).append(sp())
             .append(button(L.t("+ новый"), "/cc project new ", true, GOLD, L.t("Создать папку в workspace"))).append(sp())
             .append(button(L.t("+ по пути"), "/cc project add ", true, GOLD, L.t("project add <имя> <путь>"))).append(sp())

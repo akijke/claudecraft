@@ -262,7 +262,10 @@ final class ChatStyle {
         }
         MutableComponent buttons = Component.literal("  ").append(button(L.t("+ Новый"), "/" + mode + " new local", false, GOLD, null));
         if (mode.equals("c")) buttons.append(" ").append(button("+ API", "/c new api", false, GOLD, L.t("Чат через Messages API")));
-        else buttons.append(" ").append(button(L.t("Импорт CLI"), "/cc local", false, GOLD, L.t("Сессии Claude Code из workspace")));
+        else buttons.append(" ").append(button(L.t("⇄ Синхр. с ПК"), "/cc sync", false, GREEN,
+                L.t("Подтянуть сессии Claude Code этой папки с ПК (терминал, приложение Claude)")))
+            .append(" ").append(button(L.t("▶ Продолжить на ПК"), "/cc pc", false, AQUA,
+                L.t("Открыть терминал на ПК в этой же сессии (claude --resume)")));
         out.add(line(mode, buttons));
     }
 

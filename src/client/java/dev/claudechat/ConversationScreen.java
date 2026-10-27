@@ -150,8 +150,11 @@ final class ConversationScreen extends Screen {
             String project = state.get("project").getAsString();
             addRenderableWidget(Button.builder(Component.literal("✦ " + project).withColor(ChatStyle.CODE_MODE),
                     b -> mod.runLine(mode, "/cc project"))
-                .bounds(left, y, panel, 20)
+                .bounds(left, y, panel - 24, 20)
                 .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + L.t("\nСменить проект")))).build());
+            addRenderableWidget(Button.builder(Component.literal("+"), b -> FolderPicker.pick(mod))
+                .bounds(left + panel - 22, y, 22, 20)
+                .tooltip(Tooltip.create(Component.literal(L.t("Открыть папку на ПК как проект")))).build());
             y += 24;
         }
         String selected = selectedChat();

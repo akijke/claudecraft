@@ -18,6 +18,8 @@ from backends.agents import Agents
 from backends.connectors import Connectors
 from backends.files import FileManager
 from backends.gitops import Git
+from backends.shell import Shell
+from backends.github import GitHub
 from backends.projects import DEFAULT as DEFAULT_PROJECT, Projects
 from backends.util import save_json  # noqa: F401  (re-exported for older imports)
 from backends.i18n import language, to_english, translate_event
@@ -41,6 +43,7 @@ class Chat:
     allowed: list = field(default_factory=list)  # tools approved with "always"
     usage: dict = field(default_factory=dict)    # token/cost totals for /c tokens
     updated: float = 0.0
+    origin: str = ''                 # 'pc' = session found in Claude Code on the PC
     cwd: str | None = None           # legacy field (old `cd`), ignored
     run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     step: str = ''                   # last progress line, for the task manager
@@ -53,7 +56,7 @@ class Chat:
 
 
 SAVED = ('id', 'mode', 'backend', 'title', 'sdk_id', 'messages', 'project', 'session_cwd', 'auto',
-         'allowed', 'usage', 'updated')
+         'allowed', 'usage', 'updated', 'origin')
 
 
 class Bridge:
@@ -77,6 +80,8 @@ class Bridge:
         self.agents = Agents(self)
         self.files = FileManager(self)
         self.git = Git(self)
+        self.shell = Shell(self)
+        self.github = GitHub(self)
         self.extensions = {}
         self.reload_extensions()
         self.chats = {}
@@ -217,6 +222,42 @@ class Bridge:
         self.files.cwd['cc'] = self.projects.path_of(name)
         self.projects.save()
         return self.current_chat('cc')
+
+    async def sync_sessions(self, name=None):
+        """Import Claude Code sessions of the project folder from the PC (shared ~/.claude store).
+
+        Sessions started in a terminal / the Claude app show up as chats; chats started here
+        are already the same sessions there. Returns how many sessions were new."""
+        name = name or self.projects.current
+        folder = self.projects.path_of(name)
+        try:
+            from claude_agent_sdk import list_sessions
+            sessions = await asyncio.to_thread(list_sessions, directory=folder, limit=50, include_worktrees=False)
+        except Exception:  # missing SDK or unreadable store: syncing is best effort
+            return 0
+        from backends.terminal import session_title
+        by_sdk = {c.sdk_id: c for c in self.chats.values() if c.sdk_id}
+        new = 0
+        for session in sessions:
+            when = (session.last_modified or 0) / 1000
+            chat = by_sdk.get(session.session_id)
+            if chat:
+                chat.updated = max(chat.updated, when)  # continued on the PC → moves up the list
+                continue
+            imported = Chat(uid(), 'cc', 'local', session_title(session), session.session_id,
+                            project=name, session_cwd=session.cwd or folder, updated=when, origin='pc')
+            self.chats[imported.id] = imported
+            new += 1
+        if new or sessions:
+            self.persist()
+        return new
+
+    def safe_project_name(self, folder):
+        base = re.sub(r'[^\w.\-]+', '-', folder.name, flags=re.UNICODE).strip('-.')[:36] or 'project'
+        name, n = base, 2
+        while name in self.projects.items:
+            name, n = f'{base}-{n}', n + 1
+        return name
 
     def chat_cwd(self, chat):
         """Folder Claude works in for this chat."""
@@ -422,8 +463,8 @@ class Bridge:
     # ---- menus ------------------------------------------------------------
     def chat_menu(self, mode):
         chat = self.current_chat(mode)
-        rows = [{'id': c.id, 'label': f'{c.backend}: {c.title}', 'selected': c.id == chat.id,
-                 'running': bool(c.task), 'queue': len(c.queue)}
+        rows = [{'id': c.id, 'label': ('PC · ' if c.origin == 'pc' else '') + c.title, 'selected': c.id == chat.id,
+                 'running': bool(c.task), 'queue': len(c.queue), 'origin': c.origin, 'session': bool(c.sdk_id)}
                 for c in sorted(self.chats.values(), key=lambda c: -c.updated)
                 if c.mode == mode and (mode == 'c' or c.project == self.projects.current)]
         self.emit(chat, 'Выбери чат:', kind='chats', rows=rows,
@@ -440,19 +481,31 @@ class Bridge:
         if not sub or sub == 'list':
             return self.projects_menu(mode)
         if sub == 'open':
+            if rest not in self.projects.items:
+                raise ValueError(f'Нет проекта {rest}. Список: /cc project')
+            # Pull PC sessions first, so opening picks the newest of them instead of a blank chat.
+            new = await self.sync_sessions(rest)
             chat = self.open_project(rest)
             self.emit(chat, f'Проект «{rest}» открыт. Claude работает в {self.projects.path_of(rest)}',
-                      kind='project_opened', path=self.projects.path_of(rest), name=rest)
+                      kind='project_opened', path=self.projects.path_of(rest), name=rest, synced=new)
             return self.chat_menu('cc')
+        if sub == 'pick':
+            # Folder chosen in the system dialog of the game (any folder on the PC).
+            folder = Path(rest.strip().strip('"')).expanduser()
+            if not folder.is_dir():
+                raise ValueError(f'Нет такой папки: {folder}')
+            name = self.projects.find_by_path(folder) or self.projects.add(self.safe_project_name(folder), folder)
+            return await self.project_command(mode, f'open {name}')
         if sub in ('add', 'here'):
             # add <name> [path]  |  here [name]  (path = the file manager's folder)
             name, _, path = rest.partition(' ')
             folder = Path(path.strip().strip('"')) if path.strip() else self.files.here(mode)
             name = name or folder.name
             self.projects.add(name, folder)
+            new = await self.sync_sessions(name)
             self.open_project(name)
             self.emit(self.current_chat('cc'), f'Проект «{name}» создан и открыт: {folder}',
-                      kind='project_opened', path=str(folder), name=name)
+                      kind='project_opened', path=str(folder), name=name, synced=new)
             return self.projects_menu(mode)
         if sub == 'new':
             name = self.projects.check_name(rest)
@@ -677,7 +730,38 @@ class Bridge:
             self.persist()
             self.chat_menu(mode)
         elif action == 'chat':
+            if mode == 'cc':
+                await self.sync_sessions()
             self.chat_menu(mode)
+        elif action == 'sh':
+            # /sh <cmd> (system shell), /ps, /cmd, /bash <cmd>; `kill [id]` stops running commands.
+            kind, _, rest = text.partition(' ')
+            if kind not in ('auto', 'ps', 'cmd', 'bash'):
+                kind, rest = 'auto', text
+            if rest.strip() in ('kill', 'stop') or rest.strip().startswith(('kill ', 'stop ')):
+                await self.shell.kill(rest.strip().partition(' ')[2].strip() or None)
+            else:
+                await self.shell.run(mode, kind, rest)
+        elif action == 'gh_login':
+            await self.github.login()
+        elif action == 'gh_cancel':
+            await self.github.cancel()
+        elif action == 'gh_logout':
+            await self.github.logout()
+        elif action == 'gh_token':
+            self.github.set_token(data.get('secret') or text)
+        elif action == 'gh_connector':
+            self.github.connector(text.strip() != 'off')
+        elif action == 'sync':
+            new = await self.sync_sessions()
+            self.emit(chat, f'Синхронизировано с Claude Code на ПК: новых сессий {new}.', kind='status')
+            self.chat_menu('cc')
+        elif action == 'terminal':
+            from backends.terminal import open_terminal
+            target = self.current_chat('cc')
+            line = await asyncio.to_thread(open_terminal, self.chat_cwd(target), self.config, target.sdk_id)
+            self.emit(target, f'Открыт терминал: {line}', kind='terminal', command=line,
+                      folder=self.chat_cwd(target), busy=bool(target.task))
         elif action == 'rename':
             name = text.strip()
             if not name or len(name) > 80:
@@ -713,18 +797,8 @@ class Bridge:
         elif action == 'local':
             if mode != 'cc':
                 raise ValueError('Use /cc local to import CLI coding sessions')
-            from claude_agent_sdk import list_sessions
-            folder = self.projects.path_of_current()
-            sessions = await asyncio.to_thread(list_sessions, directory=folder, limit=30)
-            known = {c.sdk_id for c in self.chats.values()}
-            for session in sessions:
-                if session.session_id not in known:
-                    imported = Chat(uid(), 'cc', 'local', session.summary or session.session_id[:8],
-                                    session.session_id, project=self.projects.current, session_cwd=folder,
-                                    updated=time.time())
-                    self.chats[imported.id] = imported
-                    known.add(session.session_id)
-            self.persist()
+            new = await self.sync_sessions()
+            self.emit(chat, f'Синхронизировано с Claude Code на ПК: новых сессий {new}.', kind='status')
             self.chat_menu(mode)
         else:
             raise ValueError('Unknown action')
@@ -747,10 +821,12 @@ class Bridge:
 
     async def close(self):
         await self.account.cancel_login()
+        await self.github.cancel()
         for chat in self.chats.values():
             await self.stop(chat)
         for job in list(self.git.jobs):
             job.cancel()
+        await self.shell.close()
         self.persist()
 
 
@@ -758,7 +834,8 @@ class Bridge:
 ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls', 'type': 'cat',
            'usage': 'tokens', 'cq': 'clearqueue', 'p': 'project', 'projects': 'project', 'g': 'git',
            'ps': 'tasks', 'jobs': 'tasks', 'mcp': 'connectors', 'unconnect': 'disconnect_connector',
-           'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn'}
+           'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn',
+           'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh'}
 USAGE_KEYS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
 AUTO_MODES = {
     'off': 'Авторазрешение выключено: каждое действие спрашивает подтверждение.',
@@ -800,6 +877,7 @@ def create_app(bridge, token):
     async def state(request):
         """Snapshot for the conversation screen: chats, projects, selection."""
         chats = [{'id': c.id, 'mode': c.mode, 'title': bridge.tr(c.title), 'project': c.project, 'backend': c.backend,
+                  'origin': c.origin,
                   'running': bool(c.task), 'queue': len(c.queue), 'updated': c.updated}
                  for c in bridge.chats.values()]
         return web.json_response({'chats': chats, 'selected': bridge.selected,
@@ -810,7 +888,9 @@ def create_app(bridge, token):
     app.router.add_get('/events', events)
     app.router.add_get('/state', state)
     async def account(request):
-        return web.json_response(await bridge.account.status())
+        status = await bridge.account.status()
+        status['github'] = await bridge.github.status()
+        return web.json_response(status)
     app.router.add_get('/account', account)
     async def cleanup(app):
         await bridge.close()

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+import os
 import shutil
 import tempfile
 import unittest
@@ -541,6 +542,102 @@ class LanguageTests(unittest.IsolatedAsyncioTestCase):
         response = await app.middlewares[0](request, route.handler)
         self.assertEqual(response.status, 400)
         self.assertTrue(json.loads(response.text)['error'].startswith('No such folder: '))
+
+
+class PcSyncTests(unittest.IsolatedAsyncioTestCase):
+    """Folder picked on the PC becomes a project; Claude Code sessions are shared with the PC."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.folder = Path(self.temp.name) / 'My Game Mod'
+        self.folder.mkdir()
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    def session(self, sid, title, modified):
+        return sdk.SDKSessionInfo(session_id=sid, summary=title, last_modified=modified, file_size=1,
+                                  custom_title=None, first_prompt=title, git_branch=None,
+                                  cwd=str(self.folder), tag=None, created_at=None)
+
+    async def test_pick_folder_imports_pc_sessions_once(self):
+        from unittest import mock
+        sessions = [self.session('pc-1', 'Fix renderer', 2_000_000_000_000),
+                    self.session('pc-2', 'Write README', 1_000_000_000_000)]
+        with mock.patch('claude_agent_sdk.list_sessions', return_value=sessions) as listing:
+            await self.bridge.command({'mode': 'cc', 'action': 'project', 'text': f'pick {self.folder}'})
+            self.assertEqual(listing.call_args.kwargs['directory'], str(self.folder.resolve()))
+            name = self.bridge.projects.current
+            self.assertEqual(name, 'My-Game-Mod')  # safe name from the folder
+            chats = [c for c in self.bridge.chats.values() if c.project == name]
+            self.assertEqual({c.sdk_id for c in chats}, {'pc-1', 'pc-2'})
+            self.assertEqual(self.bridge.current_chat('cc').sdk_id, 'pc-1')  # newest PC session opens
+            self.assertTrue(all(c.origin == 'pc' for c in chats))
+            # picking the same folder again just opens it, and syncing never duplicates
+            await self.bridge.command({'mode': 'cc', 'action': 'project', 'text': f'pick {self.folder}'})
+            await self.bridge.command({'mode': 'cc', 'action': 'sync', 'text': ''})
+            self.assertEqual(len([c for c in self.bridge.chats.values() if c.project == name]), 2)
+            menu = [e for e in self.bridge.events if e['kind'] == 'chats'][-1]
+            self.assertTrue(menu['rows'][0]['label'].startswith('PC · '))
+
+    async def test_open_in_terminal_resumes_same_session(self):
+        from unittest import mock
+        chat = self.bridge.current_chat('cc')
+        chat.sdk_id = 'abc-123'
+        with mock.patch('backends.terminal.subprocess.Popen') as popen, \
+                mock.patch('backends.terminal.shutil.which', return_value='C:/bin/claude.exe'):
+            await self.bridge.command({'mode': 'cc', 'action': 'pc', 'text': ''})
+        command = popen.call_args.args[0]
+        self.assertIn('--resume abc-123', command if isinstance(command, str) else ' '.join(command))
+        self.assertEqual(popen.call_args.kwargs.get('cwd'), self.bridge.chat_cwd(chat))
+        event = self.bridge.events[-1]
+        self.assertEqual((event['kind'], event['command']), ('terminal', 'claude --resume abc-123'))
+
+
+class ShellTests(unittest.IsolatedAsyncioTestCase):
+    """Real shell commands from chat: output, UTF-8, cd between commands, exit codes, kill."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        (self.bridge.workspace / 'sub').mkdir()
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def sh(self, text):
+        await self.bridge.command({'mode': 'cc', 'action': 'sh', 'text': text})
+
+    async def finished(self, count=1):
+        async with asyncio.timeout(60):
+            while len([e for e in self.bridge.events if e['kind'] == 'shell_end']) < count:
+                await asyncio.sleep(0.05)
+        return [e for e in self.bridge.events if e['kind'] == 'shell_end'][-1]
+
+    def output(self):
+        return '\n'.join(e['text'] for e in self.bridge.events if e['kind'] == 'shell_out')
+
+    async def test_command_output_cd_and_exit_code(self):
+        await self.sh('cd sub')  # handled by the bridge: next commands run in sub
+        self.assertTrue(str(self.bridge.files.here('cc')).endswith('sub'))
+        kind = 'ps' if os.name == 'nt' else 'bash'
+        await self.sh(f'{kind} echo привет; echo $PWD' if kind == 'bash' else 'ps echo привет; (Get-Location).Path')
+        end = await self.finished()
+        self.assertEqual(end['code'], 0)
+        self.assertIn('привет', self.output())
+        self.assertIn('sub', self.output())
+        await self.sh('exit 3' if os.name != 'nt' else 'cmd exit /b 3')
+        self.assertEqual((await self.finished(2))['code'], 3)
+
+    async def test_kill_long_command(self):
+        await self.sh('Start-Sleep 30' if os.name == 'nt' else 'sleep 30')
+        await asyncio.sleep(1)
+        self.assertEqual(len(self.bridge.shell.running()), 1)
+        await self.sh('kill')
+        end = await self.finished()
+        self.assertTrue(end.get('killed'))
+        self.assertFalse(self.bridge.shell.running())
 
 
 class AccountTests(unittest.IsolatedAsyncioTestCase):

@@ -43,7 +43,22 @@ public final class ClaudeChat implements ClientModInitializer {
         "open", "explorer", "code", "edit",
         // projects, git, agents, tasks, connectors
         "project", "projects", "p", "git", "g", "agents", "agent", "spawn", "run", "tasks", "ps", "jobs",
-        "stop", "connectors", "mcp", "connect", "disconnect", "detach", "key", "crash");
+        "stop", "connectors", "mcp", "connect", "disconnect", "detach", "key", "crash",
+        // shell and PC sync
+        "sh", "shell", "$", "sync", "terminal", "pc", "resume", "term");
+    /** Top-level commands → /cc action (so `/ls`, `/mkdir x`, `/ps Get-Process`, `/git push` work). */
+    static final Map<String, String> SHORTCUTS = new LinkedHashMap<>();
+    static {
+        for (String a : new String[]{"ls", "dir", "cd", "pwd", "cat", "tree", "find", "mkdir", "touch", "mv", "cp",
+            "rm", "open", "code", "git"}) SHORTCUTS.put(a, a);
+        SHORTCUTS.put("sh", "sh auto");
+        SHORTCUTS.put("ps", "sh ps");
+        SHORTCUTS.put("powershell", "sh ps");
+        SHORTCUTS.put("cmd", "sh cmd");
+        SHORTCUTS.put("bash", "sh bash");
+        SHORTCUTS.put("kill", "sh kill");
+        SHORTCUTS.put("project", "project");
+    }
     private final Set<String> needsText = Set.of("q", "queue", "f", "force", "spawn", "run", "cat", "type",
         "find", "mkdir", "touch", "mv", "cp", "rm", "connect", "stop", "disconnect", "detach");
     private Path connection;
@@ -91,6 +106,15 @@ public final class ClaudeChat implements ClientModInitializer {
                 .then(argument("input", StringArgumentType.greedyString()).executes(c -> {
                     claudeCommand(StringArgumentType.getString(c, "input")); return 1;
                 })));
+            // Terminal-style shortcuts without /cc: /ls, /cd, /mkdir, /sh, /ps, /cmd, /bash, /git …
+            for (Map.Entry<String, String> shortcut : SHORTCUTS.entrySet()) {
+                String target = shortcut.getValue();
+                dispatcher.register(literal(shortcut.getKey()).requires(source -> source.attended())
+                    .executes(c -> { dispatch("cc", target); return 1; })
+                    .then(argument("input", StringArgumentType.greedyString()).executes(c -> {
+                        dispatch("cc", target + " " + StringArgumentType.getString(c, "input")); return 1;
+                    })));
+            }
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             devShots.tick(client);
@@ -157,13 +181,18 @@ public final class ClaudeChat implements ClientModInitializer {
     void runLine(String mode, String line) {
         String text = line.strip();
         if (text.isEmpty()) return;
+        if (text.startsWith("$")) { dispatch("cc", "sh " + text.substring(1).strip()); return; }  // $ <shell command>
         if (text.startsWith("/")) {
             String[] parts = text.substring(1).split("\\s+", 2);
             String rest = parts.length > 1 ? parts[1] : "";
             switch (parts[0]) {
                 case "c", "cc" -> { if (rest.isBlank()) help(parts[0]); else dispatch(parts[0], rest); }
                 case "claude" -> { if (rest.isBlank()) open(() -> new SettingsScreen(this, null)); else claudeCommand(rest); }
-                default -> notice = L.t("Неизвестная команда: /") + parts[0];
+                default -> {
+                    String target = SHORTCUTS.get(parts[0]);
+                    if (target != null) dispatch("cc", rest.isBlank() ? target : target + " " + rest);
+                    else notice = L.t("Неизвестная команда: /") + parts[0];
+                }
             }
             return;
         }
@@ -177,6 +206,10 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("help")) { help(mode); return; }
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
+        if (Set.of("project", "projects", "p").contains(action) && text.strip().equals("pick")) {
+            FolderPicker.pick(this);  // system folder dialog; the bridge gets the chosen path
+            return;
+        }
         if (!ACTIONS.contains(action)) { action = "q"; text = input; }
         JsonObject data = command(mode, action, text);
         if (action.equals("reply")) {

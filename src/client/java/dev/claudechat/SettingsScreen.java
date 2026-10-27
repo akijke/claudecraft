@@ -93,7 +93,7 @@ final class SettingsScreen extends Screen {
                 mod.launcher.setLanguage(L.russian() ? "en" : "ru");
                 rebuildWidgets();
             }).bounds(leftX + cw / 2 + 2, top + 58, cw / 2 - 2, 20)
-            .tooltip(Tooltip.create(Component.literal("Language / Язык: English ⇄ Русский"))).build());
+            .tooltip(Tooltip.create(Component.literal(L.t("Language / Язык: English ⇄ Русский")))).build());
         python = new EditBox(font, leftX, top + 82, cw, 18, Component.literal("Python"));
         python.setMaxLength(500);
         python.setHint(Component.literal(L.t("путь к python.exe (пусто = авто)")));
@@ -148,9 +148,45 @@ final class SettingsScreen extends Screen {
             }
         }
 
+        // ---- right: GitHub (gh device login → git push/pull + GitHub connector for Claude) ----
+        JsonObject gh = github();
+        int gy = top + 137;
+        if (gh != null && "waiting".equals(str(gh.getAsJsonObject("flow"), "state"))) {
+            String url = str(gh.getAsJsonObject("flow"), "url");
+            Button open = addRenderableWidget(Button.builder(Component.literal(L.t("Открыть github.com/login/device")), b ->
+                ConfirmLinkScreen.confirmLinkNow(this, URI.create(url != null ? url : "https://github.com/login/device")))
+                .bounds(rightX, gy, cw - 64, 20).build());
+            open.active = true;
+            addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> action("gh_cancel", ""))
+                .bounds(rightX + cw - 60, gy, 60, 20).build());
+        } else if (gh != null && !str(gh, "login").isEmpty()) {
+            boolean on = gh.get("connector").getAsBoolean();
+            addRenderableWidget(Button.builder(Component.literal("MCP: " + (on ? L.t("вкл") : L.t("выкл"))),
+                    b -> action("gh_connector", on ? "off" : "on"))
+                .bounds(rightX, gy, cw / 2 - 2, 20)
+                .tooltip(Tooltip.create(Component.literal(L.t("Коннектор GitHub для Claude: issues, PR, Actions")))).build());
+            addRenderableWidget(Button.builder(Component.literal(L.t("Выйти")), b -> action("gh_logout", ""))
+                .bounds(rightX + cw / 2 + 2, gy, cw / 2 - 2, 20).build());
+        } else if (gh != null && gh.get("installed").getAsBoolean()) {
+            addRenderableWidget(Button.builder(Component.literal(L.t("Войти через GitHub")), b -> action("gh_login", ""))
+                .bounds(rightX, gy, cw, 20)
+                .tooltip(Tooltip.create(Component.literal(L.t("Вход GitHub CLI по коду: git push/pull без паролей + коннектор для Claude")))).build());
+        } else if (gh != null) {
+            addRenderableWidget(Button.builder(Component.literal(L.t("Установить GitHub CLI")), b ->
+                    ConfirmLinkScreen.confirmLinkNow(this, URI.create("https://cli.github.com")))
+                .bounds(rightX, gy, cw / 2 - 2, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(L.t("Токен…")), b -> mod.runLine("cc", "/claude key github"))
+                .bounds(rightX + cw / 2 + 2, gy, cw / 2 - 2, 20)
+                .tooltip(Tooltip.create(Component.literal(L.t("Personal access token для коннектора (без gh)")))).build());
+        }
+
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
             .bounds(width / 2 - 100, top + 184, 200, 20).build());
         layoutKey = layoutKey();
+    }
+
+    private JsonObject github() {
+        return status != null && status.has("github") ? status.getAsJsonObject("github") : null;
     }
 
     private Component autoLabel() {
@@ -159,14 +195,22 @@ final class SettingsScreen extends Screen {
 
     private String layoutKey() {
         JsonObject login = status == null ? null : status.getAsJsonObject("login");
-        return loggedIn() + ":" + waitingForCode() + ":" + (str(login, "url") != null);
+        JsonObject gh = github();
+        String ghKey = gh == null ? "-" : str(gh, "login") + "/" + gh.get("connector").getAsBoolean() + "/"
+            + str(gh.getAsJsonObject("flow"), "state") + "/" + gh.get("installed").getAsBoolean();
+        return loggedIn() + ":" + waitingForCode() + ":" + (str(login, "url") != null) + ":" + ghKey;
+    }
+
+    private boolean githubWaiting() {
+        JsonObject gh = github();
+        return gh != null && "waiting".equals(str(gh.getAsJsonObject("flow"), "state"));
     }
 
     @Override public void tick() {
         if (preview) return;
         long now = System.currentTimeMillis();
         if (now < nextPoll || busy) return;
-        nextPoll = now + (waitingForCode() ? 1000 : 4000);
+        nextPoll = now + (waitingForCode() || githubWaiting() ? 1000 : 4000);
         busy = true;
         CompletableFuture.supplyAsync(() -> {
             try { return mod.request("/account", null); }
@@ -179,6 +223,9 @@ final class SettingsScreen extends Screen {
             if (before.equals("checking") && after.equals("done")) say(L.t("Вход выполнен."), GREEN);
             if (after.equals("failed") && !before.equals("failed"))
                 say(L.t("Вход не удался: ") + str(status.getAsJsonObject("login"), "error"), RED);
+            JsonObject gh = github();
+            if (gh != null && "failed".equals(str(gh.getAsJsonObject("flow"), "state")))
+                say("GitHub: " + str(gh.getAsJsonObject("flow"), "error"), RED);
             if (!layoutKey().equals(layoutKey)) rebuildWidgets();
         }));
     }
@@ -263,13 +310,26 @@ final class SettingsScreen extends Screen {
         } else {
             g.text(font, L.t("● вход не выполнен"), rightX, top + 12, GOLD);
         }
-        if (waitingForCode()) {
-            g.text(font, fit(L.t("Войди на странице, скопируй код"), cw), rightX, top + 108, DARK);
-            g.text(font, fit(L.t("и вставь его в поле выше."), cw), rightX, top + 118, DARK);
-        } else if (!loggedIn()) {
+        if (!waitingForCode() && !loggedIn()) {  // while signing in, the numbered buttons explain the steps
             g.text(font, fit(L.t("Вход сохраняется как у Claude Code"), cw), rightX, top + 84, DARK);
             g.text(font, fit(L.t("в терминале (claude auth login)."), cw), rightX, top + 94, DARK);
         }
+
+        // right: GitHub
+        g.text(font, "GitHub", rightX, top + 114, GOLD);
+        JsonObject gh = github();
+        String ghLine;
+        int ghColor;
+        if (gh == null) { ghLine = "—"; ghColor = DARK; }
+        else if (githubWaiting()) {
+            ghLine = L.t("Код: ") + str(gh.getAsJsonObject("flow"), "code") + L.t("  (уже в буфере, вставь на странице)");
+            ghColor = GOLD;
+        } else if (str(gh, "login") != null && !str(gh, "login").isEmpty()) {
+            ghLine = "● " + str(gh, "login") + (gh.get("connector").getAsBoolean() ? "  · git + MCP" : "  · git");
+            ghColor = GREEN;
+        } else if (gh.get("installed").getAsBoolean()) { ghLine = L.t("● не подключён"); ghColor = GOLD; }
+        else { ghLine = L.t("● нужен GitHub CLI (gh) или токен"); ghColor = DARK; }
+        g.text(font, fit(ghLine, cw), rightX, top + 125, ghColor);
 
         if (!message.isEmpty()) g.centeredText(font, fit(message, width - 20), width / 2, top + 170, messageColor);
     }

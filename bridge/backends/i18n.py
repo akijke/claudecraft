@@ -152,6 +152,21 @@ EN = {
     'Платежи, клиенты, подписки': 'Payments, customers, subscriptions', 'Страницы и базы Notion': 'Notion pages and databases',
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
+    # --- shell & GitHub --------------------------------------------------------
+    'Формат: /sh <команда>  (а также /ps, /cmd, /bash)': 'Usage: /sh <command>  (also /ps, /cmd, /bash)',
+    'cmd есть только в Windows — используй /sh или /bash': 'cmd exists only on Windows — use /sh or /bash',
+    'bash не найден — в Windows поставь Git for Windows или используй /ps':
+        'bash not found — on Windows install Git for Windows or use /ps',
+    'Нет команды {}': 'No running command {}',
+    'Нужен GitHub CLI: установи с cli.github.com и перезапусти мост':
+        'GitHub CLI is required: install it from cli.github.com and restart the bridge',
+    'Это не похоже на токен GitHub (ghp_… или github_pat_…)': 'This does not look like a GitHub token (ghp_… or github_pat_…)',
+    'Сначала войди в GitHub или задай токен': 'Sign in to GitHub or set a token first',
+    # --- PC sync -------------------------------------------------------------
+    'Синхронизировано с Claude Code на ПК: новых сессий {}.': 'Synced with Claude Code on the PC: {} new sessions.',
+    'Открыт терминал: {}': 'Terminal opened: {}', 'Claude Code CLI не найден': 'Claude Code CLI not found',
+    'Не найден терминал (x-terminal-emulator, gnome-terminal, konsole)':
+        'No terminal found (x-terminal-emulator, gnome-terminal, konsole)',
     # --- account -------------------------------------------------------------
     'Claude Code CLI не найден: установи claude-agent-sdk или укажи cli_path': 'Claude Code CLI not found: install claude-agent-sdk or set cli_path',
     'API-ключ выглядит неверно': 'The API key looks wrong', 'Claude CLI не ответил вовремя': 'Claude CLI did not answer in time',

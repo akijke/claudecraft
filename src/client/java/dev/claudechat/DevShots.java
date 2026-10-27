@@ -55,7 +55,9 @@ final class DevShots {
         return parse("{\"account\":{\"logged_in\":" + logged + ",\"method\":\"claude.ai\","
             + "\"email\":" + (logged ? "\"player@example.com\"" : "null") + "},"
             + "\"api_key\":" + (logged ? "\"sk-ant-…abcd\"" : "null") + ","
-            + "\"login\":{\"state\":\"" + login + "\",\"url\":\"https://claude.com/cai/oauth/authorize?code=true\",\"error\":null}}");
+            + "\"login\":{\"state\":\"" + login + "\",\"url\":\"https://claude.com/cai/oauth/authorize?code=true\",\"error\":null},"
+            + "\"github\":{\"installed\":true,\"login\":\"akijke\",\"connector\":true,\"token\":false,"
+            + "\"flow\":{\"state\":\"idle\",\"code\":null,\"url\":null,\"error\":null}}}");
     }
 
     private static final String STATE = "{\"selected\":{\"cc\":\"demo\",\"c\":\"x\"},\"project\":\"my-mod\","
