@@ -62,6 +62,10 @@ class SdkTurn:
         self.write_lock = asyncio.Lock()  # FIFO: several f messages keep their order
         self.cwd = None          # folder used to shorten paths in progress lines
         self.cost_seen = 0.0     # total_cost_usd is cumulative per CLI process
+        self.stream = ''         # partial text not yet sent (streamed line by line)
+        self.streamed = False    # current assistant message already shown via deltas
+        self.first_part = True   # next streamed line starts a new answer block
+        self.subagents = {}      # Task tool_use id -> subagent name
         if client is not None:
             self.attach(client)
 
@@ -132,6 +136,27 @@ class SdkTurn:
             self.unacked.popleft()
         self.acked += matched
 
+    def stream_delta(self, event):
+        """Text deltas of the main agent: emit complete lines as they arrive."""
+        kind = event.get('type')
+        if kind == 'content_block_delta' and event.get('delta', {}).get('type') == 'text_delta':
+            self.stream += event['delta'].get('text', '')
+            self.streamed = True
+            while '\n' in self.stream:
+                line, self.stream = self.stream.split('\n', 1)
+                self.emit_part(line)
+        elif kind == 'content_block_stop':
+            self.flush_stream()
+
+    def emit_part(self, line):
+        self.bridge.emit(self.chat, line, kind='text_part', first=self.first_part)
+        self.first_part = False
+
+    def flush_stream(self):
+        if self.stream:
+            self.emit_part(self.stream)
+            self.stream = ''
+
     async def drive(self, text):
         T = self.types
         async with self.write_lock:
@@ -149,7 +174,23 @@ class SdkTurn:
                         self.replay = True
                         self.ready.set()
                     continue
+                if isinstance(message, T.StreamEvent):
+                    if message.parent_tool_use_id is None:
+                        self.stream_delta(message.event)
+                    continue
+                if isinstance(message, T.RateLimitEvent):
+                    info = message.rate_limit_info
+                    self.bridge.rate_limits[info.rate_limit_type or 'limit'] = {
+                        'status': info.status, 'utilization': info.utilization, 'resets_at': info.resets_at}
+                    if info.status in ('allowed_warning', 'rejected'):
+                        self.bridge.emit(self.chat, 'Лимит подписки: ' + ('почти исчерпан' if info.status ==
+                                         'allowed_warning' else 'исчерпан'), kind='error' if info.status ==
+                                         'rejected' else 'status')
+                    continue
                 if isinstance(message, T.SystemMessage) and message.subtype == 'init':
+                    for server in message.data.get('mcp_servers') or []:
+                        if isinstance(server, dict) and server.get('name'):
+                            self.bridge.connectors.status[server['name']] = server.get('status')
                     self.chat.sdk_id = message.data.get('session_id', self.chat.sdk_id)
                     if message.data.get('cwd') and not getattr(self.chat, 'session_cwd', None):
                         self.chat.session_cwd = message.data['cwd']
@@ -164,15 +205,28 @@ class SdkTurn:
                 elif isinstance(message, T.AssistantMessage):
                     if self.acked == 0 and self.replay is not False:
                         self._no_echo()
+                    sub = message.parent_tool_use_id
+                    agent = self.subagents.get(sub) if sub else None
+                    if not sub and self.streamed:
+                        self.flush_stream()  # text already shown line by line
                     for block in message.content:
                         if isinstance(block, T.TextBlock):
-                            self.bridge.emit(self.chat, block.text, kind='text')
+                            if sub:
+                                continue  # a subagent's thinking-out-loud stays out of the chat
+                            if not self.streamed:
+                                self.bridge.emit(self.chat, block.text, kind='text')
                         elif isinstance(block, T.ToolUseBlock):
-                            if block.name == 'TodoWrite':
+                            if block.name in ('TodoWrite',):
                                 self.bridge.emit(self.chat, 'План', kind='todo', rows=todo_rows(block.input))
-                            else:
-                                icon, line = describe(block.name, block.input, self.cwd)
-                                self.bridge.emit(self.chat, line, kind='tool', icon=icon, tool=block.name)
+                                continue
+                            if block.name in ('Task', 'Agent'):
+                                self.subagents[block.id] = block.input.get('subagent_type') or 'агент'
+                            icon, line = describe(block.name, block.input, self.cwd)
+                            self.bridge.emit(self.chat, line, kind='tool', icon=icon, tool=block.name,
+                                             agent=agent)
+                    if not sub:
+                        self.streamed = False
+                        self.first_part = True
                 elif isinstance(message, T.ResultMessage):
                     self.chat.sdk_id = message.session_id or self.chat.sdk_id
                     cost = message.total_cost_usd or 0.0
@@ -203,6 +257,24 @@ def auto_allows(chat, name):
     if chat.auto == 'all':
         return True
     return chat.auto == 'edits' and (name in EDIT_TOOLS or name.startswith('mcp__minecraft__'))
+
+
+def read_game_logs(game_dir, kind, lines=300):
+    """latest.log tail, newest crash report, or the crash report list (for minecraft_logs)."""
+    lines = max(20, min(lines, 2000))
+    crashes = sorted((game_dir / 'crash-reports').glob('crash-*.txt'), key=lambda p: p.stat().st_mtime,
+                     reverse=True) if (game_dir / 'crash-reports').is_dir() else []
+    if kind == 'crash_list':
+        return '\n'.join(p.name for p in crashes[:30]) or 'No crash reports.'
+    if kind == 'crash':
+        if not crashes:
+            return 'No crash reports in ' + str(game_dir / 'crash-reports')
+        return f'{crashes[0].name}\n' + crashes[0].read_text(encoding='utf-8', errors='replace')[:60000]
+    log = game_dir / 'logs' / 'latest.log'
+    if not log.is_file():
+        return 'No logs/latest.log in ' + str(game_dir)
+    text = log.read_text(encoding='utf-8', errors='replace').splitlines()
+    return '\n'.join(text[-lines:])
 
 
 def _types():
@@ -261,8 +333,15 @@ async def run(bridge, chat, text):
             return {'content': [{'type': 'text', 'text': 'No answer from the user'}], 'is_error': True}
         return {'content': [{'type': 'text', 'text': result}]}
 
-    tools = (['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
-              'AskUserQuestion'] if chat.mode == 'cc' else ['AskUserQuestion'])
+    @tool('minecraft_logs', 'Read Minecraft logs of this game instance: kind="crash" (newest crash '
+          'report), "crash_list", or "latest" (tail of logs/latest.log). Use for crash/mod debugging.',
+          {'kind': str, 'lines': int})
+    async def minecraft_logs(args):
+        return {'content': [{'type': 'text', 'text': read_game_logs(bridge.game_dir, args.get('kind', 'latest'),
+                                                                     int(args.get('lines') or 300))}]}
+
+    tools = (['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'Task',
+              'NotebookEdit', 'AskUserQuestion'] if chat.mode == 'cc' else ['AskUserQuestion'])
     mcp = dict(bridge.extensions) if chat.mode == 'cc' else {}
     @tool('reload_extensions', 'Reload local MCP extension manifests for the next user request.', {})
     async def reload_tools(args):
@@ -270,27 +349,34 @@ async def run(bridge, chat, text):
         bridge.emit(chat, 'Claude перезагрузил расширения: ' + ', '.join(names), kind='status')
         return {'content': [{'type': 'text', 'text': 'Loaded for next request: ' + ', '.join(names)}]}
 
-    minecraft_tools = [open_browser, reload_tools] if chat.mode == 'cc' else [open_browser]
+    minecraft_tools = [open_browser, reload_tools, minecraft_logs] if chat.mode == 'cc' else [open_browser]
     mcp['minecraft'] = create_sdk_mcp_server(name='minecraft', tools=minecraft_tools)
-    # The CLI stores a session under the folder it was created in, so a resumed
-    # session keeps that folder; a later `cd` is given via add_dirs + a prompt note.
+    # Claude works in the chat's project folder. The CLI stores a session under the
+    # folder it was created in, so an older session keeps that folder and gets the
+    # project folder via add_dirs.
     effective = bridge.chat_cwd(chat)
     session_dir = (chat.session_cwd or effective) if chat.sdk_id else effective
     if not chat.sdk_id:
         chat.session_cwd = None
     extra_dirs = [effective] if Path(effective) != Path(session_dir) else []
     if extra_dirs:
-        text = f'[Текущая папка пользователя: {effective}]\n{text}'
+        text = f'[Рабочая папка проекта: {effective}]\n{text}'
     options = ClaudeAgentOptions(cwd=session_dir, resume=chat.sdk_id, add_dirs=extra_dirs,
         tools=tools, mcp_servers=mcp, can_use_tool=permission,
         permission_mode='default', setting_sources=[],
+        # Lines of the answer are shown while they are generated.
+        include_partial_messages=True,
+        agents=bridge.agents.definitions(effective) if chat.mode == 'cc' else None,
         # Echo accepted prompts so `f` messages can be matched against ResultMessage.
         extra_args={'replay-user-messages': None},
         system_prompt=('You are Claude in Minecraft. Reply in the user language. '
                        'The user may send extra messages while you work; take them into account. '
                        'Use AskUserQuestion for choices and minecraft open_browser when the user needs a browser. '
                        'Do not open browser using shell commands. ' +
-                       ('Help with code in the configured workspace. Use Bash for docker, ssh and native shell commands when requested. '
+                       ('You are a programming assistant inside Minecraft (the user is a developer). '
+                        f'Current project: {chat.project} at {effective}. '
+                        'Delegate focused work to subagents with the Task tool when it helps. '
+                        'Use Bash for git, docker, ssh and native shell commands when requested. '
                         'Capabilities: ' + json.dumps(bridge.capabilities()) + '. '
                         'Extensions live in workspace/extensions/<id>/manifest.json. After editing them, '
                         'call minecraft reload_extensions or ask the user to run /cc reload; changes apply to the next request. '

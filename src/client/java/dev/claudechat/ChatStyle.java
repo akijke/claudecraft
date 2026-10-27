@@ -80,9 +80,11 @@ final class ChatStyle {
             }
             case "text" -> markdown(mode, text, out);
             case "tool" -> {
-                String icon = str(e, "icon");
+                String icon = str(e, "icon"), agent = str(e, "agent");
                 boolean shell = icon.equals("$");
-                out.add(line(mode, lit("  " + icon + " ", shell ? GREEN : GOLD)
+                MutableComponent prefix = agent.isEmpty() ? Component.literal("  ")
+                    : lit("    ↳ " + agent + " · ", CODE_MODE);
+                out.add(line(mode, prefix.append(lit(icon + " ", shell ? GREEN : GOLD))
                     .append(lit(text, shell ? TEXT : DIM))));
             }
             case "tool_error" -> out.add(line(mode, lit("  ✖ ", RED).append(lit(firstLine(text), 0xC9888C))));
@@ -119,18 +121,30 @@ final class ChatStyle {
             case "chats" -> chats(e, mode, out);
             case "listing" -> listing(e, mode, out);
             case "cwd" -> {
-                out.add(line(mode, lit("📁 ", DIR).append(lit(text, TEXT))
+                out.add(line(mode, lit("📁 Обзор: ", DIR).append(lit(text, TEXT))
                     .append(Component.literal("  ")).append(button("ls", cmd + "ls", false, AQUA, "Показать содержимое"))));
-                if (!str(e, "note").isEmpty()) out.add(line(mode, lit("  " + str(e, "note"), DIM)));
+                if (!str(e, "claude").isEmpty())
+                    out.add(line(mode, lit("✦ Claude работает в: ", CODE_MODE).append(lit(str(e, "project") + "  ", TEXT))
+                        .append(lit(str(e, "claude"), DIM))));
             }
             case "file" -> {
-                out.add(line(mode, lit("📄 ", GOLD).append(lit(str(e, "path"), TEXT))));
+                String path = str(e, "path");
+                int start = e.has("start") ? e.get("start").getAsInt() : 1;
+                int total = e.has("total") ? e.get("total").getAsInt() : 0;
+                out.add(line(mode, lit("📄 ", GOLD).append(lit(path, TEXT))
+                    .append(lit(total > 0 ? "  " + total + " строк" : "", FAINT)).append(Component.literal("  "))
+                    .append(button("→ Claude", "/cc q Посмотри файл " + path + ": ", true, CODE_MODE, "Спросить Claude про этот файл"))
+                    .append(Component.literal(" ")).append(button("✎", "/" + mode + " code " + path, false, AQUA, "Открыть в редакторе (VS Code/IDEA)"))
+                    .append(Component.literal(" ")).append(button("⧉", "/" + mode + " open " + path, false, AQUA, "Открыть программой по умолчанию"))));
                 String[] lines = clean(text).split("\\R", -1);
-                int width = String.valueOf(lines.length).length();
+                int width = String.valueOf(start + lines.length).length();
                 for (int i = 0; i < lines.length; i++)
-                    out.add(line(mode, lit(String.format("%" + width + "d", i + 1) + " │ ", FAINT).append(lit(lines[i], BLOCK))));
-                if (e.has("truncated") && e.get("truncated").getAsBoolean())
-                    out.add(line(mode, lit("  … файл длиннее, показано начало", DIM)));
+                    out.add(line(mode, lit(String.format("%" + width + "d", start + i) + " │ ", FAINT).append(lit(lines[i], BLOCK))));
+                if (e.has("truncated") && e.get("truncated").getAsBoolean()) {
+                    int next = start + lines.length;
+                    out.add(line(mode, lit("  … ", DIM).append(button("дальше", cmd + "cat " + path + " " + next + "-" + (next + 149),
+                        false, AQUA, "Строки " + next + "–" + (next + 149)))));
+                }
             }
             case "tokens" -> tokens(e, mode, out);
             case "auto" -> {
@@ -157,7 +171,8 @@ final class ChatStyle {
                 } catch (IllegalArgumentException ignored) { }
             }
             default -> {
-                for (String l : clean(text).split("\\R")) if (!l.isBlank()) out.add(line(mode, lit(l, TEXT)));
+                if (!WorkStyle.render(e, mode, out))
+                    for (String l : clean(text).split("\\R")) if (!l.isBlank()) out.add(line(mode, lit(l, TEXT)));
             }
         }
         return out;
@@ -230,13 +245,20 @@ final class ChatStyle {
     }
 
     private static void chats(JsonObject e, String mode, List<Component> out) {
-        out.add(line(mode, lit("☰ Чаты " + (mode.equals("cc") ? "Claude Code" : "Claude"), TEXT).withStyle(s -> s.withBold(true))));
+        MutableComponent head = lit("☰ Чаты " + (mode.equals("cc") ? "Claude Code" : "Claude"), TEXT).withStyle(s -> s.withBold(true));
+        if (!str(e, "project_name").isEmpty())
+            head.append(lit("  ✦ ", CODE_MODE)).append(button(str(e, "project_name"), "/cc project", false, CODE_MODE,
+                "Папка: " + str(e, "project_path") + "\nНажми, чтобы сменить проект"));
+        out.add(line(mode, head));
         for (JsonElement item : e.getAsJsonArray("rows")) {
             JsonObject row = item.getAsJsonObject();
             boolean selected = row.get("selected").getAsBoolean();
-            out.add(line(mode, lit(selected ? "  ● " : "  ○ ", selected ? GREEN : FAINT)
+            MutableComponent item2 = lit(selected ? "  ● " : "  ○ ", selected ? GREEN : FAINT)
                 .append(button(row.get("label").getAsString(), "/" + mode + " select " + row.get("id").getAsString(),
-                    false, selected ? GREEN : AQUA, "Переключиться на этот чат"))));
+                    false, selected ? GREEN : AQUA, "Переключиться на этот чат"));
+            if (row.has("running") && row.get("running").getAsBoolean()) item2.append(lit("  ▶ работает", GOLD));
+            if (row.has("queue") && row.get("queue").getAsInt() > 0) item2.append(lit("  +" + row.get("queue").getAsInt(), FAINT));
+            out.add(line(mode, item2));
         }
         MutableComponent buttons = Component.literal("  ").append(button("+ Новый", "/" + mode + " new local", false, GOLD, null));
         if (mode.equals("c")) buttons.append(" ").append(button("+ API", "/c new api", false, GOLD, "Чат через Messages API"));
@@ -246,9 +268,24 @@ final class ChatStyle {
 
     private static void listing(JsonObject e, String mode, List<Component> out) {
         String cmd = "/" + mode + " ";
-        MutableComponent head = lit("📁 ", DIR).append(lit(str(e, "path"), TEXT));
-        if (!str(e, "parent").isEmpty()) head.append(Component.literal("  ")).append(button("..", cmd + "cd ..", false, AQUA, "Вверх"));
+        String path = str(e, "path");
+        MutableComponent head = lit("📁 ", DIR).append(lit(path, TEXT));
+        if (!str(e, "project").isEmpty()) head.append(lit("  ✦ проект " + str(e, "project"), CODE_MODE));
         out.add(line(mode, head));
+        MutableComponent tools = Component.literal("  ");
+        if (!str(e, "parent").isEmpty()) tools.append(button("..", cmd + "cd ..", false, AQUA, "Вверх")).append(" ");
+        tools.append(button("≡ tree", cmd + "tree", false, AQUA, "Дерево папок")).append(" ");
+        if (str(e, "project").isEmpty())
+            tools.append(button("✦ Сделать проектом", "/cc project here", false, CODE_MODE,
+                "Claude будет работать в этой папке (новый проект)")).append(" ");
+        else
+            tools.append(button("✦ Открыть проект", "/cc project open " + str(e, "project"), false, CODE_MODE,
+                "Переключить Claude на этот проект")).append(" ");
+        if (e.has("git") && e.get("git").getAsBoolean() && !str(e, "project").isEmpty())
+            tools.append(button("⇄ git", "/cc project open " + str(e, "project"), false, GREEN,
+                "Git-репозиторий: открой проект и набери /cc git")).append(" ");
+        tools.append(button("⧉", cmd + "open .", false, AQUA, "Открыть в проводнике"));
+        out.add(line(mode, tools));
         JsonArray rows = e.getAsJsonArray("rows");
         if (rows.isEmpty()) out.add(line(mode, lit("  (пусто)", DIM)));
         // Pack several entries per chat line so big folders stay readable.
@@ -284,19 +321,58 @@ final class ChatStyle {
                 c.append(lit(String.format(Locale.ROOT, "  ≈$%.3f", r.get("cost").getAsDouble()), GOLD));
             out.add(line(mode, c));
         }
+        if (e.has("limits")) {
+            for (JsonElement item : e.getAsJsonArray("limits")) {
+                JsonObject l = item.getAsJsonObject();
+                String type = switch (str(l, "type")) {
+                    case "five_hour" -> "лимит 5 часов";
+                    case "seven_day" -> "лимит недели";
+                    case "seven_day_opus" -> "неделя Opus";
+                    case "seven_day_sonnet" -> "неделя Sonnet";
+                    default -> str(l, "type");
+                };
+                String status = str(l, "status");
+                int color = status.equals("rejected") ? RED : status.equals("allowed_warning") ? GOLD : GREEN;
+                MutableComponent c = lit("  ⏱ " + type + ": ", DIM);
+                if (l.has("utilization") && !l.get("utilization").isJsonNull())
+                    c.append(lit(Math.round(l.get("utilization").getAsDouble() * 100) + "%", color));
+                else c.append(lit(status.equals("allowed") ? "в норме" : status, color));
+                if (l.has("resets_at") && !l.get("resets_at").isJsonNull()) {
+                    long left = l.get("resets_at").getAsLong() - System.currentTimeMillis() / 1000;
+                    if (left > 0) c.append(lit("  сброс через " + (left / 3600) + " ч " + (left % 3600 / 60) + " мин", FAINT));
+                }
+                out.add(line(mode, c));
+            }
+        }
         if (!str(e, "note").isEmpty()) out.add(line(mode, lit("  " + str(e, "note"), FAINT)));
     }
 
     /** Light markdown: headings, bullets, code fences, **bold**, `code`, [links](url). */
     static void markdown(String mode, String text, List<Component> out) {
-        boolean code = false, first = true;
+        boolean[] code = {false};
+        boolean first = true;
         for (String raw : clean(text).split("\\R")) {
-            if (raw.strip().startsWith("```")) { code = !code; continue; }
-            MutableComponent content;
-            if (code) {
+            MutableComponent content = markdownLine(raw, code);
+            if (content == null) continue;
+            out.add(line(mode, first ? lit("✦ ", CLAUDE).append(content) : Component.literal("  ").append(content)));
+            first = false;
+        }
+    }
+
+    /** One markdown line; code[0] carries the ``` state across lines (and across streamed parts). */
+    static MutableComponent markdownLine(String raw, boolean[] code) {
+        raw = clean(raw);
+        if (raw.strip().startsWith("```")) {
+            code[0] = !code[0];
+            String lang = raw.strip().substring(3).strip();
+            return code[0] && !lang.isEmpty() ? lit("┌ " + lang, FAINT) : null;
+        }
+        MutableComponent content;
+        {
+            if (code[0]) {
                 content = lit("│ ", FAINT).append(lit(raw, BLOCK));
             } else if (raw.isBlank()) {
-                continue;
+                return null;
             } else if (raw.startsWith("#")) {
                 String h = raw.replaceFirst("^#+\\s*", "");
                 content = inline(h, TEXT).withStyle(s -> s.withBold(true).withColor(GOLD));
@@ -313,9 +389,8 @@ final class ChatStyle {
             } else {
                 content = inline(raw, TEXT);
             }
-            out.add(line(mode, first ? lit("✦ ", CLAUDE).append(content) : Component.literal("  ").append(content)));
-            first = false;
         }
+        return content;
     }
 
     static MutableComponent inline(String text, int color) {

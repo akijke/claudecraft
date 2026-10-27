@@ -1,25 +1,29 @@
 package dev.claudechat;
 
 import com.google.gson.*;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.file.*;
 import java.time.Duration;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.*;
 
 /** UI only: all SDK credentials, agent processes and conversation scheduling live in the local bridge. */
@@ -29,16 +33,22 @@ public final class ClaudeChat implements ClientModInitializer {
     });
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     private final AtomicBoolean polling = new AtomicBoolean();
-    // Short aliases are resolved by the bridge: queue=q, force=f, c/chats=chat.
-    private final Set<String> actions = Set.of("q", "queue", "f", "force", "c", "chats", "chat",
-        "cancel", "restart", "new", "select", "rename", "status", "clearqueue", "reply", "pending",
-        "local", "reload", "tools", "capabilities", "tokens", "usage", "auto",
-        "ls", "dir", "cd", "pwd", "cat", "type");
-    private final Set<String> needsText = Set.of("q", "queue", "f", "force");
-    // "settings" is handled in the mod itself (opens SettingsScreen), never sent to the bridge.
+    /** First words sent to the bridge as actions; anything else is a question (q). */
+    static final Set<String> ACTIONS = Set.of(
+        "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
+        "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
+        "tokens", "usage", "auto",
+        // file manager (does not move Claude)
+        "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
+        "open", "explorer", "code", "edit",
+        // projects, git, agents, tasks, connectors
+        "project", "projects", "p", "git", "g", "agents", "agent", "spawn", "run", "tasks", "ps", "jobs",
+        "stop", "connectors", "mcp", "connect", "disconnect", "detach", "key", "crash");
+    private final Set<String> needsText = Set.of("q", "queue", "f", "force", "spawn", "run", "cat", "type",
+        "find", "mkdir", "touch", "mv", "cp", "rm", "connect", "stop", "disconnect", "detach");
     private Path connection;
     final BridgeLauncher launcher = new BridgeLauncher(this::bridgeAnswers);
-    private volatile boolean openSettings;
+    private volatile Supplier<Screen> openNext;
     private final DevShots devShots = new DevShots(this);
     private volatile long cursor;
     // Bridge instance id: when it changes the bridge restarted and its event numbers reset.
@@ -46,11 +56,26 @@ public final class ClaudeChat implements ClientModInitializer {
     private long nextPoll;
     private long lastFailure;
     private volatile long epoch;
+    /** Recent events per chat, for the conversation screen (game chat keeps its own copy). */
+    final Map<String, Deque<JsonObject>> log = new HashMap<>();
+    /** Last "need_key" fields per connector, for the key entry screen. */
+    final Map<String, JsonArray> keyFields = new HashMap<>();
+    volatile String notice = "";
+    private KeyMapping openKey;
+
+    private static ClaudeChat instance;
+
+    /** The running mod (for entrypoints created by other mods, e.g. Mod Menu). */
+    static ClaudeChat instance() { return instance; }
 
     @Override public void onInitializeClient() {
-        connection = FabricLoader.getInstance().getConfigDir().resolve("claude-chat/connection.json");
+        instance = this;
+        connection =FabricLoader.getInstance().getConfigDir().resolve("claude-chat/connection.json");
         if (launcher.autoStart() && !DevShots.ENABLED) launcher.start();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> launcher.stop());
+        KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("claude_chat", "main"));
+        openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.claude_chat.open",
+            InputConstants.KEY_K, category));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
             for (String mode : new String[]{"c", "cc"}) {
                 dispatcher.register(literal(mode)
@@ -62,18 +87,24 @@ public final class ClaudeChat implements ClientModInitializer {
                     })));
             }
             dispatcher.register(literal("claude").requires(source -> source.attended())
-                .executes(c -> { openSettings = true; return 1; }));
+                .executes(c -> { open(() -> new SettingsScreen(this, null)); return 1; })
+                .then(argument("input", StringArgumentType.greedyString()).executes(c -> {
+                    claudeCommand(StringArgumentType.getString(c, "input")); return 1;
+                })));
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             devShots.tick(client);
-            if (openSettings) {
+            while (openKey.consumeClick()) open(() -> new ConversationScreen(this));
+            Supplier<Screen> next = openNext;
+            if (next != null) {
                 // Deferred: the chat screen closes right after a command runs.
-                openSettings = false;
-                client.setScreenAndShow(new SettingsScreen(this, null));
+                openNext = null;
+                client.setScreenAndShow(next.get());
             }
             long now = System.currentTimeMillis();
-            if (client.player == null || now < nextPoll || !polling.compareAndSet(false, true)) return;
-            nextPoll = now + 500;
+            boolean active = client.player != null || ConversationScreen.isOpen();
+            if (!active || now < nextPoll || !polling.compareAndSet(false, true)) return;
+            nextPoll = now + 400;
             long ticket = epoch;
             io.execute(() -> {
                 try {
@@ -83,7 +114,7 @@ public final class ClaudeChat implements ClientModInitializer {
                     long nextCursor = response.get("cursor").getAsLong();
                     String nextBoot = response.has("boot") ? response.get("boot").getAsString() : "";
                     client.execute(() -> {
-                        if (ticket != epoch || client.player == null) return;
+                        if (ticket != epoch) return;
                         for (JsonElement row : response.getAsJsonArray("events")) render(row.getAsJsonObject());
                         cursor = nextCursor;
                         boot = nextBoot;
@@ -101,19 +132,52 @@ public final class ClaudeChat implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             epoch++;
             io.execute(() -> {
-                try { request("/command", command("c", "disconnect", "")); }
+                try { request("/command", command("c", "leave", "")); }
                 catch (Exception ignored) { }
             });
         });
     }
 
-    private void dispatch(String mode, String input) {
+    void open(Supplier<Screen> screen) { openNext = screen; }
+
+    /** /claude [settings|ui|key <connector>]. */
+    private void claudeCommand(String input) {
+        String[] parts = input.strip().split("\\s+", 2);
+        switch (parts[0]) {
+            case "ui", "window", "chat" -> open(() -> new ConversationScreen(this));
+            case "key" -> {
+                String id = parts.length > 1 ? parts[1].strip() : "";
+                open(() -> new KeyScreen(this, id, keyFields.getOrDefault(id, new JsonArray())));
+            }
+            default -> open(() -> new SettingsScreen(this, null));
+        }
+    }
+
+    /** Runs a line typed in the conversation screen: "/cc git", "/claude", or plain text for `mode`. */
+    void runLine(String mode, String line) {
+        String text = line.strip();
+        if (text.isEmpty()) return;
+        if (text.startsWith("/")) {
+            String[] parts = text.substring(1).split("\\s+", 2);
+            String rest = parts.length > 1 ? parts[1] : "";
+            switch (parts[0]) {
+                case "c", "cc" -> { if (rest.isBlank()) help(parts[0]); else dispatch(parts[0], rest); }
+                case "claude" -> { if (rest.isBlank()) open(() -> new SettingsScreen(this, null)); else claudeCommand(rest); }
+                default -> notice = "Неизвестная команда: /" + parts[0];
+            }
+            return;
+        }
+        dispatch(mode, text);
+    }
+
+    void dispatch(String mode, String input) {
         String[] split = input.strip().split("\\s+", 2);
         String action = split[0];
         String text = split.length == 2 ? split[1] : "";
         if (action.equals("help")) { help(mode); return; }
-        if (action.equals("settings")) { openSettings = true; return; }
-        if (!actions.contains(action)) { action = "q"; text = input; }
+        if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
+        if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
+        if (!ACTIONS.contains(action)) { action = "q"; text = input; }
         JsonObject data = command(mode, action, text);
         if (action.equals("reply")) {
             String[] answer = text.split("\\s+", 2);
@@ -122,7 +186,7 @@ public final class ClaudeChat implements ClientModInitializer {
             data.addProperty("text", answer[1]);
         }
         if (needsText.contains(action) && text.isBlank()) {
-            say(mode, "Введи запрос после /" + mode + " " + action); return;
+            say(mode, "Нужен аргумент: /" + mode + " " + action + " …"); return;
         }
         send(mode, data);
     }
@@ -147,19 +211,21 @@ public final class ClaudeChat implements ClientModInitializer {
         data.addProperty("mode", mode); data.addProperty("action", action); data.addProperty("text", text);
         return data;
     }
-    private void send(String mode, JsonObject data) {
+
+    void send(String mode, JsonObject data) {
         long ticket = epoch;
         io.execute(() -> {
             try { request("/command", data); }
             catch (Exception e) {
                 Minecraft.getInstance().execute(() -> {
-                    if (ticket == epoch) say(mode, "Ошибка моста: " + e.getMessage());
+                    if (ticket == epoch) say(mode, "Ошибка: " + e.getMessage());
                 });
             }
         });
     }
+
     JsonObject request(String path, JsonObject body) throws Exception {
-        if (!Files.isRegularFile(connection)) throw new IllegalStateException("Нет connection.json; запусти bridge.py --game-dir <папка игры>");
+        if (!Files.isRegularFile(connection)) throw new IllegalStateException("Мост ещё не запущен (нет connection.json)");
         JsonObject config = JsonParser.parseString(Files.readString(connection)).getAsJsonObject();
         int port = config.get("port").getAsInt();
         if (port < 1024 || port > 65535) throw new IllegalArgumentException("Некорректный порт моста");
@@ -177,11 +243,35 @@ public final class ClaudeChat implements ClientModInitializer {
     }
 
     private void render(JsonObject event) {
+        String kind = event.has("kind") ? event.get("kind").getAsString() : "";
+        String chat = event.has("chat") ? event.get("chat").getAsString() : "";
+        if (kind.equals("need_key") && event.has("connector"))
+            keyFields.put(event.get("connector").getAsString(), event.getAsJsonArray("fields"));
+        if (kind.equals("history")) {
+            // Conversation screen asked for older events of this chat after a reconnect.
+            Deque<JsonObject> items = log.computeIfAbsent(chat, k -> new ArrayDeque<>());
+            Set<Long> known = new HashSet<>();
+            for (JsonObject e : items) known.add(e.get("seq").getAsLong());
+            List<JsonObject> merged = new ArrayList<>();
+            for (JsonElement item : event.getAsJsonArray("items"))
+                if (!known.contains(item.getAsJsonObject().get("seq").getAsLong())) merged.add(item.getAsJsonObject());
+            merged.addAll(items);
+            merged.sort(Comparator.comparingLong(e -> e.get("seq").getAsLong()));
+            items.clear();
+            items.addAll(merged.subList(Math.max(0, merged.size() - 500), merged.size()));
+            return;
+        }
+        Deque<JsonObject> items = log.computeIfAbsent(chat, k -> new ArrayDeque<>());
+        items.addLast(event);
+        while (items.size() > 500) items.removeFirst();
+        ConversationScreen.changed();
         for (Component line : ChatStyle.render(event)) show(line);
     }
 
     /** Local (non-bridge) notice in the same style as bridge status lines. */
     private void say(String mode, String text) {
+        notice = text;
+        ConversationScreen.changed();
         for (String line : ChatStyle.clean(text).split("\\R")) {
             if (!line.isBlank()) show(ChatStyle.line(mode, ChatStyle.lit("· " + line, ChatStyle.DIM)));
         }
@@ -197,14 +287,17 @@ public final class ClaudeChat implements ClientModInitializer {
         String c = "/" + mode + " ";
         int accent = mode.equals("cc") ? ChatStyle.CODE_MODE : ChatStyle.CLAUDE;
         show(ChatStyle.line(mode, ChatStyle.lit(mode.equals("cc") ? "✦ Claude Code" : "✦ Claude", accent)
-            .withStyle(s -> s.withBold(true)).append(ChatStyle.lit("   мост: " + launcher.state().label, ChatStyle.DIM))));
+            .withStyle(s -> s.withBold(true)).append(ChatStyle.lit("   мост: " + launcher.state().label
+                + " · окно переписки: K", ChatStyle.DIM))));
         String[][] rows = {
-            {c + "<запрос>", "в очередь (то же: q, queue)"},
-            {c + "f <текст>", "дописать Claude, пока он работает (force)"},
-            {c + "c", "чаты · new · rename · status · cancel · restart"},
-            {c + "auto off|edits|all", "авторазрешение действий"},
-            {c + "tokens", "расход токенов"},
-            {c + "ls · cd · pwd · cat", "файлы и рабочая папка"},
+            {c + "<запрос>", "в очередь (q, queue) · f/force — дописать в работу · cq — очистить очередь"},
+            {c + "c", "чаты · new · rename · status · cancel · restart · tokens · auto"},
+            {"/cc project", "проекты = рабочая папка Claude (open, here, new, add)"},
+            {c + "ls", "файлы: cd · pwd · cat · tree · find · mkdir · mv · cp · rm · open · code"},
+            {"/cc git", "статус · diff · commit · push · pull · branch · log · clone · github"},
+            {"/cc agents", "агенты · agent <имя> <задача> · spawn — параллельно · tasks"},
+            {"/cc connectors", "GitHub, Playwright, Context7, БД, Sentry, Notion…"},
+            {"/cc crash", "разобрать последний крэш / latest.log Minecraft"},
             {"/claude", "настройки, вход в аккаунт, API-ключ"},
         };
         for (String[] row : rows)
@@ -212,10 +305,11 @@ public final class ClaudeChat implements ClientModInitializer {
                 .withColor(ChatStyle.AQUA).withClickEvent(new ClickEvent.SuggestCommand(row[0].split(" [<·|]")[0] + " "))))
                 .append(ChatStyle.lit("  " + row[1], ChatStyle.DIM))));
         show(ChatStyle.line(mode, Component.literal("  ")
+            .append(ChatStyle.button("▣ Окно (K)", c + "ui", false, ChatStyle.CODE_MODE, "Отдельный экран переписки")).append(" ")
             .append(ChatStyle.button("⚙ Настройки", c + "settings", false, ChatStyle.GOLD, null)).append(" ")
-            .append(ChatStyle.button("☰ Чаты", c + "chats", false, ChatStyle.AQUA, null)).append(" ")
-            .append(ChatStyle.button("Σ Токены", c + "tokens", false, ChatStyle.AQUA, null)).append(" ")
-            .append(ChatStyle.button("⚡ Auto", c + "auto", false, ChatStyle.AQUA, null)).append(" ")
-            .append(ChatStyle.button("📁 ls", c + "ls", false, ChatStyle.AQUA, null))));
+            .append(ChatStyle.button("✦ Проекты", "/cc project", false, ChatStyle.CODE_MODE, null)).append(" ")
+            .append(ChatStyle.button("⇄ Git", "/cc git", false, ChatStyle.GREEN, null)).append(" ")
+            .append(ChatStyle.button("▶ Задачи", "/cc tasks", false, ChatStyle.AQUA, null)).append(" ")
+            .append(ChatStyle.button("📁 Файлы", c + "ls", false, ChatStyle.AQUA, null))));
     }
 }

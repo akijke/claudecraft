@@ -58,24 +58,21 @@ class Account:
 
     # ---- API key -------------------------------------------------------
     def api_key(self):
-        try:
-            key = json.loads(self.secrets_path.read_text(encoding='utf-8')).get('anthropic_api_key')
-        except (OSError, ValueError):
-            key = None
-        return key or os.environ.get('ANTHROPIC_API_KEY')
+        from backends.connectors import load_secrets
+        return load_secrets(self.bridge.directory).get('anthropic_api_key') or os.environ.get('ANTHROPIC_API_KEY')
 
     def set_api_key(self, key):
+        """Stored in the shared secrets.json next to connector tokens (merged, not overwritten)."""
+        from backends.connectors import load_secrets, store_secrets
         key = (key or '').strip()
         if key and (len(key) > 300 or not re.fullmatch(r'[A-Za-z0-9_\-]+', key)):
             raise ValueError('API-ключ выглядит неверно')
+        data = load_secrets(self.bridge.directory)
         if key:
-            temp = self.secrets_path.with_suffix('.tmp')
-            with temp.open('w', encoding='utf-8') as f:
-                os.chmod(temp, 0o600)
-                json.dump({'anthropic_api_key': key}, f)
-            temp.replace(self.secrets_path)
-        elif self.secrets_path.exists():
-            self.secrets_path.unlink()
+            data['anthropic_api_key'] = key
+        else:
+            data.pop('anthropic_api_key', None)
+        store_secrets(self.bridge.directory, data)
 
     # ---- CLI helpers ---------------------------------------------------
     async def run_cli(self, *args, timeout=30):

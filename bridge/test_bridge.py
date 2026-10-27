@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from aiohttp.test_utils import make_mocked_request
@@ -194,32 +195,52 @@ class FeatureTests(unittest.IsolatedAsyncioTestCase):
         await self.bridge.command({'mode': 'cc', 'action': action, 'text': text})
         return self.last()
 
-    async def test_ls_cd_pwd_cat(self):
+    async def test_file_manager_does_not_move_claude(self):
         listing = await self.cmd('ls')
         self.assertEqual(listing['kind'], 'listing')
         names = [(r['name'], r['dir']) for r in listing['rows']]
         self.assertEqual(names[0], ('extensions', True))  # folders first
         self.assertIn(('notes.txt', False), names)
+        claude_before = self.bridge.chat_cwd(self.chat)
         await self.cmd('cd', 'src')
-        self.assertEqual(Path(self.bridge.chat_cwd(self.chat)), (self.bridge.workspace / 'src').resolve())
-        self.assertEqual((await self.cmd('pwd'))['text'], self.bridge.chat_cwd(self.chat))
+        self.assertEqual(self.bridge.files.here('cc'), (self.bridge.workspace / 'src').resolve())
+        self.assertEqual(self.bridge.chat_cwd(self.chat), claude_before)  # Claude stays put
+        pwd = await self.cmd('pwd')
+        self.assertTrue(pwd['text'].endswith('src'))
+        self.assertEqual(pwd['claude'], claude_before)
         self.assertIn('class Main', (await self.cmd('cat', 'Main.java'))['text'])
         await self.cmd('cd', '..')
-        self.assertIsNone(self.chat.cwd)  # back at workspace root
-        await self.cmd('cd', 'src')
-        await self.cmd('cd', '~')
-        self.assertIsNone(self.chat.cwd)
+        self.assertEqual(self.bridge.files.here('cc'), self.bridge.workspace)
         self.assertEqual((await self.cmd('dir'))['kind'], 'listing')  # alias
         with self.assertRaisesRegex(ValueError, 'двоичный'):
             await self.cmd('cat', 'blob.bin')
         with self.assertRaisesRegex(ValueError, 'Нет такой папки'):
             await self.cmd('cd', 'missing')
-        restored = Bridge(self.temp.name)
         await self.cmd('cd', 'src')
-        self.bridge.persist()
         restored = Bridge(self.temp.name)
-        self.assertTrue(restored.chats[self.chat.id].cwd.endswith('src'))
+        self.assertTrue(str(restored.files.here('cc')).endswith('src'))
         await restored.close()
+
+    async def test_file_operations(self):
+        await self.cmd('mkdir', 'tmp/a')
+        await self.cmd('touch', 'tmp/a/x.txt')
+        self.assertTrue((self.bridge.workspace / 'tmp' / 'a' / 'x.txt').exists())
+        await self.cmd('cp', 'tmp/a/x.txt tmp/y.txt')
+        await self.cmd('mv', 'tmp/y.txt tmp/z.txt')
+        self.assertTrue((self.bridge.workspace / 'tmp' / 'z.txt').exists())
+        tree = await self.cmd('tree', 'tmp 3')
+        self.assertIn('a/x.txt', [r['path'] for r in tree['rows']])
+        found = await self.cmd('find', 'z.txt')
+        self.assertEqual([r['path'] for r in found['rows']], ['tmp/z.txt'])
+        ask = await self.cmd('rm', 'tmp')
+        self.assertEqual(ask['kind'], 'confirm')  # rm asks first
+        self.assertTrue((self.bridge.workspace / 'tmp').exists())
+        await self.cmd('rm', ask['command'][3:])
+        self.assertFalse((self.bridge.workspace / 'tmp').exists())
+        with self.assertRaisesRegex(ValueError, 'опасно'):
+            await self.cmd('rm', '--yes ~')
+        lines = await self.cmd('cat', 'notes.txt 2-2')
+        self.assertEqual(lines['text'], 'line2')
 
     async def test_auto_modes(self):
         from backends.sdk import auto_allows
@@ -257,8 +278,9 @@ class FeatureTests(unittest.IsolatedAsyncioTestCase):
         self.bridge.add_usage(other, {'input_tokens': 1, 'output_tokens': 1}, 0.001)
         event = await self.cmd('tokens')
         self.assertEqual(event['kind'], 'tokens')
-        this, total = event['rows']
+        this, project, total = event['rows']
         self.assertEqual((this['input'], this['output'], this['cache']), (110, 5, 100))
+        self.assertEqual(project['input'], 110)
         self.assertEqual((total['input'], total['output']), (111, 6))
         self.assertAlmostEqual(total['cost'], 0.011)
 
@@ -273,6 +295,214 @@ class FeatureTests(unittest.IsolatedAsyncioTestCase):
         rows = todo_rows({'todos': [{'content': 'Fix', 'activeForm': 'Fixing', 'status': 'in_progress'},
                                     {'content': 'Test', 'status': 'pending'}]})
         self.assertEqual(rows, [{'text': 'Fixing', 'status': 'in_progress'}, {'text': 'Test', 'status': 'pending'}])
+
+
+class WorkspaceTests(unittest.IsolatedAsyncioTestCase):
+    """Projects, git, agents, connectors, task manager, Minecraft logs."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.started = []
+        self.finish = asyncio.Queue()
+        async def runner(chat, text):
+            self.started.append((chat.id, text))
+            await self.finish.get()
+        self.bridge = Bridge(self.temp.name, runner)
+        self.ws = self.bridge.workspace
+        (self.ws / 'mod').mkdir()
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def cmd(self, action, text='', mode='cc', **extra):
+        await self.bridge.command({'mode': mode, 'action': action, 'text': text, **extra})
+        return self.bridge.events[-1] if self.bridge.events else None
+
+    async def test_projects_switch_claude_folder_and_chats(self):
+        default_chat = self.bridge.current_chat('cc')
+        self.assertEqual(default_chat.project, 'workspace')
+        await self.cmd('cd', 'mod')
+        await self.cmd('project', 'here')  # project from the file manager folder
+        self.assertEqual(self.bridge.projects.current, 'mod')
+        mod_chat = self.bridge.current_chat('cc')
+        self.assertNotEqual(mod_chat.id, default_chat.id)
+        self.assertEqual(Path(self.bridge.chat_cwd(mod_chat)), (self.ws / 'mod').resolve())
+        menu = await self.cmd('chats')
+        self.assertEqual([r['id'] for r in menu['rows']], [mod_chat.id])  # only this project's chats
+        await self.cmd('project', 'open workspace')
+        self.assertEqual(self.bridge.current_chat('cc').id, default_chat.id)  # its old chat comes back
+        await self.cmd('p', 'open mod')
+        self.assertEqual(self.bridge.current_chat('cc').id, mod_chat.id)
+        listing = await self.cmd('project')
+        self.assertEqual({r['name'] for r in listing['rows']}, {'workspace', 'mod'})
+        await self.cmd('project', 'new fresh')
+        self.assertTrue((self.ws / 'fresh').is_dir())
+        await self.cmd('project', 'rename fresh fresh2')
+        self.assertIn('fresh2', self.bridge.projects.items)
+        await self.cmd('project', 'remove fresh2')
+        self.assertTrue((self.ws / 'fresh').is_dir())  # files untouched
+        self.assertNotIn('fresh2', self.bridge.projects.items)
+        await self.cmd('project', 'open mod')
+        restored = Bridge(self.temp.name)
+        self.assertEqual(restored.projects.current, 'mod')
+        self.assertEqual(restored.current_chat('cc').id, mod_chat.id)
+        await restored.close()
+
+    async def test_git_status_commit_branch_log_diff(self):
+        if not shutil.which('git'):
+            self.skipTest('git not installed')
+        await self.cmd('cd', 'mod')
+        await self.cmd('project', 'here')
+        none = await self.cmd('git')
+        self.assertEqual(none['kind'], 'git_none')
+        await self.cmd('git', 'init')
+        repo = self.ws / 'mod'
+        for key, value in (('user.email', 't@example.com'), ('user.name', 'T')):
+            await self.bridge.git.ok('config', key, value, cwd=repo)
+        (repo / 'a.txt').write_text('one\n', encoding='utf-8')
+        status = await self.cmd('git', 'status')
+        self.assertEqual(status['kind'], 'git_status')
+        self.assertIn('a.txt', [f['path'] for f in status['files']])
+        await self.cmd('git', 'commit first commit')
+        status = self.bridge.events[-1]
+        self.assertEqual(status['files'], [])
+        self.assertIn('first commit', status['last'])
+        (repo / 'a.txt').write_text('two\n', encoding='utf-8')
+        diff = await self.cmd('git', 'diff a.txt')
+        self.assertIn('+two', diff['text'])
+        await self.cmd('git', 'branch feature-x')
+        branches = await self.cmd('git', 'branch')
+        self.assertEqual([r['name'] for r in branches['rows'] if r['current']], ['feature-x'])
+        log = await self.cmd('g', 'log')
+        self.assertEqual(log['rows'][0]['subject'], 'first commit')
+        await self.cmd('git', 'commit')  # no message: Claude writes the commit
+        await asyncio.sleep(0)
+        self.assertIn('коммит', self.started[-1][1])
+
+    async def test_agents_presets_custom_and_project_files(self):
+        listing = await self.cmd('agents')
+        names = {r['name'] for r in listing['rows']}
+        self.assertTrue({'code-reviewer', 'debugger', 'test-writer'} <= names)
+        await self.cmd('agent', 'new api-checker checks REST endpoints')
+        folder = self.ws / '.claude' / 'agents'
+        folder.mkdir(parents=True)
+        (folder / 'lint-fixer.md').write_text('---\nname: lint-fixer\ndescription: Fixes lint\n'
+                                             'tools: Read, Edit\n---\nYou fix lint errors.\n', encoding='utf-8')
+        rows = {r['name']: r for r in (await self.cmd('agents'))['rows']}
+        self.assertEqual(rows['api-checker']['source'], 'свой')
+        self.assertEqual(rows['lint-fixer']['source'], 'проект')
+        self.assertEqual(rows['lint-fixer']['tools'], ['Read', 'Edit'])
+        await self.cmd('agent', 'off debugger')
+        self.assertNotIn('debugger', self.bridge.agents.enabled())
+        definitions = self.bridge.agents.definitions()
+        self.assertIn('lint-fixer', definitions)
+        self.assertNotIn('debugger', definitions)
+        await self.cmd('agent', 'code-reviewer check the last commit')
+        await asyncio.sleep(0)
+        self.assertIn('code-reviewer subagent', self.started[-1][1])
+
+    async def test_spawn_runs_in_parallel_without_switching(self):
+        current = self.bridge.current_chat('cc')
+        event = await self.cmd('spawn', '@test-writer cover utils.py')
+        await asyncio.sleep(0)
+        self.assertEqual(event['kind'], 'spawned')
+        self.assertEqual(self.bridge.current_chat('cc').id, current.id)
+        spawned = self.bridge.chats[event['target']]
+        self.assertIn('test-writer subagent', self.started[-1][1])
+        tasks = await self.cmd('ps')
+        self.assertEqual([r['id'] for r in tasks['rows']], [spawned.id])
+        await self.cmd('stop', spawned.id[:8])
+        self.assertIsNone(spawned.task)
+
+    async def test_connectors_keys_and_servers(self):
+        from unittest import mock
+        rows = {r['id']: r for r in (await self.cmd('connectors'))['rows']}
+        self.assertIn('playwright', rows)
+        self.assertEqual(rows['brave-search']['missing'], ['BRAVE_API_KEY'])
+        with mock.patch('shutil.which', return_value='npx'):
+            need = await self.cmd('connect', 'brave-search')
+            self.assertEqual(need['kind'], 'need_key')
+            await self.cmd('connect', 'brave-search', secret={'BRAVE_API_KEY': 'abc123'})
+            await self.cmd('connect', 'playwright')
+        server = self.bridge.extensions['brave-search']
+        self.assertEqual(server['env']['BRAVE_API_KEY'], 'abc123')
+        self.assertIn('@brave/brave-search-mcp-server', server['args'])
+        self.assertIn('playwright', self.bridge.extensions)
+        self.assertNotIn('abc123', json.dumps(list(self.bridge.events), ensure_ascii=False))  # never echoed
+        await self.cmd('disconnect', 'playwright')
+        self.assertNotIn('playwright', self.bridge.extensions)
+        with mock.patch.object(self.bridge.connectors, 'gh_token', return_value='gho_x'):
+            await self.cmd('connect', 'github')
+        self.assertEqual(self.bridge.extensions['github']['headers']['Authorization'], 'Bearer gho_x')
+        self.bridge.account.set_api_key('sk-ant-keep-me-123456')  # shares secrets.json
+        self.assertEqual(self.bridge.connectors.secrets('brave-search')['BRAVE_API_KEY'], 'abc123')
+        self.assertEqual(self.bridge.account.api_key(), 'sk-ant-keep-me-123456')
+
+    async def test_minecraft_logs_and_cq(self):
+        from backends.sdk import read_game_logs
+        game = Path(self.temp.name)
+        (game / 'crash-reports').mkdir()
+        (game / 'crash-reports' / 'crash-2026-10-27_01.00.00-client.txt').write_text(
+            '---- Minecraft Crash Report ----\nNullPointerException', encoding='utf-8')
+        (game / 'logs').mkdir()
+        (game / 'logs' / 'latest.log').write_text('\n'.join(f'line {i}' for i in range(500)), encoding='utf-8')
+        self.assertIn('NullPointerException', read_game_logs(game, 'crash'))
+        self.assertTrue(read_game_logs(game, 'latest', 30).endswith('line 499'))
+        await self.cmd('q', 'one')
+        await self.cmd('q', 'two')
+        await self.cmd('cq')
+        self.assertFalse(self.bridge.current_chat('cc').queue)
+
+
+class StreamTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.chat = self.bridge.current_chat('cc')
+        self.client = FakeClient()
+        self.turn = SdkTurn(self.bridge, self.chat, self.client, sdk, trusted_replay=True)
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    @staticmethod
+    def delta(text):
+        return sdk.StreamEvent(uuid='u', session_id='s', event={
+            'type': 'content_block_delta', 'delta': {'type': 'text_delta', 'text': text}})
+
+    @staticmethod
+    def done():
+        return sdk.ResultMessage(subtype='success', duration_ms=1, duration_api_ms=1, is_error=False,
+                                 num_turns=1, session_id='s')
+
+    async def test_lines_stream_and_final_text_not_duplicated(self):
+        drive = asyncio.create_task(self.turn.drive('go'))
+        stop = sdk.StreamEvent(uuid='u', session_id='s', event={'type': 'content_block_stop'})
+        for m in (sdk.UserMessage(content='go'), self.delta('Hello wo'), self.delta('rld\nSecond'),
+                  self.delta(' line'),
+                  sdk.AssistantMessage(content=[sdk.TextBlock('Hello world\nSecond line')], model='m'),
+                  stop, self.done()):
+            self.client.out.put_nowait(m)
+        await asyncio.wait_for(drive, 2)
+        parts = [(e['text'], e['first']) for e in self.bridge.events if e['kind'] == 'text_part']
+        self.assertEqual(parts, [('Hello world', True), ('Second line', False)])
+        self.assertFalse([e for e in self.bridge.events if e['kind'] == 'text'])
+
+    async def test_subagent_progress_is_tagged(self):
+        drive = asyncio.create_task(self.turn.drive('go'))
+        for m in (sdk.UserMessage(content='go'),
+                  sdk.AssistantMessage(content=[sdk.ToolUseBlock('t1', 'Task', {
+                      'subagent_type': 'code-reviewer', 'description': 'Review diff'})], model='m'),
+                  sdk.AssistantMessage(content=[sdk.TextBlock('inner notes'),
+                                                sdk.ToolUseBlock('t2', 'Read', {'file_path': 'a.py'})],
+                                       model='m', parent_tool_use_id='t1'),
+                  self.done()):
+            self.client.out.put_nowait(m)
+        await asyncio.wait_for(drive, 2)
+        tools = [(e['text'], e.get('agent')) for e in self.bridge.events if e['kind'] == 'tool']
+        self.assertEqual(tools, [('Агент code-reviewer: Review diff', None), ('Читаю a.py', 'code-reviewer')])
+        self.assertFalse([e for e in self.bridge.events if e['kind'] == 'text'])  # subagent text hidden
 
 
 class AccountTests(unittest.IsolatedAsyncioTestCase):

@@ -2,14 +2,20 @@
   "schemaVersion": 1,
   "id": "claude_chat",
   "version": "${version}",
-  "name": "Claude Chat",
-  "description": "Local Claude Code conversation in Minecraft chat",
+  "name": "Claudecraft",
+  "description": "Claude and Claude Code inside Minecraft: projects, files, git, agents, MCP connectors.",
   "environment": "client",
-  "entrypoints": { "client": ["dev.claudechat.ClaudeChat"] },
+  "entrypoints": {
+    "client": ["dev.claudechat.ClaudeChat"],
+    "modmenu": ["dev.claudechat.ModMenuEntry"]
+  },
   "depends": {
     "fabricloader": ">=0.20.1",
     "minecraft": "26.3",
     "java": ">=25",
     "fabric-api": "*"
+  },
+  "suggests": {
+    "modmenu": "*"
   }
 }

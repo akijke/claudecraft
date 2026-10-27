@@ -50,7 +50,11 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
             raise
 
     def texts(self):
-        return [e['text'] for e in self.bridge.events if e['kind'] == 'text']
+        # Answers stream line by line (text_part); whole blocks (text) only without streaming.
+        return [e['text'] for e in self.bridge.events if e['kind'] in ('text', 'text_part')]
+
+    def stream_kinds(self):
+        return {e['kind'] for e in self.bridge.events if e['kind'] in ('text', 'text_part')}
 
     def errors(self):
         return [e['text'] for e in self.bridge.events if e['kind'] == 'error']
@@ -95,6 +99,7 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         await self.until(lambda: chat.task is None)
         self.assertEqual(self.errors(), [])
         self.assertEqual(self.texts(), ['first answer', 'answer to extra'])
+        self.assertEqual(self.stream_kinds(), {'text_part'})  # shown while generated, no duplicates
         self.assertEqual(self.runs, ['tell a story'])
         self.assertIn('EXTRA question', FakeAnthropic.user_texts(self.fake.requests[1]))
 

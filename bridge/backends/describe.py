@@ -6,7 +6,7 @@ Minecraft font (unifont fallback) can draw; no colour emoji.
 from pathlib import Path
 
 # Tools that only read or edit files inside the project: auto mode "edits" allows them.
-EDIT_TOOLS = {'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep', 'LS', 'TodoWrite'}
+EDIT_TOOLS = {'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep', 'LS', 'TodoWrite', 'Task'}
 
 
 def short_path(value, cwd):
@@ -55,7 +55,8 @@ def describe(name, data, cwd=None):
     if name == 'TodoWrite':
         return '☰', 'Обновляю план'
     if name in ('Task', 'Agent'):
-        return '◆', f'Запускаю помощника: {clip(data.get("description") or data.get("prompt", ""), 100)}'
+        who = data.get('subagent_type') or 'помощник'
+        return '◆', f'Агент {who}: {clip(data.get("description") or data.get("prompt", ""), 100)}'
     if name == 'AskUserQuestion':
         return '?', 'Задаю вопрос'
     if name.startswith('mcp__'):

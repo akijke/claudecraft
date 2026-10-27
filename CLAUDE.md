@@ -84,6 +84,22 @@ backends/describe.py. Значки только из проверенных на
 usage. Токены: usage в ResultMessage — за ход, total_cost_usd — накопительно за
 процесс CLI (проверено на реальном CLI), поэтому стоимость считается по приращению.
 
+Рабочий инструмент (2026-10-27). Пользователь: «это мод для программиста», не про
+геймплей; готовые зависимости брать охотно. Модули моста: backends/projects.py
+(проект = имя+папка; у /cc-чата поле project; рабочая папка Claude = папка проекта;
+open_project возвращает чаты проекта), files.py (файловый менеджер, своя папка на
+режим, НЕ двигает Claude; rm с подтверждением), gitops.py (git/gh, сеть в фоне,
+`git commit` без текста = задача Claude), agents.py (пресеты + agents.json +
+<проект>/.claude/agents/*.md → ClaudeAgentOptions.agents, инструмент Task),
+connectors.py (каталог MCP из npm с проверенными env; секреты в secrets.json вместе
+с API-ключом; статус из init.mcp_servers). sdk.py: include_partial_messages →
+события text_part построчно (AssistantMessage-текст тогда не дублируется),
+субагенты по parent_tool_use_id (поле agent), RateLimitEvent → /c tokens,
+инструмент minecraft_logs. Bridge: tasks/spawn/stop, /state для окна, history.
+Мод: ConversationScreen (клавиша K, свой hit-test стилей, Ctrl+Enter), KeyScreen
+(ключи коннекторов, не через чат), WorkStyle (новые kind'ы), Mod Menu (compileOnly
+21.0.0, entrypoint modmenu). Игровые п.2–3 (Claude видит/действует в игре) отложены.
+
 Прочее: /events возвращает boot id моста; мод шлёт его обратно, при смене моста
 курсор сбрасывается (раньше после перезапуска моста события пропадали). Новый
 клиент без boot начинает с текущего момента (старую историю не проигрывает).
