@@ -862,6 +862,26 @@ class OAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.bridge.oauth.has_token('fake'))
 
 
+class DoctorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_report_rows_and_english(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(temp.name, AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        bridge.account.status = AsyncMock(return_value={'account': {'logged_in': False}})
+        with mock.patch('shutil.which', lambda name, *a, **k: None):
+            await bridge.command({'mode': 'cc', 'action': 'doctor'})
+        event = [e for e in bridge.events if e['kind'] == 'doctor'][-1]
+        rows = {r['name']: r for r in event['rows']}
+        self.assertEqual(rows['Python']['status'], 'ok')
+        self.assertEqual(rows['git']['status'], 'fail')
+        self.assertEqual(rows['git']['value'], 'not found')          # translated (English default)
+        self.assertIn('git-scm.com', rows['git']['hint'])
+        self.assertEqual(rows['Claude account']['status'], 'warn')
+        self.assertEqual(event['overall'], 'fail')
+        self.assertNotIn('token', json.dumps(event).lower())
+
+
 class ModelTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()

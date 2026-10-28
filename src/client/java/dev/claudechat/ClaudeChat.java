@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -407,6 +407,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "c", L.t("чаты · new · rename · status · cancel · restart · tokens · auto")},
             {c + "compact", L.t("[фокус] — сжать историю, когда контекст заполнен · context — сколько занято")},
             {c + "model", L.t("модель и усилие для этого чата (opus, sonnet, haiku · low…max)")},
+            {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
             {"/pty", L.t("[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один")},

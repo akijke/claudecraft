@@ -156,6 +156,25 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "doctor" -> {
+                String overall = s(e, "overall");
+                out.add(line(mode, lit(L.t("◎ Диагностика"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(overall.equals("ok") ? L.t("  всё в порядке") : overall.equals("warn") ? L.t("  есть предупреждения")
+                        : L.t("  есть проблемы"), overall.equals("ok") ? GREEN : overall.equals("warn") ? GOLD : RED)).append(sp())
+                    .append(button("⟳ " + L.t("ещё раз"), cmd + "doctor", false, AQUA, null))));
+                for (JsonElement item : e.getAsJsonArray("rows")) {
+                    JsonObject r = item.getAsJsonObject();
+                    String st = s(r, "status");
+                    int color = st.equals("ok") ? GREEN : st.equals("warn") ? GOLD : st.equals("fail") ? RED : DIM;
+                    String icon = st.equals("ok") ? "✔ " : st.equals("warn") ? "⚠ " : st.equals("fail") ? "✖ " : "· ";
+                    MutableComponent row = lit("  " + icon, color).append(lit(s(r, "name") + "  ", TEXT)).append(lit(s(r, "value"), DIM));
+                    if (!s(r, "hint").isEmpty() && !st.equals("ok"))
+                        row.withStyle(x -> x.withHoverEvent(new HoverEvent.ShowText(lit(s(r, "hint"), TEXT))));
+                    out.add(line(mode, row));
+                    if (!s(r, "hint").isEmpty() && (st.equals("warn") || st.equals("fail")))
+                        out.add(line(mode, lit("      → " + s(r, "hint"), FAINT)));
+                }
+            }
             case "edit_diff" -> {
                 out.add(line(mode, lit("± ", GOLD).append(lit(s(e, "text"), TEXT)).append(sp())
                     .append(lit("+" + n(e, "added"), GREEN)).append(lit(" −" + n(e, "removed"), RED)).append(sp())

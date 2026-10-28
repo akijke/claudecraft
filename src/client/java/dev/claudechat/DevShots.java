@@ -66,7 +66,9 @@ final class DevShots {
             case 495 -> Screenshot.grab(client, true);
             case 510 -> client.setScreenAndShow(new ChatPreview(EDITS));
             case 540 -> Screenshot.grab(client, true);
-            case 550 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 545 -> client.setScreenAndShow(new ChatPreview(DOCTOR));
+            case 556 -> Screenshot.grab(client, true);
+            case 560 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
             case 720 -> client.stop();
@@ -118,6 +120,18 @@ final class DevShots {
         "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Done\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092,\"context\":162000,\"window\":200000}",
         "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"context_warn\",\"text\":\"Context is 81% full — compress the history: /cc compact [what to focus on]\",\"percent\":81}",
         "{\"seq\":15,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r1\",\"text\":\"Bash\\n{}\",\"summary\":\"$ git push\",\"choices\":[\"Allow\",\"Deny\",\"Always allow Bash\"]}",
+    };
+
+    private static final String[] DOCTOR = {
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"doctor\",\"text\":\"Diagnostics\",\"overall\":\"warn\",\"rows\":["
+            + "{\"name\":\"Python\",\"status\":\"ok\",\"value\":\"3.13.18\",\"hint\":\"\"},"
+            + "{\"name\":\"Claude Code CLI\",\"status\":\"ok\",\"value\":\"2.1.310 (Claude Code)\",\"hint\":\"\"},"
+            + "{\"name\":\"git\",\"status\":\"ok\",\"value\":\"git version 2.54.0\",\"hint\":\"\"},"
+            + "{\"name\":\"node\",\"status\":\"fail\",\"value\":\"not found\",\"hint\":\"nodejs.org — needed by npx connectors and Codex CLI\"},"
+            + "{\"name\":\"codex CLI\",\"status\":\"warn\",\"value\":\"not found\",\"hint\":\"Only for Codexcraft\"},"
+            + "{\"name\":\"Claude account\",\"status\":\"ok\",\"value\":\"claude.ai pro\",\"hint\":\"\"},"
+            + "{\"name\":\"Free disk space\",\"status\":\"ok\",\"value\":\"129.3 GB\",\"hint\":\"\"},"
+            + "{\"name\":\"Rights\",\"status\":\"info\",\"value\":\"regular user\",\"hint\":\"\"}]}",
     };
 
     private static final String[] EDITS = {

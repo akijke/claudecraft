@@ -659,6 +659,10 @@ class Bridge:
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
         elif action == 'tokens':
             self.tokens_report(chat)
+        elif action == 'doctor':
+            from backends.doctor import report
+            data = await report(self)
+            self.emit(chat, 'Диагностика', kind='doctor', **data)
         elif action == 'compact':
             if chat.backend == 'api':
                 raise ValueError('compact работает в чатах Claude Code (SDK)')

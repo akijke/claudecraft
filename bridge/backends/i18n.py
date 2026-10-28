@@ -157,6 +157,41 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Диагностика': 'Diagnostics',
+    'Нужен Python 3.11+': 'Python 3.11+ is needed',
+    'pip install -r requirements.txt (мост ставит сам при запуске)': 'pip install -r requirements.txt (the bridge does it on start)',
+    'Встроен в SDK; если пусто — переустанови зависимости моста': 'Bundled with the SDK; if missing, reinstall the bridge dependencies',
+    'Установи git: git-scm.com — нужен для /cc git и worktrees': 'Install git: git-scm.com — needed for /cc git and worktrees',
+    'cli.github.com — для PR, issues и входа в GitHub': 'cli.github.com — for PRs, issues and GitHub sign-in',
+    'nodejs.org — нужен коннекторам через npx и Codex CLI': 'nodejs.org — needed by npx connectors and Codex CLI',
+    'Ставится вместе с Node.js': 'Comes with Node.js',
+    'Нужен только для Codexcraft: кнопка «Установить Codex CLI» в его настройках': "Only for Codexcraft: the 'Install Codex CLI' button in its settings",
+    'Необязательно: только для работы в контейнере': 'Optional: only for working in a container',
+    'не найден': 'not found',
+    'не запускается: {}': 'does not start: {}',
+    'вход выполнен': 'signed in',
+    'нет входа': 'not signed in',
+    'Войди в GitHub: /claude → GitHub или gh auth login': 'Sign in to GitHub: /claude → GitHub or gh auth login',
+    'Аккаунт Claude': 'Claude account',
+    'не выполнен вход': 'not signed in',
+    'Войди: /claude (настройки) → «Войти», либо задай API-ключ': 'Sign in: /claude (settings) → Sign in, or set an API key',
+    'Порт моста': 'Bridge port',
+    'Соседний мост': 'Other bridge',
+    '{}: занят (работает второй мод)': '{}: in use (the other mod is running)',
+    '{}: свободен': '{}: free',
+    'Папка моста': 'Bridge folder',
+    'Нет прав на запись в эту папку': 'No write access to this folder',
+    'Проект': 'Project',
+    'Папка проекта недоступна для записи — Claude не сможет править файлы': 'The project folder is not writable — Claude cannot edit files',
+    'Свободно на диске': 'Free disk space',
+    '{} ГБ': '{} GB',
+    'Меньше 2 ГБ — сборки и npm могут не поместиться': 'Under 2 GB — builds and npm may not fit',
+    'Права': 'Rights',
+    'администратор': 'administrator',
+    'обычный пользователь': 'regular user',
+    'Команды Claude выполняются с правами этого пользователя': "Claude's commands run with this user's rights",
+    'Коннектор {}': 'Connector {}',
+    '/cc connect {} — проверь ключ или вход': '/cc connect {} — check the key or sign-in',
     'Контекст заполнен на {}% — сожми историю: /cc compact [на чём сосредоточиться]':
         'Context is {}% full — compress the history: /cc compact [what to focus on]',
     'compact работает в чатах Claude Code (SDK)': 'compact works in Claude Code (SDK) chats',
@@ -299,6 +334,9 @@ def translate_event(event, lang):
         out[key] = to_english(out[key])
     if isinstance(out.get('rows'), list) and out.get('kind') in ('tokens', 'tasks', 'agents', 'connectors', 'chats', 'projects'):
         out['rows'] = [{k: (to_english(v) if k in UI_KEYS else v) for k, v in r.items()} if isinstance(r, dict) else r
+                       for r in out['rows']]
+    if out.get('kind') == 'doctor' and isinstance(out.get('rows'), list):
+        out['rows'] = [{k: (to_english(v) if k in ('name', 'value', 'hint') else v) for k, v in r.items()}
                        for r in out['rows']]
     if isinstance(out.get('fields'), list):
         out['fields'] = [{k: (to_english(v) if k in UI_KEYS else v) for k, v in f.items()} for f in out['fields']]

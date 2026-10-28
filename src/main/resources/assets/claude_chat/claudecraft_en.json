@@ -401,5 +401,11 @@
   "[фокус] — сжать историю, когда контекст заполнен · context — сколько занято": "[focus] — compress the history when the context is full · context — how much is used",
   "сжать": "compact",
   "◎ Контекст": "◎ Context",
-  "Открыть в редакторе: строка ": "Open in the editor: line "
+  "Открыть в редакторе: строка ": "Open in the editor: line ",
+  "  всё в порядке": "  all good",
+  "  есть предупреждения": "  some warnings",
+  "  есть проблемы": "  problems found",
+  "ещё раз": "again",
+  "◎ Диагностика": "◎ Diagnostics",
+  "проверить Python, git, gh, node, CLI, вход, порты и права — с советами": "check Python, git, gh, node, CLIs, sign-in, ports and rights — with advice"
 }
