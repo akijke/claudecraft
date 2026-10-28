@@ -153,6 +153,9 @@ final class WorkStyle {
                 out.add(line("cc", lit("  " + L.t("Та же сессия: в игре и на ПК видно одно и то же. Не пиши в неё в двух местах одновременно."),
                     b(e, "busy") ? GOLD : FAINT)));
             }
+            case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
+                .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
+                .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
             case "edit_diff" -> {
                 out.add(line(mode, lit("± ", GOLD).append(lit(s(e, "text"), TEXT)).append(sp())
                     .append(lit("+" + n(e, "added"), GREEN)).append(lit(" −" + n(e, "removed"), RED)).append(sp())

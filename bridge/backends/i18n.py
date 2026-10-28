@@ -157,6 +157,12 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Картинка для Claude: {}': 'Picture for Claude: {}',
+    'Картинка должна быть PNG, JPG, GIF или WebP': 'The picture must be PNG, JPG, GIF or WebP',
+    'Картинка больше 5 МБ — уменьши её': 'The picture is over 5 MB — make it smaller',
+    'img: /cc img <файл> [вопрос]': 'img: /cc img <file> [question]',
+    'Картинки работают в чатах Claude Code (SDK), не в Messages API-чате. /c new local':
+        'Pictures work in Claude Code (SDK) chats, not in a Messages API chat. /c new local',
     'Правки Claude': "Claude's edits",
     'Откат правок Claude': "Undo of Claude's edits",
     'Claude ещё работает над этим запросом — дождись конца или /cc cancel':

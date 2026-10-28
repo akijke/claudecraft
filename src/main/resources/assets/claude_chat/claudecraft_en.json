@@ -364,5 +364,8 @@
   "ещё строк: ": "more lines: ",
   "история": "history",
   "откатить": "undo",
-  "откатить файлы, изменённые Claude в последнем запросе · undo list — история": "restore files Claude changed in the last request · undo list — history"
+  "откатить файлы, изменённые Claude в последнем запросе · undo list — история": "restore files Claude changed in the last request · undo list — history",
+  "[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка": "[question] — game screenshot for Claude · img <file> [question] — any picture",
+  "Скриншот": "Screenshot",
+  "Снимок игры без интерфейса → Claude; текст из поля уйдёт вопросом": "Game screenshot without the GUI → Claude; the text in the box goes along as the question"
 }

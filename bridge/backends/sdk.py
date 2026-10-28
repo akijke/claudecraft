@@ -20,6 +20,7 @@ import logging
 from urllib.parse import urlparse
 from backends.describe import EDIT_TOOLS, describe, todo_rows, clip
 from backends import undo as undo_files
+from backends import images
 
 
 log = logging.getLogger('claudecraft.sdk')
@@ -106,14 +107,24 @@ class SdkTurn:
             if not self.accepting:
                 raise TurnClosed()
             # Register first: the reader must not finish while this write is in flight.
-            self.sent += 1
-            self.unacked.append(text)
             try:
-                await self.client.query(text)
+                await self.write(text)
             except Exception:
                 self.sent -= 1
                 self.unacked.pop()
                 raise
+
+    async def write(self, text):
+        """Counts the message as sent and writes it; image markers become image blocks."""
+        plain, message = images.user_message(text)
+        self.sent += 1
+        self.unacked.append(text if message is None else plain)
+        if message is None:
+            await self.client.query(text)
+        else:
+            async def one():
+                yield message
+            await self.client.query(one())
 
     def acknowledge(self, message):
         """Match an echoed prompt against sent texts.
@@ -161,9 +172,7 @@ class SdkTurn:
     async def drive(self, text):
         T = self.types
         async with self.write_lock:
-            self.sent += 1
-            self.unacked.append(text)
-            await self.client.query(text)
+            await self.write(text)
         error = None
         try:
             async for message in self.client.receive_messages():

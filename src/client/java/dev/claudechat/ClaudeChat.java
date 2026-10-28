@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo",
+        "tokens", "usage", "auto", "model", "effort", "undo", "img", "image",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -67,6 +67,10 @@ public final class ClaudeChat implements ClientModInitializer {
     private Path connection;
     final BridgeLauncher launcher = new BridgeLauncher(this::bridgeAnswers);
     private volatile Supplier<Screen> openNext;
+    // /cc shot: hide the GUI for a couple of frames, grab the frame, send it to Claude.
+    private int shotTicks;
+    private String shotMode, shotQuestion;
+    private boolean shotHidGui, shotReopen;
     private final DevShots devShots = new DevShots(this);
     private volatile long cursor;
     // Bridge instance id: when it changes the bridge restarted and its event numbers reset.
@@ -122,6 +126,7 @@ public final class ClaudeChat implements ClientModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             devShots.tick(client);
+            if (shotTicks > 0 && --shotTicks == 0) takeShot(client);
             while (openKey.consumeClick()) open(() -> new ConversationScreen(this));
             Supplier<Screen> next = openNext;
             if (next != null) {
@@ -167,6 +172,51 @@ public final class ClaudeChat implements ClientModInitializer {
     }
 
     void open(Supplier<Screen> screen) { openNext = screen; }
+
+    /** Game screenshot for Claude (without HUD and menus); the question goes with it. */
+    void screenshot(String mode, String question) {
+        Minecraft client = Minecraft.getInstance();
+        shotMode = mode;
+        shotQuestion = question == null ? "" : question.strip();
+        shotReopen = client.gui.screen() instanceof ConversationScreen;
+        if (client.gui.screen() != null) client.setScreenAndShow(null);
+        shotHidGui = !client.gui.hud.isHidden();
+        if (shotHidGui) client.gui.hud.toggle();
+        shotTicks = 4;  // the chat/K screen closes and a clean frame is drawn first
+    }
+
+    private void takeShot(Minecraft client) {
+        var target = client.gameRenderer.mainRenderTarget();
+        int factor = Math.max(1, (int) Math.ceil(Math.max(target.width / 1600.0, target.height / 1600.0)));
+        String mode = shotMode, question = shotQuestion;
+        boolean reopen = shotReopen;
+        net.minecraft.client.Screenshot.takeScreenshot(target, factor, image -> {
+            client.execute(() -> {
+                if (shotHidGui && client.gui.hud.isHidden()) client.gui.hud.toggle();
+                if (reopen) client.setScreenAndShow(new ConversationScreen(this));
+            });
+            Path file = FabricLoader.getInstance().getConfigDir().resolve("claude-chat/shots/shot-"
+                + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date()) + ".png");
+            io.execute(() -> {
+                try (image) {
+                    Files.createDirectories(file.getParent());
+                    image.writeToFile(file);
+                    keepNewestShots(file.getParent(), 30);
+                    send(mode, command(mode, "img", "\"" + file + "\" " + question));
+                } catch (Exception e) {
+                    Minecraft.getInstance().execute(() -> say(mode, L.t("Ошибка: ") + e.getMessage()));
+                }
+            });
+        });
+    }
+
+    private static void keepNewestShots(Path folder, int keep) throws java.io.IOException {
+        try (var files = Files.list(folder)) {
+            List<Path> shots = files.filter(f -> f.getFileName().toString().startsWith("shot-"))
+                .sorted(Comparator.reverseOrder()).toList();
+            for (Path old : shots.subList(Math.min(keep, shots.size()), shots.size())) Files.deleteIfExists(old);
+        }
+    }
 
     /** /claude [settings|ui|key <connector>]. */
     private void claudeCommand(String input) {
@@ -218,6 +268,7 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
+        if (action.equals("shot") || action.equals("screenshot")) { screenshot(mode, text); return; }
         if (Set.of("edit", "nano", "vim").contains(action)) {
             if (text.isBlank()) { say(mode, L.t("Формат: /edit <файл>")); return; }
             String file = text.strip().replaceAll("^\"|\"$", "");
@@ -346,6 +397,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "c", L.t("чаты · new · rename · status · cancel · restart · tokens · auto")},
             {c + "model", L.t("модель и усилие для этого чата (opus, sonnet, haiku · low…max)")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
+            {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},

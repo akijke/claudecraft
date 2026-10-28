@@ -18,6 +18,7 @@ from backends.agents import Agents
 from backends.connectors import Connectors
 from backends.files import FileManager
 from backends.undo import Checkpoints
+from backends import images
 from backends.gitops import Git
 from backends.shell import Shell
 from backends.github import GitHub
@@ -374,7 +375,7 @@ class Bridge:
         else:
             chat.queue.append(text)
         if chat.title == 'Новый чат':
-            chat.title = text[:60]
+            chat.title = images.display(text)[:60]
             self.persist()
         if chat.task is None:
             chat.task = asyncio.create_task(self.pump(chat))
@@ -604,6 +605,19 @@ class Bridge:
             await self.enqueue(chat, text)
         elif action == 'f':
             await self.force(chat, text)
+        elif action == 'img':
+            # /cc img [f] <file> [question]; the mod's /cc shot sends a fresh screenshot here.
+            force = text.startswith('f ')
+            path, question = images.split_arg(text[2:] if force else text,
+                                              lambda p: self.files.resolve(mode, p).is_file())
+            if not path:
+                raise ValueError('img: /cc img <файл> [вопрос]')
+            if chat.backend == 'api':
+                raise ValueError('Картинки работают в чатах Claude Code (SDK), не в Messages API-чате. /c new local')
+            path = images.check(self.files.resolve(mode, path))
+            prompt = images.marked([path], question)
+            self.emit(chat, f'Картинка для Claude: {path.name}', kind='image', path=str(path), question=question)
+            await (self.force(chat, prompt) if force else self.enqueue(chat, prompt))
         elif action in ('cancel', 'restart'):
             await self.stop(chat)
             self.emit(chat, 'Остановлено; очередь очищена. История сохранена.', kind='status')
@@ -867,7 +881,8 @@ ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls'
            'usage': 'tokens', 'cq': 'clearqueue', 'p': 'project', 'projects': 'project', 'g': 'git',
            'ps': 'tasks', 'jobs': 'tasks', 'mcp': 'connectors', 'unconnect': 'disconnect_connector',
            'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn',
-           'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh'}
+           'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh',
+           'image': 'img', 'picture': 'img'}
 MODELS = ('opus', 'sonnet', 'haiku')
 EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
 USAGE_KEYS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')

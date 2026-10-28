@@ -211,6 +211,13 @@ final class ConversationScreen extends Screen {
             .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Дописать в текущую работу, без отмены")))).build());
         addRenderableWidget(Button.builder(Component.literal("⏹"), b -> mod.dispatch(mode, "cancel"))
             .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Остановить и очистить очередь")))).build());
+        addRenderableWidget(Button.builder(Component.literal("◎ " + L.t("Скриншот")), b -> {
+                String question = input.getValue().strip();
+                input.setValue("");
+                draft = "";
+                mod.screenshot(mode, question);
+            }).bounds(bx, height - 18, 88, 16)
+            .tooltip(Tooltip.create(Component.literal(L.t("Снимок игры без интерфейса → Claude; текст из поля уйдёт вопросом")))).build());
         setInitialFocus(input);
         dirty = true;
     }

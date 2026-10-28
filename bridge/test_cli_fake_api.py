@@ -9,6 +9,7 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 from bridge import Bridge
 from fake_anthropic import FakeAnthropic, text, tool
@@ -157,6 +158,29 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(os.path.exists(made))
         with self.assertRaises(ValueError):
             await self.bridge.command({'mode': 'cc', 'action': 'undo'})
+
+    async def test_image_reaches_api_and_session_file(self):
+        await self.start([text('a red pixel')])
+        png = os.path.join(self.bridge.workspace, 'shot one.png')
+        with open(png, 'wb') as f:  # 1x1 PNG
+            f.write(bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010806000000'
+                                  '1f15c4890000000d49444154789c63f8cfc0f01f0005000201a5f0b5c50000000049454e44ae426082'))
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'img', 'text': png + ' what is on it?'})
+        await self.until(lambda: chat.task is None)
+        self.assertEqual(self.errors(), [])
+        self.assertIn('a red pixel', self.texts())
+        content = [b for m in self.fake.requests[0]['messages'] if m['role'] == 'user'
+                   and isinstance(m['content'], list) for b in m['content']]
+        kinds = [b.get('type') for b in content if isinstance(b, dict)]
+        self.assertIn('image', kinds)
+        self.assertIn('what is on it?', json.dumps(content))
+        self.assertEqual(chat.title, '[image shot one.png] what is on it?')
+        # The session transcript (what Claude Code on the PC opens) keeps the picture.
+        stored = []
+        for root, _, names in os.walk(os.path.join(self.temp.name, 'claude-config', 'projects')):
+            stored += [Path(root, n).read_text(encoding='utf-8') for n in names if n.endswith('.jsonl')]
+        self.assertTrue(any('"type":"image"' in s.replace(' ', '') for s in stored))
 
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])

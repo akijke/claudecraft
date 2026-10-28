@@ -346,6 +346,10 @@ final class FileScreen extends Screen {
 
     private void askClaude() {
         String target = current() != null ? child(current().get("name").getAsString()) : path();
+        if (target.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g|gif|webp)$")) {
+            openConversation("/cc img \"" + target + "\" ");  // the picture itself goes to Claude
+            return;
+        }
         openConversation(L.t("Посмотри ") + target + ": ");
     }
 
