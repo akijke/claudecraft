@@ -611,5 +611,10 @@
   "Расходы: графики": "Spending: charts",
   "графики расходов по дням, проектам и моделям": "spending charts by day, project and model",
   "строка… (Enter)": "line… (Enter)",
-  " курсоров": " carets"
+  " курсоров": " carets",
+  "Форматирую…": "Formatting…",
+  "Уже отформатировано": "Already formatted",
+  "Отформатировано: ": "Formatted: ",
+  " · Ctrl+S — сохранить": " · Ctrl+S — save",
+  "Форматировать (Ctrl+Shift+F)": "Format (Ctrl+Shift+F)"
 }

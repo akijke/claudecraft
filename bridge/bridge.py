@@ -1464,6 +1464,14 @@ def create_app(bridge, token):
         days = max(1, min(int(request.query.get('days') or 14), 90))
         return web.json_response(await asyncio.to_thread(bridge.ledger.aggregate, days))
     app.router.add_get('/usage', usage)
+    async def format_code(request):
+        from backends import formatters
+        data = await request.json()
+        mode = data.get('mode') if data.get('mode') in ('c', 'cc') else 'cc'
+        path = bridge.files.resolve(mode, data.get('path', ''))
+        text, tool = await formatters.format_text(path, str(data.get('text', '')))
+        return web.json_response({'text': text, 'tool': tool})
+    app.router.add_post('/format', format_code)
     async def index(request):
         mode = request.query.get('mode', 'cc')
         chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')

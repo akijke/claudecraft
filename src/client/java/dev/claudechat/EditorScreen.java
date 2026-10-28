@@ -340,6 +340,33 @@ final class EditorScreen extends Screen {
 
     private void say(String text, int color) { message = text; messageColor = color; }
 
+    /** Ctrl+Shift+F: the installed formatter (ruff/black, prettier, google-java-format, gofmt…) via the bridge. */
+    private void format() {
+        if (!loaded) return;
+        JsonObject body = new JsonObject();
+        body.addProperty("mode", "cc");
+        body.addProperty("path", path);
+        body.addProperty("text", String.join("\n", lines) + "\n");
+        say(L.t("Форматирую…"), 0xFF8A8A8A);
+        CompletableFuture.supplyAsync(() -> {
+            try { return mod.request("/format", body); }
+            catch (Exception e) { JsonObject o = new JsonObject(); o.addProperty("error", e.getMessage()); return o; }
+        }, mod.io).thenAccept(r -> minecraft.execute(() -> {
+            if (r.has("error")) { say(r.get("error").getAsString(), 0xFFF2C14E); return; }
+            String text = r.get("text").getAsString();
+            List<String> formatted = new ArrayList<>(List.of(text.split("\n", -1)));
+            if (formatted.size() > 1 && formatted.get(formatted.size() - 1).isEmpty()) formatted.remove(formatted.size() - 1);
+            if (formatted.equals(lines)) { say(L.t("Уже отформатировано") + " (" + r.get("tool").getAsString() + ")", 0xFF8A8A8A); return; }
+            snapshot();  // Ctrl+Z brings the old text back
+            lines.clear();
+            lines.addAll(formatted);
+            row = Math.min(row, lines.size() - 1);
+            col = Math.min(col, lines.get(row).length());
+            anchorRow = -1;
+            say("✔ " + L.t("Отформатировано: ") + r.get("tool").getAsString() + L.t(" · Ctrl+S — сохранить"), 0xFF6BD08B);
+        }));
+    }
+
     // ---- layout -------------------------------------------------------------
     @Override protected void init() {
         areaX = 6;
@@ -383,7 +410,8 @@ final class EditorScreen extends Screen {
             ConversationScreen.prefill("cc", L.t("Посмотри ") + path + ": ");
             minecraft.setScreenAndShow(new ConversationScreen(mod));
         });
-        button(x, "💾 " + L.t("Сохранить"), "Ctrl+S", () -> save(confirmOverwrite));
+        x = button(x, "💾 " + L.t("Сохранить"), "Ctrl+S", () -> save(confirmOverwrite));
+        button(x, "{ }", L.t("Форматировать (Ctrl+Shift+F)"), this::format);
         if (goingTo) {
             gotoBox = new net.minecraft.client.gui.components.EditBox(font, 6, 29, 120, 18, Component.literal("line"));
             gotoBox.setHint(Component.literal(L.t("строка… (Enter)")));
@@ -603,6 +631,7 @@ final class EditorScreen extends Screen {
         if (key == InputConstants.KEY_ESCAPE && !carets.isEmpty()) { carets.clear(); return true; }
         if (key == InputConstants.KEY_ESCAPE) { if (finding) closeFind(); else onClose(); return true; }
         if (ctrl && key == InputConstants.KEY_G) { openGoto(); return true; }
+        if (ctrl && shift && key == InputConstants.KEY_F) { format(); return true; }
         if (ctrl && shift && key == InputConstants.KEY_LBRACKET) { toggleFold(row); return true; }
         if (ctrl && shift && key == InputConstants.KEY_RBRACKET) { folds.clear(); return true; }
         if (ctrl && alt && (key == InputConstants.KEY_UP || key == InputConstants.KEY_DOWN)) {
@@ -612,7 +641,7 @@ final class EditorScreen extends Screen {
             return true;
         }
         if (!loaded) return super.keyPressed(event);
-        if (ctrl && key == InputConstants.KEY_F) { openFind(false); return true; }
+        if (ctrl && !shift && key == InputConstants.KEY_F) { openFind(false); return true; }
         if (ctrl && key == InputConstants.KEY_H) { openFind(true); return true; }
         if (key == InputConstants.KEY_F3 || (inFind && key == InputConstants.KEY_RETURN)) {
             if (inFind && getFocused() == replaceBox) replaceOne(); else nextMatch(shift ? -1 : 1);

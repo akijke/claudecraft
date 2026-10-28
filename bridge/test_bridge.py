@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from urllib.parse import quote
@@ -1119,6 +1120,41 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
                 break
             await asyncio.sleep(0.02)
         self.assertEqual(bridge.runner.await_args.args[1], 'waits')
+
+
+class FormatterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_formatter_from_path_and_missing_hint(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        tools = Path(temp.name) / 'tools'
+        tools.mkdir()
+        script = tools / 'fake_ruff.py'
+        script.write_text('import sys\nsys.stdin.reconfigure(encoding="utf-8")\n'
+                          'print("ARGS", " ".join(sys.argv[1:3]))\nsys.stdout.write(sys.stdin.read().upper())\n', encoding='utf-8')
+        if os.name == 'nt':
+            (tools / 'ruff.cmd').write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding='utf-8')
+        else:
+            (tools / 'ruff').write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding='utf-8')
+            (tools / 'ruff').chmod(0o755)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        app = create_app(bridge, 't')
+        async def post(body):
+            request = make_mocked_request('POST', '/format', headers={'Authorization': 'Bearer t'})
+            request.json = AsyncMock(return_value=body)
+            route = await app.router.resolve(request)
+            r = await app.middlewares[0](request, route.handler)
+            return r.status, json.loads(r.text)
+        with mock.patch.dict(os.environ, {'PATH': str(tools) + os.pathsep + os.environ.get('PATH', '')}):
+            status, data = await post({'mode': 'cc', 'path': 'x.py', 'text': 'a = 1\n'})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(data['tool'], 'ruff')
+        self.assertIn('ARGS format --stdin-filename', data['text'])
+        self.assertIn('A = 1', data['text'])
+        with mock.patch('shutil.which', lambda *a, **k: None):
+            status, data = await post({'mode': 'cc', 'path': 'x.py', 'text': 'a'})
+        self.assertEqual(status, 400)
+        self.assertIn('pip install ruff', data['error'])
 
 
 class LedgerTests(unittest.IsolatedAsyncioTestCase):
