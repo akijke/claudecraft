@@ -59,6 +59,10 @@ final class ConversationScreen extends Screen {
 
     static boolean isOpen() { return open; }
 
+    private static volatile String visibleChat = "";
+    /** Chat currently shown in the window (notifications skip it). */
+    static String shownChat() { return visibleChat; }
+
     /** Opens the next conversation window on `m` with `text` already in the input box. */
     static void prefill(String m, String text) { mode = m; draft = text; }
     static void changed() { dirty = true; }
@@ -128,6 +132,7 @@ final class ConversationScreen extends Screen {
         lines.clear();
         String chat = selectedChat();
         shownChat = chat;
+        visibleChat = chat;
         Deque<JsonObject> events = mod.log.get(chat);
         if (events != null) {
             for (JsonObject e : events)

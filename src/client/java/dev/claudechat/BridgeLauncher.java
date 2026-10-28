@@ -55,6 +55,16 @@ final class BridgeLauncher {
     /** "en" (default) or "ru"; the bridge reads the same client.json. */
     String language() { return settings.has("language") && settings.get("language").getAsString().equals("ru") ? "ru" : "en"; }
 
+    /** Boolean client setting (hud, toasts, sound …) from client.json. */
+    boolean flag(String key, boolean fallback) {
+        return settings.has(key) ? settings.get(key).getAsBoolean() : fallback;
+    }
+
+    void setFlag(String key, boolean value) {
+        settings.addProperty(key, value);
+        write();
+    }
+
     void setLanguage(String language) {
         settings.addProperty("language", language);
         write();

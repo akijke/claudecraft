@@ -319,5 +319,11 @@
   "Усилие": "Effort",
   "Дольше думает, тратит больше лимита": "Thinks longer, uses more of the limit",
   "Для этого чата, со следующего запроса. Можно и полный id: model claude-…": "For this chat, from the next request. A full id works too: model claude-…",
-  "модель и усилие для этого чата (opus, sonnet, haiku · low…max)": "model and effort for this chat (opus, sonnet, haiku · low…max)"
+  "модель и усилие для этого чата (opus, sonnet, haiku · low…max)": "model and effort for this chat (opus, sonnet, haiku · low…max)",
+  "думает…": "thinking…",
+  "Claude ждёт твоего ответа": "Claude needs your answer",
+  "Claude закончил": "Claude is done",
+  "Ошибка": "Error",
+  "ждёт твоего ответа · K": "waiting for your answer · K",
+  "индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл": "on-screen task panel · /claude toasts · /claude sound — on/off"
 }

@@ -89,6 +89,7 @@ public final class ClaudeChat implements ClientModInitializer {
         connection =FabricLoader.getInstance().getConfigDir().resolve("claude-chat/connection.json");
         if (launcher.autoStart() && !DevShots.ENABLED) launcher.start();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> launcher.stop());
+        Notify.register();
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("claude_chat", "main"));
         openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.claude_chat.open",
             InputConstants.KEY_K, category));
@@ -173,6 +174,13 @@ public final class ClaudeChat implements ClientModInitializer {
             case "key" -> {
                 String id = parts.length > 1 ? parts[1].strip() : "";
                 open(() -> new KeyScreen(this, id, keyFields.getOrDefault(id, new JsonArray())));
+            }
+            case "hud", "toasts", "sound" -> {
+                // /claude hud|toasts|sound [on|off]: toggles without an argument.
+                String value = parts.length > 1 ? parts[1].strip() : "";
+                boolean on = value.isEmpty() ? !launcher.flag(parts[0], true) : !value.equals("off");
+                launcher.setFlag(parts[0], on);
+                say("c", parts[0] + ": " + (on ? L.t("вкл") : L.t("выкл")));
             }
             default -> open(() -> new SettingsScreen(this, null));
         }
@@ -282,6 +290,7 @@ public final class ClaudeChat implements ClientModInitializer {
         String chat = event.has("chat") ? event.get("chat").getAsString() : "";
         if (kind.equals("need_key") && event.has("connector"))
             keyFields.put(event.get("connector").getAsString(), event.getAsJsonArray("fields"));
+        if (!kind.equals("history")) Notify.onEvent(event);
         if (kind.equals("history")) {
             // Conversation screen asked for older events of this chat after a reconnect.
             Deque<JsonObject> items = log.computeIfAbsent(chat, k -> new ArrayDeque<>());
@@ -328,6 +337,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + L.t("<запрос>"), L.t("в очередь (q, queue) · f/force — дописать в работу · cq — очистить очередь")},
             {c + "c", L.t("чаты · new · rename · status · cancel · restart · tokens · auto")},
             {c + "model", L.t("модель и усилие для этого чата (opus, sonnet, haiku · low…max)")},
+            {"/claude hud", L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},
             {c + "ls", L.t("файлы: cd · pwd · cat · tree · find · mkdir · mv · cp · rm · open · code")},
             {"/cc git", L.t("статус · diff · commit · push · pull · branch · log · clone · github")},

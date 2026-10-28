@@ -38,6 +38,14 @@ final class DevShots {
                 client.setScreenAndShow(new ConversationScreen(mod, parse(STATE)));
             }
             case 300 -> Screenshot.grab(client, true);
+            case 302 -> {
+                Notify.onEvent(parse("{\"kind\":\"thinking\",\"chat\":\"a\",\"mode\":\"cc\",\"title\":\"Fix the build\"}"));
+                Notify.onEvent(parse("{\"kind\":\"tool\",\"chat\":\"a\",\"mode\":\"cc\",\"text\":\"gradlew build  — Building\"}"));
+                Notify.onEvent(parse("{\"kind\":\"thinking\",\"chat\":\"b\",\"mode\":\"c\",\"title\":\"Explain mixins\"}"));
+                Notify.onEvent(parse("{\"kind\":\"permission\",\"chat\":\"b\",\"mode\":\"c\",\"title\":\"Explain mixins\"}"));
+                client.setScreenAndShow(new HudPreview());
+            }
+            case 307 -> Screenshot.grab(client, true);
             case 310 -> client.setScreenAndShow(new FileScreen(mod, null, parse(FILES)));
             case 318 -> Screenshot.grab(client, true);
             case 320 -> client.setScreenAndShow(new ChatPreview(PROJECT));
@@ -125,6 +133,15 @@ final class DevShots {
             + "{\"id\":\"playwright\",\"name\":\"Playwright\",\"group\":\"Browser & web\",\"about\":\"Drive a browser\",\"enabled\":true,\"missing\":[],\"needs_node\":false,\"status\":\"failed\"},"
             + "{\"id\":\"context7\",\"name\":\"Context7\",\"group\":\"Docs & search\",\"about\":\"Up-to-date library docs\",\"enabled\":false,\"missing\":[],\"needs_node\":false,\"status\":null}]}",
     };
+
+    /** The task HUD panel and a toast, outside a world. */
+    static final class HudPreview extends Screen {
+        HudPreview() { super(Component.literal("hud")); }
+        @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
+            super.extractRenderState(g, mouseX, mouseY, delta);
+            Notify.preview(g);
+        }
+    }
 
     /** Draws ChatStyle output like the chat HUD, without needing a world. */
     static final class ChatPreview extends Screen {
