@@ -400,6 +400,19 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
             await self.bridge.command({'mode': 'cc', 'action': 'bg', 'text': 'out ' + task['id']})
             self.assertIn('BG-LINE', [e for e in self.bridge.events if e['kind'] == 'shell_out'][-1]['text'])
 
+    async def test_output_style_and_project_addition_reach_the_model(self):
+        await self.start([text('ok')])
+        await self.bridge.command({'mode': 'cc', 'action': 'style', 'text': 'concise'})
+        await self.bridge.command({'mode': 'cc', 'action': 'style', 'text': 'append STYLE-ADDITION-77'})
+        card = [e for e in self.bridge.events if e['kind'] == 'styles'][-1]
+        self.assertEqual((card['current'], card['append']), ('concise', 'STYLE-ADDITION-77'))
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'hi')
+        await self.until(lambda: chat.task is None)
+        request = json.dumps(self.fake.requests[0], ensure_ascii=False)
+        self.assertIn('STYLE-ADDITION-77', request)
+        self.assertIn('Output style \\"concise\\"', request)
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

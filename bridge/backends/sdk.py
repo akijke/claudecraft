@@ -462,6 +462,8 @@ async def run(bridge, chat, text):
     extra_dirs = [effective] if Path(effective) != Path(session_dir) else []
     if extra_dirs:
         text = f'[Рабочая папка проекта: {effective}]\n{text}'
+    from backends import styles
+    style_addition = styles.system_addition(bridge.config, chat.project, effective) if chat.mode == 'cc' else ''
     from backends import skills as skill_files
     skills = skill_files.sdk_option(effective, set(bridge.config.get('skills_disabled', []))) if chat.mode == 'cc' else None
     if skills:
@@ -494,7 +496,8 @@ async def run(bridge, chat, text):
                         'Extensions live in workspace/extensions/<id>/manifest.json. After editing them, '
                         'call minecraft reload_extensions or ask the user to run /cc reload; changes apply to the next request. '
                         'You inherit bridge account permissions; do not claim privilege elevation.' if chat.mode == 'cc'
-                        else 'You are a chat assistant; you cannot edit files or control the game.')))
+                        else 'You are a chat assistant; you cannot edit files or control the game.'))
+                      + style_addition)
     if bridge.config.get('cli_path'):
         options.cli_path = bridge.config['cli_path']
     # Registered before connecting, so an early `f` waits for the session instead of missing it.

@@ -157,6 +157,14 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Стиль ответов': 'Output style',
+    'Стиль задаётся для проекта: используй /cc style': 'A style is set per project: use /cc style',
+    'Нет стиля {}. Есть: {}': 'No style {}. Available: {}',
+    'Обычные ответы Claude Code': 'Normal Claude Code answers',
+    'Коротко: только суть, без вступлений': 'Brief: just the point, no preamble',
+    'Объясняет «почему» и решения по ходу работы': 'Explains the why and its decisions while working',
+    'Учит: оставляет пользователю небольшие куски кода': 'Teaches: leaves small pieces of code for you to write',
+    'Строгий ревьюер: риски и ошибки прежде всего': 'Strict reviewer: risks and bugs first',
     'Фоновая задача Claude: {}': "Claude's background task: {}",
     'Нет такой фоновой задачи': 'No such background task',
     'пока нет вывода': 'no output yet',
@@ -423,7 +431,7 @@ def translate_event(event, lang):
         out['choices'] = [to_english(c) for c in out.get('choices', [])]
     for key in UI_KEYS & out.keys():
         out[key] = to_english(out[key])
-    if isinstance(out.get('rows'), list) and out.get('kind') in ('tokens', 'tasks', 'agents', 'connectors', 'chats', 'projects', 'commands'):
+    if isinstance(out.get('rows'), list) and out.get('kind') in ('tokens', 'tasks', 'agents', 'connectors', 'chats', 'projects', 'commands', 'styles'):
         out['rows'] = [{k: (to_english(v) if k in UI_KEYS else v) for k, v in r.items()} if isinstance(r, dict) else r
                        for r in out['rows']]
     if out.get('kind') == 'doctor' and isinstance(out.get('rows'), list):

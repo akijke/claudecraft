@@ -453,7 +453,7 @@
   "Закоммитить то, что в коммите (staged)": "Commit what is staged",
   "  В коммите (staged)": "  Staged",
   "  Не в коммите": "  Not staged",
-  "убрать": "unstage",
+  "убрать": "remove",
   "в коммит": "stage",
   "куски": "hunks",
   "Добавлять в коммит по кускам (stage по ханкам)": "Stage hunk by hunk",
@@ -563,5 +563,12 @@
   "  пока ничего не запускалось": "  nothing ran yet",
   "хуки из settings.json: список, add <Событие> [matcher] -- <команда>, rm, log": "hooks from settings.json: list, add <Event> [matcher] -- <command>, rm, log",
   "  Фоновые процессы Claude": "  Claude's background processes",
-  "вывод": "output"
+  "вывод": "output",
+  "Стиль ответов": "Output style",
+  "   проект ": "   project ",
+  "  добавка к промпту: ": "  prompt addition: ",
+  "нет  ": "none  ",
+  "Напр.: «отвечай по-русски, код комментируй по-английски»": "E.g. “answer in Russian, comment code in English”",
+  "  свои стили: .claude/output-styles/*.md · действует со следующего запроса": "  your own styles: .claude/output-styles/*.md · applies from the next request",
+  "стиль ответов на проект (concise, explanatory, learning…) · style append <текст> — добавка к промпту": "output style per project (concise, explanatory, learning…) · style append <text> — prompt addition"
 }

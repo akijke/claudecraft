@@ -185,6 +185,25 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "styles" -> {
+                String current = s(e, "current");
+                out.add(line(mode, lit("✦ " + L.t("Стиль ответов"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(L.t("   проект ") + s(e, "project"), FAINT))));
+                for (JsonElement item : e.getAsJsonArray("rows")) {
+                    JsonObject r = item.getAsJsonObject();
+                    boolean on = s(r, "name").equals(current);
+                    MutableComponent row = Component.literal("  ").append(button((on ? "● " : "") + s(r, "name"), cmd + "style " + s(r, "name"),
+                        false, on ? GREEN : AQUA, null)).append(lit("  " + s(r, "description"), DIM));
+                    if (!s(r, "path").isEmpty()) row.append(sp()).append(button("✎", "/edit " + s(r, "path"), false, DIM, s(r, "path")));
+                    out.add(line(mode, row));
+                }
+                out.add(line(mode, lit(L.t("  добавка к промпту: "), TEXT)
+                    .append(lit(s(e, "append").isEmpty() ? L.t("нет  ") : "«" + s(e, "append") + "»  ", s(e, "append").isEmpty() ? FAINT : TEXT))
+                    .append(button(L.t("изменить"), cmd + "style append " + s(e, "append"), true, AQUA,
+                        L.t("Напр.: «отвечай по-русски, код комментируй по-английски»")))
+                    .append(s(e, "append").isEmpty() ? Component.literal("") : Component.literal(" ").append(button(L.t("убрать"), cmd + "style append off", false, DIM, null)))));
+                out.add(line(mode, lit(L.t("  свои стили: .claude/output-styles/*.md · действует со следующего запроса"), FAINT)));
+            }
             case "hooks" -> {
                 out.add(line(mode, lit("⚙ " + L.t("Хуки"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit(b(e, "loaded") ? L.t("   выполняет сам Claude Code") : L.t("   не загружаются: /cc memory on"), b(e, "loaded") ? FAINT : RED))

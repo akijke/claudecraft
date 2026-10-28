@@ -855,6 +855,29 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'style':
+            from backends import styles
+            from backends.util import save_json
+            project = chat.project if mode == 'cc' else None
+            if not project:
+                raise ValueError('Стиль задаётся для проекта: используй /cc style')
+            sub, _, rest = text.strip().partition(' ')
+            all_styles = styles.available(self.chat_cwd(chat))
+            mine = self.config.setdefault('styles', {}).setdefault(project, {})
+            if sub == 'append':
+                if rest.strip() in ('', 'off'):
+                    mine.pop('append', None)
+                else:
+                    mine['append'] = rest.strip()[:2000]
+            elif sub:
+                if sub not in all_styles:
+                    raise ValueError('Нет стиля ' + sub + '. Есть: ' + ', '.join(all_styles))
+                mine['style'] = sub
+            if sub:
+                save_json(self.directory / 'bridge-config.json', self.config)
+            self.emit(chat, 'Стиль ответов', kind='styles', project=project, current=mine.get('style') or 'default',
+                      append=mine.get('append', ''),
+                      rows=[{k: v for k, v in s.items() if k != 'prompt'} for s in all_styles.values()])
         elif action == 'hooks':
             from backends import hooks
             project = self.chat_cwd(chat)
