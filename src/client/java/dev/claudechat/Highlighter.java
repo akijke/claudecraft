@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
  * generic C-like scheme. Block comments are tracked across lines with a one-element state.
  */
 final class Highlighter {
-    static final int PLAIN = 0xD4D4D4, KEYWORD = 0xC586C0, STRING = 0xCE9178, NUMBER = 0xB5CEA8,
+    // not final: Theme switches the palette
+    static int PLAIN = 0xD4D4D4, KEYWORD = 0xC586C0, STRING = 0xCE9178, NUMBER = 0xB5CEA8,
         COMMENT = 0x6A9955, TYPE = 0x4EC9B0, ANNOTATION = 0xDCDCAA, PUNCT = 0xA0A0A0, KEY = 0x9CDCFE, HEADING = 0xF2C14E;
 
     private static final Set<String> C_LIKE = Set.of("java", "kt", "kts", "js", "jsx", "ts", "tsx", "c", "h", "cpp",
@@ -39,6 +40,12 @@ final class Highlighter {
         "output", "out", "lock", "license");
 
     private Highlighter() { }
+
+    static void palette(int plain, int keyword, int string, int number, int comment, int type, int annotation,
+                        int punct, int key, int heading) {
+        PLAIN = plain; KEYWORD = keyword; STRING = string; NUMBER = number; COMMENT = comment; TYPE = type;
+        ANNOTATION = annotation; PUNCT = punct; KEY = key; HEADING = heading;
+    }
 
     static String language(String fileName) {
         String name = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);

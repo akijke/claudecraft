@@ -64,6 +64,11 @@ final class DevShots {
             case 480 -> Screenshot.grab(client, true);
             case 485 -> client.setScreenAndShow(new EditorScreen(mod, null, "src/main/java/dev/demo/Hello.java").withText(EDITOR));
             case 495 -> Screenshot.grab(client, true);
+            case 497 -> { Theme.apply("light"); client.setScreenAndShow(new EditorScreen(mod, null, "src/main/java/dev/demo/Hello.java").withText(EDITOR)); }
+            case 501 -> Screenshot.grab(client, true);
+            case 503 -> { Theme.apply("contrast"); client.setScreenAndShow(new ChatPreview(WORK)); }
+            case 507 -> Screenshot.grab(client, true);
+            case 509 -> Theme.apply("dark");
             case 510 -> client.setScreenAndShow(new ChatPreview(EDITS));
             case 540 -> Screenshot.grab(client, true);
             case 541 -> client.setScreenAndShow(new ChatPreview(PLAN));

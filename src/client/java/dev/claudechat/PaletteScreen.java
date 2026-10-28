@@ -213,23 +213,23 @@ final class PaletteScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, width, height, 0xC0101014);
         int w = Math.min(420, width - 40), x = (width - w) / 2;
-        g.fill(x - 4, 12, x + w + 4, Math.min(height - 8, 58 + visible() * ROW), 0xF01E1E22);
+        g.fill(x - 4, 12, x + w + 4, Math.min(height - 8, 58 + visible() * ROW), Theme.PALETTE_BG);
         g.text(font, files ? L.t("Перейти к файлу") + "  Ctrl+P" : L.t("Команды") + "  Ctrl+Shift+P", x, 17, 0xFFD97757);
         super.extractRenderState(g, mouseX, mouseY, delta);
         for (int i = 0; i < visible() && scroll + i < shown.size(); i++) {
             Entry e = shown.get(scroll + i);
             int y = 54 + i * ROW;
-            if (scroll + i == selected) g.fill(x - 2, y - 2, x + w + 2, y + ROW - 2, 0xFF2D3A4F);
+            if (scroll + i == selected) g.fill(x - 2, y - 2, x + w + 2, y + ROW - 2, Theme.PALETTE_SELECTED);
             if (files) {
                 int slash = e.label().lastIndexOf('/');
                 String name = e.label().substring(slash + 1), dir = slash < 0 ? "" : e.label().substring(0, slash);
-                g.text(font, "📄 " + name, x, y, 0xFFE8E8E8);
-                g.text(font, font.plainSubstrByWidth(dir, w - font.width("📄 " + name) - 12), x + font.width("📄 " + name) + 8, y, 0xFF6A6A6A);
+                g.text(font, "📄 " + name, x, y, Theme.WINDOW_TEXT);
+                g.text(font, font.plainSubstrByWidth(dir, w - font.width("📄 " + name) - 12), x + font.width("📄 " + name) + 8, y, Theme.WINDOW_DIM);
             } else {
-                g.text(font, e.label(), x, y, 0xFFE8E8E8);
+                g.text(font, e.label(), x, y, Theme.WINDOW_TEXT);
                 String right = e.hint().isEmpty() ? e.run() : e.hint();
                 right = font.plainSubstrByWidth(right, w / 2);
-                g.text(font, right, x + w - font.width(right), y, 0xFF6A6A6A);
+                g.text(font, right, x + w - font.width(right), y, Theme.WINDOW_DIM);
             }
         }
         if (shown.isEmpty()) g.text(font, L.t("ничего не найдено"), x, 56, 0xFF8A8A8A);

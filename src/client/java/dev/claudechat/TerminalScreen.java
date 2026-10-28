@@ -304,7 +304,7 @@ final class TerminalScreen extends Screen {
     // ---- render ---------------------------------------------------------------
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         poll();
-        g.fill(0, 0, width, height, 0xF00C0C0C);
+        g.fill(0, 0, width, height, Theme.TERMINAL_BG);
         super.extractRenderState(g, mouseX, mouseY, delta);
         float z = zoom();
         int x0 = 4, y0 = TOP;
@@ -318,7 +318,7 @@ final class TerminalScreen extends Screen {
                 for (JsonElement runEl : rowsJson.get(r).getAsJsonArray()) {
                     JsonArray run = runEl.getAsJsonArray();
                     String text = run.get(0).getAsString();
-                    int fg = run.get(1).isJsonNull() ? 0xCCCCCC : run.get(1).getAsInt();
+                    int fg = run.get(1).isJsonNull() ? Theme.TERMINAL_FG : run.get(1).getAsInt();
                     boolean bold = run.get(3).getAsBoolean();
                     int n = text.codePointCount(0, text.length());
                     if (!run.get(2).isJsonNull())
@@ -340,7 +340,7 @@ final class TerminalScreen extends Screen {
             JsonArray cursor = snap.getAsJsonArray("cursor");
             if (snap.get("cursor_visible").getAsBoolean() && (System.currentTimeMillis() / 530) % 2 == 0) {
                 int cx = cursor.get(0).getAsInt() * CELL_W, cy = cursor.get(1).getAsInt() * CELL_H;
-                g.fill(cx, cy + CELL_H - 2, cx + CELL_W, cy + CELL_H, 0xFFE0E0E0);
+                g.fill(cx, cy + CELL_H - 2, cx + CELL_W, cy + CELL_H, Theme.CARET);
             }
             g.pose().popMatrix();
         }

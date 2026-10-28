@@ -590,5 +590,10 @@
   "Открыть чат": "Open the chat",
   "  ты": "  you",
   "Поиск по истории чатов…": "Search the chat history…",
-  "<текст> — поиск по всем чатам и сессиям проекта (и начатым на ПК)": "<text> — search all chats and sessions of the project (also those started on the PC)"
+  "<текст> — поиск по всем чатам и сессиям проекта (и начатым на ПК)": "<text> — search all chats and sessions of the project (also those started on the PC)",
+  "Тема": "Theme",
+  "Масштаб окон мода": "Scale of the mod's windows",
+  "Как в настройках игры": "As in the game settings",
+  "  терминал: Ctrl+= / Ctrl+- — размер шрифта": "  terminal: Ctrl+= / Ctrl+- — font size",
+  "тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода": "theme dark | light | contrast · /claude scale auto|1..4 — scale of the mod's windows"
 }

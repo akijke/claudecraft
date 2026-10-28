@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 
 /** Turns bridge events into styled chat lines (colours, icons, buttons, light markdown). */
 final class ChatStyle {
-    static final int CLAUDE = 0xD97757, CODE_MODE = 0xB48EF0, TEXT = 0xE8E8E8, DIM = 0x8A8A8A, FAINT = 0x5E5E5E,
+    // not final: Theme switches them
+    static int CLAUDE = 0xD97757, CODE_MODE = 0xB48EF0, TEXT = 0xE8E8E8, DIM = 0x8A8A8A, FAINT = 0x5E5E5E,
         GREEN = 0x6BD08B, RED = 0xF0626A, GOLD = 0xF2C14E, AQUA = 0x5CC8E6, CODE = 0xE5C07B, BLOCK = 0x9CDCFE,
         DIR = 0x6CA8FF;
     private static final Pattern INLINE = Pattern.compile("\\*\\*(.+?)\\*\\*|`([^`]+)`|\\[([^\\]]+)]\\((https?://[^)\\s]+)\\)");

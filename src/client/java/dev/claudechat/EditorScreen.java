@@ -576,15 +576,15 @@ final class EditorScreen extends Screen {
 
     // ---- render ---------------------------------------------------------------
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
-        g.fill(0, 0, width, height, 0xE0151518);
+        g.fill(0, 0, width, height, Theme.SCREEN_BG);
         super.extractRenderState(g, mouseX, mouseY, delta);
         String title = "✎ " + new File(path).getName() + (dirty ? " ●" : "");
         g.text(font, Component.literal(title).withColor(dirty ? 0xF2C14E : 0xD97757), 6, 10, 0xFFFFFFFF);
         g.text(font, font.plainSubstrByWidth(path, width / 2 - font.width(title)), 14 + font.width(title), 10, 0xFF5E5E5E);
 
         gutterW = font.width(String.valueOf(lines.size())) + GUTTER_PAD * 2;
-        g.fill(areaX, areaY, areaX + areaW, areaY + areaH, 0xFF1E1E22);
-        g.fill(areaX, areaY, areaX + gutterW, areaY + areaH, 0xFF19191D);
+        g.fill(areaX, areaY, areaX + areaW, areaY + areaH, Theme.PANEL);
+        g.fill(areaX, areaY, areaX + gutterW, areaY + areaH, Theme.GUTTER);
         int visible = areaH / LINE, textX = areaX + gutterW + 4;
         boolean[] block = {false};
         // block-comment state for the lines above the view
@@ -593,10 +593,10 @@ final class EditorScreen extends Screen {
         for (int i = 0; i < visible && scrollRow + i < lines.size(); i++) {
             int r = scrollRow + i, y = areaY + 2 + i * LINE;
             String text = lines.get(r);
-            if (r == row) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, 0xFF26262C);
+            if (r == row) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, Theme.CURRENT_LINE);
             if (r == highlight) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, 0x40F2C14E);
             String number = String.valueOf(r + 1);
-            g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? 0xFFC6C6C6 : 0xFF5A5A5A);
+            g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? Theme.LINE_NUMBER_ON : Theme.LINE_NUMBER);
             g.enableScissor(textX, areaY, areaX + areaW, areaY + areaH);
             for (int[] m : matches) {
                 if (m[0] != r || m[1] > text.length()) continue;
@@ -608,19 +608,19 @@ final class EditorScreen extends Screen {
                 int c0 = r == sel[0] ? sel[1] : 0, c1 = r == sel[2] ? sel[3] : text.length();
                 int x0 = textX - scrollX + font.width(text.substring(0, Math.min(c0, text.length())));
                 int x1 = textX - scrollX + font.width(text.substring(0, Math.min(c1, text.length()))) + (r < sel[2] ? 4 : 0);
-                g.fill(x0, y - 1, x1, y + LINE - 1, 0xFF264F78);
+                g.fill(x0, y - 1, x1, y + LINE - 1, Theme.SELECTION);
             }
-            g.text(font, Highlighter.line(text, lang, block), textX - scrollX, y, 0xFFFFFFFF);
+            g.text(font, Highlighter.line(text, lang, block), textX - scrollX, y, 0xFFFFFFFF, !Theme.current().equals("light"));
             if (r == row && (System.currentTimeMillis() / 500) % 2 == 0) {
                 int cx = textX - scrollX + font.width(text.substring(0, Math.min(col, text.length())));
-                g.fill(cx, y - 1, cx + 1, y + LINE - 1, 0xFFFFFFFF);
+                g.fill(cx, y - 1, cx + 1, y + LINE - 1, Theme.CARET);
             }
             g.disableScissor();
         }
         if (!loaded) g.text(font, L.t("Загрузка…"), textX, areaY + 4, 0xFF8A8A8A);
         String status = L.t("Стр ") + (row + 1) + ", " + L.t("кол ") + (col + 1) + " · " + (lang.isEmpty() ? "text" : lang)
             + " · " + (eol.equals("\r\n") ? "CRLF" : "LF") + " · " + lines.size() + L.t(" строк");
-        g.text(font, status, width - font.width(status) - 6, height - 13, 0xFF6A6A6A);
+        g.text(font, status, width - font.width(status) - 6, height - 13, Theme.WINDOW_DIM);
         if (!message.isEmpty()) g.text(font, font.plainSubstrByWidth(message, width - font.width(status) - 20), 6, height - 13, messageColor);
     }
 }

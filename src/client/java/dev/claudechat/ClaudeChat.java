@@ -150,10 +150,12 @@ public final class ClaudeChat implements ClientModInitializer {
                     })));
             }
         });
+        Theme.load();
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             devShots.tick(client);
             liveTest.tick(client);
             if (shotTicks > 0 && --shotTicks == 0) takeShot(client);
+            Theme.tick(client);
             // Ctrl+Shift+P in the game (no screen open): the command palette
             boolean palette = client.gui.screen() == null && client.player != null
                 && InputConstants.isKeyDown(InputConstants.KEY_P) && InputConstants.isKeyDown(InputConstants.KEY_LCONTROL)
@@ -329,6 +331,16 @@ public final class ClaudeChat implements ClientModInitializer {
                     } catch (RuntimeException e) { say("c", L.t("Неверный звук: ") + args[1]); }
                 } else say("c", L.t("Формат: /claude sound [on|off|test|done|ask|error|volume] …"));
             }
+            case "theme" -> {
+                String name = parts.length > 1 ? parts[1].strip() : "";
+                if (!name.isEmpty()) Theme.set(name);
+                themeMenu();
+            }
+            case "scale" -> {
+                String v = parts.length > 1 ? parts[1].strip() : "";
+                if (!v.isEmpty()) Theme.setScale(v.equals("auto") ? 0 : Integer.parseInt(v.replaceAll("\\D", "0")));
+                themeMenu();
+            }
             case "hud", "toasts" -> {
                 // /claude hud|toasts|sound [on|off]: toggles without an argument.
                 String value = parts.length > 1 ? parts[1].strip() : "";
@@ -338,6 +350,25 @@ public final class ClaudeChat implements ClientModInitializer {
             }
             default -> open(() -> new SettingsScreen(this, null));
         }
+    }
+
+    /** Theme and window-scale choices. */
+    private void themeMenu() {
+        int c = ChatStyle.AQUA;
+        var row = ChatStyle.lit("◑ " + L.t("Тема") + "  ", ChatStyle.GOLD).withStyle(st -> st.withBold(true));
+        for (String name : Theme.NAMES)
+            row.append(ChatStyle.button((name.equals(Theme.current()) ? "● " : "") + name, "/claude theme " + name, false,
+                name.equals(Theme.current()) ? ChatStyle.GREEN : c, null)).append(" ");
+        show(ChatStyle.line("c", row));
+        int scale = Theme.scaleSetting();
+        var scales = ChatStyle.lit("  " + L.t("Масштаб окон мода") + "  ", ChatStyle.TEXT);
+        for (int i = 0; i <= 4; i++) {
+            String label = i == 0 ? "auto" : String.valueOf(i);
+            scales.append(ChatStyle.button((i == scale ? "● " : "") + label, "/claude scale " + label, false,
+                i == scale ? ChatStyle.GREEN : c, i == 0 ? L.t("Как в настройках игры") : null)).append(" ");
+        }
+        show(ChatStyle.line("c", scales));
+        show(ChatStyle.line("c", ChatStyle.lit(L.t("  терминал: Ctrl+= / Ctrl+- — размер шрифта"), ChatStyle.FAINT)));
     }
 
     /** Sound settings with clickable choices. */
@@ -571,6 +602,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
             {"/pty", L.t("[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один")},
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
+            {"/claude theme", L.t("тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода")},
             {"/claude sound", L.t("звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},
