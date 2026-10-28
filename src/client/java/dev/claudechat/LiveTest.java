@@ -46,6 +46,7 @@ final class LiveTest {
     private boolean finished;
     private Path editFile;
     private TerminalScreen terminal;
+    private boolean foldCheck;
     private final List<String> confirmations = new ArrayList<>();
 
     LiveTest(ClaudeChat mod) {
@@ -252,6 +253,22 @@ final class LiveTest {
         }, () -> waited > 10 && mc().getWindow().getGuiScale() == 1, 10);
         quiet("the game's scale returns", () -> { Theme.setScale(0); mc().setScreenAndShow(null); },
             () -> waited > 5 && mc().getWindow().getGuiScale() == gameScale[0], 10);
+        step("editor: fold, skip folded lines, auto-close, extra caret, go to line", () ->
+            mc().setScreenAndShow(new EditorScreen(mod, null, "demo.py").withText("def f():\n    a = 1\n    b = 2\nprint(f)\nend")), () -> {
+            if (!(screen() instanceof EditorScreen ed)) return false;
+            if (waited == 5) {
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_LBRACKET, 0, 3));   // Ctrl+Shift+[ on line 1
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_DOWN, 0, 0));        // jumps over the folded lines
+                foldCheck = ed.foldsForTest() == 1 && ed.cursorRow() == 3;
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_END, 0, 0));
+                ed.charTyped(new CharacterEvent('('));                             // → "print(f)()"
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_DOWN, 0, 6));        // Ctrl+Alt+↓: caret on "end"
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_HOME, 0, 0));
+                ed.charTyped(new CharacterEvent('#'));
+            }
+            if (waited == 10) { ed.keyPressed(new KeyEvent(InputConstants.KEY_G, 0, 2)); }
+            return waited > 20 && foldCheck && ed.textForTest().contains("#print(f)()\n#end") && ed.caretsForTest() == 1;
+        }, 10);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);
     }

@@ -609,5 +609,7 @@
   "Модели": "Models",
   "Оценка Claude Code по ценам API; на подписке тратится лимит, а не деньги": "Claude Code's estimate at API prices; on a subscription it is your limit, not money",
   "Расходы: графики": "Spending: charts",
-  "графики расходов по дням, проектам и моделям": "spending charts by day, project and model"
+  "графики расходов по дням, проектам и моделям": "spending charts by day, project and model",
+  "строка… (Enter)": "line… (Enter)",
+  " курсоров": " carets"
 }

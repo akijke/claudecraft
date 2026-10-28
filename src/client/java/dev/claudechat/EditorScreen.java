@@ -73,6 +73,104 @@ final class EditorScreen extends Screen {
 
     private int highlight = -1;
 
+    // ---- folding, brackets, go to line, extra carets (#48) ----
+    private final java.util.TreeMap<Integer, Integer> folds = new java.util.TreeMap<>();  // first line -> last hidden line
+    private final List<int[]> carets = new ArrayList<>();  // extra carets: row, col (Ctrl+Alt+↑/↓, Alt+click)
+    private net.minecraft.client.gui.components.EditBox gotoBox;
+    private boolean goingTo;
+
+    private boolean hiddenLine(int r) {
+        var f = folds.lowerEntry(r);
+        return f != null && r <= f.getValue();
+    }
+
+    private int stepVisible(int r, int dir) {
+        int n = r + dir;
+        while (n >= 0 && n < lines.size() && hiddenLine(n)) n += dir;
+        return n < 0 || n >= lines.size() ? r : n;
+    }
+
+    private static int indentOf(String l) { return l.isBlank() ? Integer.MAX_VALUE : l.length() - l.stripLeading().length(); }
+
+    /** Lines below `r` that belong to its block: deeper indentation (blank lines inside count too). */
+    private int blockEnd(int r) {
+        int base = indentOf(lines.get(r)), end = r;
+        for (int i = r + 1; i < lines.size(); i++) {
+            int ind = indentOf(lines.get(i));
+            if (ind == Integer.MAX_VALUE) continue;
+            if (ind <= base) break;
+            end = i;
+        }
+        return end;
+    }
+
+    private void toggleFold(int r) {
+        var inside = folds.floorEntry(r);
+        if (inside != null && r <= inside.getValue()) { folds.remove(inside.getKey()); return; }
+        int end = blockEnd(r);
+        if (end > r) {
+            folds.put(r, end);
+            if (row > r && row <= end) { row = r; col = Math.min(col, lines.get(r).length()); anchorRow = -1; }
+        }
+    }
+
+    /** {row, col} of the bracket matching the one at/just before the caret, plus that bracket; or null. */
+    private int[] matchBracket() {
+        String l = lines.get(row);
+        String open = "([{", close = ")]}";
+        for (int c : new int[]{col - 1, col}) {
+            if (c < 0 || c >= l.length()) continue;
+            char ch = l.charAt(c);
+            int oi = open.indexOf(ch), ci = close.indexOf(ch);
+            if (oi < 0 && ci < 0) continue;
+            char want = oi >= 0 ? close.charAt(oi) : open.charAt(ci);
+            int dir = oi >= 0 ? 1 : -1, depth = 0, r = row, x = c, limit = 5000;
+            while (limit-- > 0) {
+                String line = lines.get(r);
+                if (x >= 0 && x < line.length()) {
+                    char k = line.charAt(x);
+                    if (k == ch) depth++;
+                    else if (k == want && --depth == 0) return new int[]{r, x, row, c};
+                }
+                x += dir;
+                if (x < 0 || x >= line.length()) {
+                    r += dir;
+                    if (r < 0 || r >= lines.size()) return null;
+                    x = dir > 0 ? 0 : lines.get(r).length() - 1;
+                }
+            }
+            return null;
+        }
+        return null;
+    }
+
+    /** Typing at the extra carets too (same text, rows below first so positions stay right). */
+    private void typeAtCarets(String text) {
+        carets.sort((a, b) -> b[0] - a[0]);
+        for (int[] c : carets) {
+            if (c[0] == row || c[0] >= lines.size()) continue;
+            String l = lines.get(c[0]);
+            int x = Math.min(c[1], l.length());
+            lines.set(c[0], l.substring(0, x) + text + l.substring(x));
+            c[1] = x + text.length();
+        }
+    }
+
+    private void backspaceAtCarets() {
+        for (int[] c : carets) {
+            if (c[0] == row || c[0] >= lines.size()) continue;
+            String l = lines.get(c[0]);
+            int x = Math.min(c[1], l.length());
+            if (x > 0) { lines.set(c[0], l.substring(0, x - 1) + l.substring(x)); c[1] = x - 1; }
+        }
+    }
+
+    private void openGoto() {
+        goingTo = true;
+        rebuildWidgets();
+        setFocused(gotoBox);
+    }
+
     // ---- find & replace (Ctrl+F / Ctrl+H) ----
     private net.minecraft.client.gui.components.EditBox findBox, replaceBox;
     private boolean finding, replacing, findRegex, findCase;
@@ -168,6 +266,9 @@ final class EditorScreen extends Screen {
         refreshMatches();
         say(L.t("Заменено: ") + n, 0xFF6BD08B);
     }
+
+    int foldsForTest() { return folds.size(); }
+    int caretsForTest() { return carets.size(); }
 
     String textForTest() { return String.join("\n", lines); }
 
@@ -283,6 +384,14 @@ final class EditorScreen extends Screen {
             minecraft.setScreenAndShow(new ConversationScreen(mod));
         });
         button(x, "💾 " + L.t("Сохранить"), "Ctrl+S", () -> save(confirmOverwrite));
+        if (goingTo) {
+            gotoBox = new net.minecraft.client.gui.components.EditBox(font, 6, 29, 120, 18, Component.literal("line"));
+            gotoBox.setHint(Component.literal(L.t("строка… (Enter)")));
+            gotoBox.setMaxLength(7);
+            addRenderableWidget(gotoBox);
+            areaY = Math.max(areaY, 52);
+            areaH = height - areaY - 18;
+        }
         if (!loaded) load();
     }
 
@@ -306,6 +415,7 @@ final class EditorScreen extends Screen {
 
     // ---- editing --------------------------------------------------------------
     private void snapshot() {
+        folds.clear();
         undo.push(new State(new ArrayList<>(lines), row, col));
         if (undo.size() > 300) undo.removeLast();
         redo.clear();
@@ -367,6 +477,14 @@ final class EditorScreen extends Screen {
     private void backspace(boolean forward) {
         if (hasSelection()) { snapshot(); deleteSelection(); reveal(); return; }
         String line = lines.get(row);
+        if (!forward && col > 0 && col < line.length() && "()[]{}\"\"''".contains(line.substring(col - 1, col + 1))
+                && "([{\"'".indexOf(line.charAt(col - 1)) == ")]}\"'".indexOf(line.charAt(col))) {
+            snapshot();  // empty pair: delete both
+            lines.set(row, line.substring(0, col - 1) + line.substring(col + 1));
+            col--;
+            return;
+        }
+        if (!forward && !carets.isEmpty()) backspaceAtCarets();
         if (!forward && col == 0 && row == 0) return;
         if (forward && col == line.length() && row == lines.size() - 1) return;
         snapshot();
@@ -406,7 +524,10 @@ final class EditorScreen extends Screen {
     private void move(int dRow, int newCol, boolean select) {
         if (select && anchorRow < 0) { anchorRow = row; anchorCol = col; }
         if (!select) anchorRow = -1;
-        row = Math.max(0, Math.min(lines.size() - 1, row + dRow));
+        int target = row;
+        for (int i = 0; i < Math.abs(dRow); i++) target = stepVisible(target, dRow > 0 ? 1 : -1);
+        if (dRow != 0 && target == row) target = Math.max(0, Math.min(lines.size() - 1, row + dRow > row ? lines.size() - 1 : 0));
+        row = hiddenLine(target) ? folds.lowerKey(target) : target;
         col = Math.max(0, Math.min(lines.get(row).length(), newCol));
         reveal();
     }
@@ -425,9 +546,14 @@ final class EditorScreen extends Screen {
     }
 
     private void reveal() {
-        int visible = areaH / LINE;
+        int visible = Math.max(1, areaH / LINE);
+        if (hiddenLine(row)) {  // the caret went into a fold: open it
+            folds.remove(folds.lowerKey(row));
+        }
         if (row < scrollRow) scrollRow = row;
-        if (row >= scrollRow + visible) scrollRow = row - visible + 1;
+        int shown = 0;
+        for (int r = scrollRow; r < row; r = stepVisible(r, 1)) { shown++; if (stepVisible(r, 1) == r) break; }
+        while (shown >= visible) { scrollRow = stepVisible(scrollRow, 1); shown--; }
         int x = font.width(lines.get(row).substring(0, Math.min(col, lines.get(row).length())));
         int textW = areaW - gutterW - 8;
         if (x < scrollX) scrollX = Math.max(0, x - 40);
@@ -437,8 +563,26 @@ final class EditorScreen extends Screen {
     // ---- input ----------------------------------------------------------------
     @Override public boolean charTyped(CharacterEvent event) {
         if (finding && (getFocused() == findBox || (replaceBox != null && getFocused() == replaceBox))) return super.charTyped(event);
+        if (goingTo && getFocused() == gotoBox) return super.charTyped(event);
         if (!loaded || event.codepoint() < 32) return super.charTyped(event);
-        insert(event.codepointAsString());
+        String ch = event.codepointAsString();
+        String line = lines.get(row);
+        char next = col < line.length() ? line.charAt(col) : 0;
+        if (carets.isEmpty() && !hasSelection()) {
+            if (")]}\"'".contains(ch) && next == ch.charAt(0)) { col++; return true; }  // type over the closing char
+            String pairs = "([{\"'", closers = ")]}\"'";
+            int pi = pairs.indexOf(ch);
+            char prev = col > 0 ? line.charAt(col - 1) : ' ';
+            boolean quote = pi >= 3;
+            if (pi >= 0 && (next == 0 || Character.isWhitespace(next) || ")]},;".indexOf(next) >= 0)
+                    && !(quote && (Character.isLetterOrDigit(prev) || prev == ch.charAt(0)))) {
+                insert(ch + closers.charAt(pi));
+                col--;
+                return true;
+            }
+        }
+        insert(ch);
+        if (!carets.isEmpty()) typeAtCarets(ch);
         return true;
     }
 
@@ -447,7 +591,26 @@ final class EditorScreen extends Screen {
         int key = event.key();
         boolean ctrl = (event.modifiers() & 2) != 0, shift = (event.modifiers() & 1) != 0;
         boolean inFind = finding && (getFocused() == findBox || (replaceBox != null && getFocused() == replaceBox));
+        boolean alt = (event.modifiers() & 4) != 0;
+        if (goingTo && getFocused() == gotoBox) {
+            if (key == InputConstants.KEY_RETURN) {
+                try { gotoLine = Integer.parseInt(gotoBox.getValue().strip()); jump(); } catch (NumberFormatException ignored) { }
+                goingTo = false; rebuildWidgets(); setFocused(null); return true;
+            }
+            if (key == InputConstants.KEY_ESCAPE) { goingTo = false; rebuildWidgets(); return true; }
+            return super.keyPressed(event);
+        }
+        if (key == InputConstants.KEY_ESCAPE && !carets.isEmpty()) { carets.clear(); return true; }
         if (key == InputConstants.KEY_ESCAPE) { if (finding) closeFind(); else onClose(); return true; }
+        if (ctrl && key == InputConstants.KEY_G) { openGoto(); return true; }
+        if (ctrl && shift && key == InputConstants.KEY_LBRACKET) { toggleFold(row); return true; }
+        if (ctrl && shift && key == InputConstants.KEY_RBRACKET) { folds.clear(); return true; }
+        if (ctrl && alt && (key == InputConstants.KEY_UP || key == InputConstants.KEY_DOWN)) {
+            int base = carets.isEmpty() ? row : carets.get(carets.size() - 1)[0];
+            int r = key == InputConstants.KEY_DOWN ? base + 1 : base - 1;
+            if (r >= 0 && r < lines.size() && r != row) carets.add(new int[]{r, col});
+            return true;
+        }
         if (!loaded) return super.keyPressed(event);
         if (ctrl && key == InputConstants.KEY_F) { openFind(false); return true; }
         if (ctrl && key == InputConstants.KEY_H) { openFind(true); return true; }
@@ -456,6 +619,19 @@ final class EditorScreen extends Screen {
             return true;
         }
         if (inFind) return super.keyPressed(event);
+        if (!carets.isEmpty() && !ctrl && (key == InputConstants.KEY_HOME || key == InputConstants.KEY_END
+                || key == InputConstants.KEY_LEFT || key == InputConstants.KEY_RIGHT)) {
+            for (int[] c : carets) {  // extra carets follow horizontal moves
+                String l = lines.get(Math.min(c[0], lines.size() - 1));
+                int first = l.length() - l.stripLeading().length();
+                c[1] = switch (key) {
+                    case InputConstants.KEY_HOME -> c[1] == first ? 0 : first;
+                    case InputConstants.KEY_END -> l.length();
+                    case InputConstants.KEY_LEFT -> Math.max(0, c[1] - 1);
+                    default -> Math.min(l.length(), c[1] + 1);
+                };
+            }
+        }
         if (ctrl) {
             switch (key) {
                 case InputConstants.KEY_S -> { save(confirmOverwrite); return true; }
@@ -520,7 +696,8 @@ final class EditorScreen extends Screen {
     }
 
     private int[] positionAt(double x, double y) {
-        int r = Math.max(0, Math.min(lines.size() - 1, scrollRow + (int) ((y - areaY - 2) / LINE)));
+        int r = Math.max(0, Math.min(lines.size() - 1, scrollRow));
+        for (int i = (int) ((y - areaY - 2) / LINE); i > 0; i--) r = stepVisible(r, 1);
         String l = lines.get(r);
         int target = (int) x - (areaX + gutterW + 4) + scrollX, c = 0;
         while (c < l.length() && font.width(l.substring(0, c + 1)) - font.width(String.valueOf(l.charAt(c))) / 2 <= target) c++;
@@ -531,6 +708,9 @@ final class EditorScreen extends Screen {
         if (event.x() >= areaX && event.x() < areaX + areaW && event.y() >= areaY && event.y() < areaY + areaH && loaded) {
             int[] p = positionAt(event.x(), event.y());
             boolean shift = (event.modifiers() & 1) != 0;
+            if ((event.modifiers() & 4) != 0) { carets.add(new int[]{p[0], p[1]}); return true; }  // Alt+click
+            if (event.x() < areaX + gutterW) { toggleFold(p[0]); return true; }                    // gutter: fold
+            carets.clear();
             if (shift && anchorRow < 0) { anchorRow = row; anchorCol = col; }
             if (!shift) { anchorRow = p[0]; anchorCol = p[1]; }
             row = p[0];
@@ -590,8 +770,14 @@ final class EditorScreen extends Screen {
         // block-comment state for the lines above the view
         for (int r = Math.max(0, scrollRow - 200); r < scrollRow; r++) Highlighter.line(lines.get(r), lang, block);
         int[] sel = hasSelection() ? selection() : null;
-        for (int i = 0; i < visible && scrollRow + i < lines.size(); i++) {
-            int r = scrollRow + i, y = areaY + 2 + i * LINE;
+        int[] bracket = loaded ? matchBracket() : null;
+        int r = Math.min(scrollRow, Math.max(0, lines.size() - 1)) - 1;
+        for (int i = 0; i < visible; i++) {
+            int nextR = r < 0 ? 0 : stepVisible(r, 1);
+            if (r >= 0 && nextR == r) break;
+            r = nextR;
+            if (r >= lines.size()) break;
+            int y = areaY + 2 + i * LINE;
             String text = lines.get(r);
             if (r == row) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, Theme.CURRENT_LINE);
             if (r == highlight) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, 0x40F2C14E);
@@ -610,7 +796,26 @@ final class EditorScreen extends Screen {
                 int x1 = textX - scrollX + font.width(text.substring(0, Math.min(c1, text.length()))) + (r < sel[2] ? 4 : 0);
                 g.fill(x0, y - 1, x1, y + LINE - 1, Theme.SELECTION);
             }
+            if (bracket != null)
+                for (int b = 0; b < 4; b += 2)
+                    if (bracket[b] == r && bracket[b + 1] < text.length()) {
+                        int bx = textX - scrollX + font.width(text.substring(0, bracket[b + 1]));
+                        g.fill(bx - 1, y - 1, bx + font.width(text.substring(bracket[b + 1], bracket[b + 1] + 1)) + 1, y + LINE - 1, 0x50FFFFFF);
+                    }
             g.text(font, Highlighter.line(text, lang, block), textX - scrollX, y, 0xFFFFFFFF, !Theme.current().equals("light"));
+            Integer foldEnd = folds.get(r);
+            if (foldEnd != null) {
+                int fx = textX - scrollX + font.width(text) + 6;
+                String marker = " ⋯ " + (foldEnd - r) + " ";
+                g.fill(fx - 2, y - 1, fx + font.width(marker) + 2, y + LINE - 1, 0x60808080);
+                g.text(font, marker, fx, y, 0xFFC8C8C8, false);
+                for (int skip = r + 1; skip <= foldEnd; skip++) Highlighter.line(lines.get(skip), lang, block);
+            }
+            for (int[] c : carets)
+                if (c[0] == r && (System.currentTimeMillis() / 500) % 2 == 0) {
+                    int cx = textX - scrollX + font.width(text.substring(0, Math.min(c[1], text.length())));
+                    g.fill(cx, y - 1, cx + 1, y + LINE - 1, 0xFFF2C14E);
+                }
             if (r == row && (System.currentTimeMillis() / 500) % 2 == 0) {
                 int cx = textX - scrollX + font.width(text.substring(0, Math.min(col, text.length())));
                 g.fill(cx, y - 1, cx + 1, y + LINE - 1, Theme.CARET);
@@ -619,7 +824,8 @@ final class EditorScreen extends Screen {
         }
         if (!loaded) g.text(font, L.t("Загрузка…"), textX, areaY + 4, 0xFF8A8A8A);
         String status = L.t("Стр ") + (row + 1) + ", " + L.t("кол ") + (col + 1) + " · " + (lang.isEmpty() ? "text" : lang)
-            + " · " + (eol.equals("\r\n") ? "CRLF" : "LF") + " · " + lines.size() + L.t(" строк");
+            + " · " + (eol.equals("\r\n") ? "CRLF" : "LF") + " · " + lines.size() + L.t(" строк")
+            + (carets.isEmpty() ? "" : " · " + (carets.size() + 1) + L.t(" курсоров"));
         g.text(font, status, width - font.width(status) - 6, height - 13, Theme.WINDOW_DIM);
         if (!message.isEmpty()) g.text(font, font.plainSubstrByWidth(message, width - font.width(status) - 20), 6, height - 13, messageColor);
     }
