@@ -984,6 +984,49 @@ class GraphBlameTests(unittest.IsolatedAsyncioTestCase):
                          [('Alex', 'first commit'), ('Alex', 'first commit'), ('Alex', 'add three')])
 
 
+@unittest.skipUnless(shutil.which('git'), 'git is not installed')
+class ConflictTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pick_sides_per_block_and_claude(self):
+        import subprocess
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        env = mock.patch.dict(os.environ, {'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t', 'GIT_COMMITTER_NAME': 't',
+                                           'GIT_COMMITTER_EMAIL': 't@t', 'GIT_CONFIG_GLOBAL': os.devnull})
+        env.start()
+        self.addCleanup(env.stop)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        repo = Path(bridge.projects.path_of_current())
+        git = lambda *a: subprocess.run(['git', *a], cwd=repo, capture_output=True, text=True)
+        lines = ['top', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'bottom']
+        (repo / 'f.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        git('init', '-q', '-b', 'main'); git('add', '.'); git('commit', '-qm', 'base')
+        git('checkout', '-qb', 'other')
+        (repo / 'f.txt').write_text('\n'.join(['TOP-THEIRS'] + lines[1:-1] + ['BOTTOM-THEIRS']) + '\n', encoding='utf-8')
+        git('commit', '-qam', 'theirs')
+        git('checkout', '-q', 'main')
+        (repo / 'f.txt').write_text('\n'.join(['TOP-OURS'] + lines[1:-1] + ['BOTTOM-OURS']) + '\n', encoding='utf-8')
+        git('commit', '-qam', 'ours')
+        git('merge', 'other')                                        # two conflict blocks
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'conflicts'})
+        card = [e for e in bridge.events if e['kind'] == 'git_conflicts'][-1]
+        self.assertTrue(card['merging'])
+        self.assertEqual([len(f['blocks']) for f in card['files']], [2])
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'pick f.txt 0 ours'})
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'pick f.txt 0 theirs'})   # what is left is block 0 again
+        text = (repo / 'f.txt').read_text(encoding='utf-8')
+        self.assertIn('TOP-OURS', text)
+        self.assertIn('BOTTOM-THEIRS', text)
+        self.assertNotIn('<<<<<<<', text)
+        self.assertEqual(git('diff', '--name-only', '--diff-filter=U').stdout, '')   # staged
+        with self.assertRaises(ValueError):
+            await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'resolve'})  # nothing left for Claude
+        from backends.conflicts import parse, resolve
+        sample = 'x\n<<<<<<< HEAD\nours\n||||||| base\nold\n=======\ntheirs\n>>>>>>> branch\ny'
+        self.assertEqual(parse(sample)[0]['base'], ['old'])
+        self.assertEqual(resolve(sample, 0, 'both'), 'x\nours\ntheirs\ny')
+
+
 class ReplaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_preview_apply_stale_and_undo(self):
         temp = tempfile.TemporaryDirectory()

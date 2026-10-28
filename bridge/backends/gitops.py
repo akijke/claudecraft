@@ -96,10 +96,10 @@ class Git:
             'switch': self.switch, 'checkout': self.switch, 'remote': self.remote,
             'github': self.github, 'stash': self.stash,
             'hunks': self.hunks, 'stage': self.stage_hunk, 'unstage': self.unstage_hunk,
-            'graph': self.graph,
+            'graph': self.graph, 'conflicts': self.conflicts, 'pick': self.pick, 'resolve': self.resolve_with_claude,
         }.get(sub)
         if not handler:
-            raise ValueError('git: status, diff, hunks, stage, unstage, log, add, commit, push, pull, fetch, branch, '
+            raise ValueError('git: status, diff, hunks, stage, unstage, conflicts, pick, resolve, graph, log, add, commit, push, pull, fetch, branch, '
                              'switch, remote, github, stash, init, clone')
         if handler in (self.status, self.push, self.pull, self.fetch):
             return await handler(mode)
@@ -179,6 +179,56 @@ class Git:
         path = await self._apply(rest, staged=True, reverse=True)
         self.emit(mode, f'Кусок {path} убран из коммита (unstaged)', kind='status')
         await self.hunks(mode, '')
+
+    # ---- merge conflicts -----------------------------------------------------
+    async def conflicted(self):
+        out = await self.ok('diff', '--name-only', '--diff-filter=U')
+        return [l.strip() for l in out.splitlines() if l.strip()]
+
+    async def conflicts(self, mode, rest=''):
+        from backends import conflicts
+        files = []
+        for name in await self.conflicted():
+            path = self.folder() / name
+            try:
+                text = path.read_text(encoding='utf-8', errors='replace')
+            except OSError:
+                continue
+            blocks = conflicts.parse(text)
+            files.append({'path': name, 'blocks': [{k: (v[:12] if isinstance(v, list) else v) for k, v in b.items()}
+                                                  for b in blocks]})
+        code, merging = await self.run('rev-parse', '-q', '--verify', 'MERGE_HEAD')
+        self.emit(mode, 'Конфликты', kind='git_conflicts', files=files, merging=code == 0)
+
+    async def pick(self, mode, rest):
+        """git pick <file> <block> ours|theirs|both"""
+        from backends import conflicts
+        parts = rest.rsplit(' ', 2)
+        if len(parts) != 3 or not parts[1].isdigit():
+            raise ValueError('git pick <файл> <номер> ours|theirs|both')
+        name, index, choice = parts[0].strip().strip('"'), int(parts[1]), parts[2]
+        path = (self.folder() / name).resolve()
+        if not path.is_file() or self.folder().resolve() not in path.parents:
+            raise ValueError(f'Нет такого файла в проекте: {name}')
+        raw = path.read_bytes().decode('utf-8', 'replace')
+        text = conflicts.resolve(raw, index, choice)
+        path.write_text(text, encoding='utf-8', newline='')
+        if not conflicts.parse(text):
+            await self.ok('add', '--', name)
+            self.emit(mode, f'{name}: конфликты разрешены, файл добавлен в коммит', kind='status')
+        await self.conflicts(mode)
+
+    async def resolve_with_claude(self, mode, rest=''):
+        files = await self.conflicted()
+        if not files:
+            raise ValueError('Конфликтов нет')
+        chat = self.bridge.current_chat('cc')
+        await self.bridge.enqueue(chat, (
+            'There is a merge conflict in this repository. Resolve the conflict markers in: ' + ', '.join(files)
+            + '. For each block understand what both sides wanted and keep both intents (not just one side), '
+            'remove all conflict markers, make sure the code still builds/tests pass if you can run them, then '
+            '`git add` the resolved files. Do not commit; summarise each decision briefly.'))
+        self.emit(mode, 'Claude разрешает конфликты: ' + ', '.join(files), kind='status')
 
     async def graph(self, mode, rest):
         n = int(rest) if rest.isdigit() else 40

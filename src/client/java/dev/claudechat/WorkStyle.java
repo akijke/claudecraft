@@ -341,6 +341,29 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "git_conflicts" -> {
+                JsonArray files = e.getAsJsonArray("files");
+                out.add(line(mode, lit("⚠ " + L.t("Конфликты слияния"), files.isEmpty() ? GREEN : RED).withStyle(st -> st.withBold(true))
+                    .append(lit(files.isEmpty() ? L.t("  нет") : "  " + files.size() + L.t(" файл(ов)  "), FAINT))
+                    .append(files.isEmpty() ? Component.literal("") : button("✦ " + L.t("Claude, разреши"), "/cc git resolve", false, CODE_MODE,
+                        L.t("Claude поймёт обе стороны, уберёт маркеры, проверит сборку и сделает git add")))));
+                for (JsonElement fe : files) {
+                    JsonObject f = fe.getAsJsonObject();
+                    String file = s(f, "path");
+                    out.add(line(mode, Component.literal("  ").append(button(file, "/edit " + file, false, GOLD, L.t("Открыть в редакторе")))));
+                    for (JsonElement be : f.getAsJsonArray("blocks")) {
+                        JsonObject b = be.getAsJsonObject();
+                        int idx = n(b, "index");
+                        String base = "/cc git pick " + file + " " + idx + " ";
+                        out.add(line(mode, lit(String.format(L.t("    #%d стр. %d  "), idx + 1, n(b, "start")), DIM)
+                            .append(button("◀ ours", base + "ours", false, GREEN, s(b, "ours_label"))).append(sp())
+                            .append(button("theirs ▶", base + "theirs", false, AQUA, s(b, "theirs_label"))).append(sp())
+                            .append(button(L.t("оба"), base + "both", false, GOLD, null))));
+                        for (JsonElement l : b.getAsJsonArray("ours")) out.add(line(mode, lit("      < " + clean(l.getAsString()), GREEN)));
+                        for (JsonElement l : b.getAsJsonArray("theirs")) out.add(line(mode, lit("      > " + clean(l.getAsString()), AQUA)));
+                    }
+                }
+            }
             case "git_graph" -> {
                 out.add(line(mode, lit("⇄ " + L.t("Граф коммитов"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit(L.t("   все ветки · клик по хэшу — show"), FAINT))));
@@ -598,6 +621,7 @@ final class WorkStyle {
             .append(button("diff", "/cc git diff", false, AQUA, L.t("Все изменения"))).append(sp())
             .append(button(L.t("куски"), "/cc git hunks", false, AQUA, L.t("Добавлять в коммит по кускам (stage по ханкам)"))).append(sp())
             .append(button(L.t("граф"), "/cc git graph", false, AQUA, L.t("Граф коммитов всех веток"))).append(sp())
+            .append(button(L.t("конфликты"), "/cc git conflicts", false, AQUA, L.t("Разрешить конфликты слияния"))).append(sp())
             .append(button("✔ commit", "/cc git commit ", true, GREEN, L.t("Впиши сообщение; пусто — Claude напишет сам"))).append(sp())
             .append(button("✦ commit", "/cc git commit", false, CODE_MODE, L.t("Claude посмотрит diff и закоммитит"))).append(sp())
             .append(button("↑ push", "/cc git push", false, GOLD, null)).append(sp())
