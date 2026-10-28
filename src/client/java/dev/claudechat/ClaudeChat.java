@@ -361,6 +361,13 @@ public final class ClaudeChat implements ClientModInitializer {
                 if (!v.isEmpty()) Theme.setScale(v.equals("auto") ? 0 : Integer.parseInt(v.replaceAll("\\D", "0")));
                 themeMenu();
             }
+            case "osnotify" -> {
+                String value = parts.length > 1 ? parts[1].strip() : "";
+                boolean on = value.isEmpty() ? !launcher.flag("osnotify", true) : !value.equals("off");
+                launcher.setFlag("osnotify", on);
+                say("c", "osnotify: " + (on ? L.t("вкл") : L.t("выкл")) + L.t(" — системные уведомления, когда игра свёрнута"));
+                if (value.equals("test")) OsNotify.show("Claudecraft", L.t("Проверка уведомления"));
+            }
             case "hud", "toasts" -> {
                 // /claude hud|toasts|sound [on|off]: toggles without an argument.
                 String value = parts.length > 1 ? parts[1].strip() : "";
@@ -623,6 +630,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/pty", L.t("[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один")},
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude theme", L.t("тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода")},
+            {"/claude osnotify", L.t("уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл")},
             {"/claude sound", L.t("звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},

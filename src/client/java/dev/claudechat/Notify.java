@@ -85,6 +85,7 @@ final class Notify {
             SystemToast.addOrUpdate(client.gui.toastManager(), TOAST, Component.literal(head),
                 Component.literal(title == null ? "" : title));
         if (on("sound")) Sounds.play(sound);
+        OsNotify.show(head, title);  // only when the game is in the background or minimized
     }
 
     /** Dev screenshots: draw the panel outside a world. */
