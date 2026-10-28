@@ -157,6 +157,13 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Правки Claude': "Claude's edits",
+    'Откат правок Claude': "Undo of Claude's edits",
+    'Claude ещё работает над этим запросом — дождись конца или /cc cancel':
+        'Claude is still working on this request — wait for it to finish or /cc cancel',
+    'Нечего откатывать: Claude ещё не менял файлы в этом чате': "Nothing to undo: Claude hasn't changed files in this chat",
+    'undo: без аргумента — откатить последний запрос; undo list — история':
+        'undo: no argument — undo the last request; undo list — history',
     # --- shell & GitHub --------------------------------------------------------
     'Формат: /sh <команда>  (а также /ps, /cmd, /bash)': 'Usage: /sh <command>  (also /ps, /cmd, /bash)',
     'cmd есть только в Windows — используй /sh или /bash': 'cmd exists only on Windows — use /sh or /bash',

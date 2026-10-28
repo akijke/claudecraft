@@ -127,6 +127,37 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.errors(), [])
         self.assertIn('haiku', self.fake.requests[0]['model'])
 
+    async def test_edits_show_diff_and_undo_restores(self):
+        await self.start([])
+        src = os.path.join(self.bridge.workspace, 'Main.java')
+        made = os.path.join(self.bridge.workspace, 'New.txt')
+        with open(src, 'w', encoding='utf-8') as f:
+            f.write('class Main {\n    int x = 1;\n}\n')
+        self.fake.script = [
+            tool('Read', {'file_path': src}),
+            tool('Edit', {'file_path': src, 'old_string': 'int x = 1;', 'new_string': 'int x = 2;'}, tool_id='toolu_2'),
+            tool('Write', {'file_path': made, 'content': 'fresh\n'}, tool_id='toolu_3'),
+            text('edited')]
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'auto', 'text': 'all'})
+        await self.bridge.enqueue(chat, 'change x')
+        await self.until(lambda: chat.task is None)
+        self.assertEqual(self.errors(), [])
+        with open(src, encoding='utf-8') as f:
+            self.assertIn('int x = 2;', f.read())
+        self.assertTrue(os.path.exists(made))
+        diffs = [e for e in self.bridge.events if e['kind'] == 'edit_diff']
+        self.assertEqual(len(diffs), 2)
+        self.assertIn('-    int x = 1;', diffs[0]['lines'])
+        self.assertIn('+    int x = 2;', diffs[0]['lines'])
+        self.assertTrue(diffs[1]['new'])
+        await self.bridge.command({'mode': 'cc', 'action': 'undo'})
+        with open(src, encoding='utf-8') as f:
+            self.assertIn('int x = 1;', f.read())
+        self.assertFalse(os.path.exists(made))
+        with self.assertRaises(ValueError):
+            await self.bridge.command({'mode': 'cc', 'action': 'undo'})
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

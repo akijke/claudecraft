@@ -17,6 +17,7 @@ from backends.account import Account
 from backends.agents import Agents
 from backends.connectors import Connectors
 from backends.files import FileManager
+from backends.undo import Checkpoints
 from backends.gitops import Git
 from backends.shell import Shell
 from backends.github import GitHub
@@ -84,6 +85,7 @@ class Bridge:
         self.git = Git(self)
         self.shell = Shell(self)
         self.github = GitHub(self)
+        self.checkpoints = Checkpoints(self.directory / 'undo')
         self.extensions = {}
         self.reload_extensions()
         self.chats = {}
@@ -326,6 +328,18 @@ class Bridge:
                 bucket[key] = bucket.get(key, 0) + int((usage or {}).get(key) or 0)
             bucket['cost_usd'] = bucket.get('cost_usd', 0.0) + float(cost or 0.0)
         chat.usage['turns'] = chat.usage.get('turns', 0) + 1
+
+    def undo(self, chat, arg=''):
+        """/cc undo — restore files Claude changed in the newest request; /cc undo list — history."""
+        if arg in ('list', 'ls', 'history'):
+            turns = self.checkpoints.history(chat.id)
+            self.emit(chat, 'Правки Claude', kind='undo_list', turns=turns[::-1][:10])
+            return
+        if arg:
+            raise ValueError('undo: без аргумента — откатить последний запрос; undo list — история')
+        restored, removed, skipped, prompt = self.checkpoints.undo(chat.id)
+        self.emit(chat, 'Откат правок Claude', kind='undo', prompt=prompt, restored=restored,
+                  removed=removed, skipped=skipped, left=len(self.checkpoints.load(chat.id)))
 
     def tokens_report(self, chat):
         def row(label, u):
@@ -610,6 +624,8 @@ class Bridge:
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
         elif action == 'tokens':
             self.tokens_report(chat)
+        elif action == 'undo':
+            self.undo(chat, text.strip())
         elif action in ('model', 'effort'):
             value = text.strip()
             if value:

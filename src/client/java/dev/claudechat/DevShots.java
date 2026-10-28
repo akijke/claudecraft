@@ -40,7 +40,7 @@ final class DevShots {
             case 300 -> Screenshot.grab(client, true);
             case 302 -> {
                 Notify.onEvent(parse("{\"kind\":\"thinking\",\"chat\":\"a\",\"mode\":\"cc\",\"title\":\"Fix the build\"}"));
-                Notify.onEvent(parse("{\"kind\":\"tool\",\"chat\":\"a\",\"mode\":\"cc\",\"text\":\"gradlew build  вЂ” Building\"}"));
+                Notify.onEvent(parse("{\"kind\":\"tool\",\"chat\":\"a\",\"mode\":\"cc\",\"text\":\"gradlew build  — Building\"}"));
                 Notify.onEvent(parse("{\"kind\":\"thinking\",\"chat\":\"b\",\"mode\":\"c\",\"title\":\"Explain mixins\"}"));
                 Notify.onEvent(parse("{\"kind\":\"permission\",\"chat\":\"b\",\"mode\":\"c\",\"title\":\"Explain mixins\"}"));
                 client.setScreenAndShow(new HudPreview());
@@ -64,7 +64,9 @@ final class DevShots {
             case 480 -> Screenshot.grab(client, true);
             case 485 -> client.setScreenAndShow(new EditorScreen(mod, null, "src/main/java/dev/demo/Hello.java").withText(EDITOR));
             case 495 -> Screenshot.grab(client, true);
-            case 505 -> client.stop();
+            case 510 -> client.setScreenAndShow(new ChatPreview(EDITS));
+            case 540 -> Screenshot.grab(client, true);
+            case 550 -> client.stop();
             default -> { }
         }
     }
@@ -74,7 +76,7 @@ final class DevShots {
     private static JsonObject status(boolean logged, String login) {
         return parse("{\"account\":{\"logged_in\":" + logged + ",\"method\":\"claude.ai\","
             + "\"email\":" + (logged ? "\"player@example.com\"" : "null") + "},"
-            + "\"api_key\":" + (logged ? "\"sk-ant-вЂ¦abcd\"" : "null") + ","
+            + "\"api_key\":" + (logged ? "\"sk-ant-…abcd\"" : "null") + ","
             + "\"login\":{\"state\":\"" + login + "\",\"url\":\"https://claude.com/cai/oauth/authorize?code=true\",\"error\":null},"
             + "\"github\":{\"installed\":true,\"login\":\"akijke\",\"connector\":true,\"token\":false,"
             + "\"flow\":{\"state\":\"idle\",\"code\":null,\"url\":null,\"error\":null}}}");
@@ -97,21 +99,31 @@ final class DevShots {
         + "{\"name\":\"notes.md\",\"dir\":false,\"size\":120400,\"mtime\":1790000000,\"hidden\":false}]}";
 
     private static final String[] WORK = {
-        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Fix the build\",\"text\":\"Р”СѓРјР°СЋвЂ¦\",\"queued\":0}",
-        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"рџ“„\",\"text\":\"Reading build.gradle\"}",
-        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"$\",\"text\":\"gradlew build  вЂ” Building the project\"}",
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Fix the build\",\"text\":\"Думаю…\",\"queued\":0}",
+        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"📄\",\"text\":\"Reading build.gradle\"}",
+        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"$\",\"text\":\"gradlew build  — Building the project\"}",
         "{\"seq\":4,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool_error\",\"text\":\"error: cannot find symbol ClientCommandManager\"}",
-        "{\"seq\":5,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"в—†\",\"text\":\"Agent debugger: Find the cause of the compile error\"}",
-        "{\"seq\":6,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"рџ”Ќ\",\"text\":\"Searching вЂњClientCommandsвЂќ in .gradle\",\"agent\":\"debugger\"}",
-        "{\"seq\":7,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"вњЋ\",\"text\":\"Editing src/client/Main.java\"}",
+        "{\"seq\":5,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"◆\",\"text\":\"Agent debugger: Find the cause of the compile error\"}",
+        "{\"seq\":6,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"🔍\",\"text\":\"Searching “ClientCommands” in .gradle\",\"agent\":\"debugger\"}",
+        "{\"seq\":7,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"✎\",\"text\":\"Editing src/client/Main.java\"}",
         "{\"seq\":8,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":true,\"text\":\"## Fixed\"}",
         "{\"seq\":9,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"In 26.3 the class was renamed to **ClientCommands**:\"}",
         "{\"seq\":10,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```java\"}",
         "{\"seq\":11,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"import static ...ClientCommands.*;\"}",
         "{\"seq\":12,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```\"}",
-        "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- the build passes, `gradlew build` вњ”\"}",
+        "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- the build passes, `gradlew build` ✔\"}",
         "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Done\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092}",
         "{\"seq\":15,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r1\",\"text\":\"Bash\\n{}\",\"summary\":\"$ git push\",\"choices\":[\"Allow\",\"Deny\",\"Always allow Bash\"]}",
+    };
+
+    private static final String[] EDITS = {
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"edit_diff\",\"text\":\"✎ Editing src/Main.java\",\"path\":\"C:/dev/my-mod/src/Main.java\","
+            + "\"added\":2,\"removed\":1,\"lines\":[\"@@ -3,4 +3,5 @@\",\" import x;\",\"-import old.Commands;\",\"+import new.ClientCommands;\",\"+import new.Hud;\",\" class Main {}\"]}",
+        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r2\",\"text\":\"Write\\n{}\",\"summary\":\"✚ Creating src/Hud.java\","
+            + "\"diff\":{\"new\":true,\"added\":3,\"removed\":0,\"lines\":[\"@@ -0,0 +1,3 @@\",\"+final class Hud {\",\"+    void draw() { }\",\"+}\"]},"
+            + "\"choices\":[\"Allow\",\"Deny\",\"Always allow Write\"]}",
+        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"undo\",\"text\":\"Undo\",\"prompt\":\"fix the build\",\"restored\":[\"C:/dev/my-mod/src/Main.java\"],"
+            + "\"removed\":[\"C:/dev/my-mod/src/Hud.java\"],\"skipped\":[],\"left\":2}",
     };
 
     private static final String[] PROJECT = {

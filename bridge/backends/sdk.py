@@ -19,6 +19,7 @@ import json
 import logging
 from urllib.parse import urlparse
 from backends.describe import EDIT_TOOLS, describe, todo_rows, clip
+from backends import undo as undo_files
 
 
 log = logging.getLogger('claudecraft.sdk')
@@ -305,12 +306,21 @@ async def run(bridge, chat, text):
                 answers[question['question']] = await bridge.ask_user(
                     chat, 'question', description, labels, question.get('multiSelect', False))
             return PermissionResultAllow(updated_input={**data, 'answers': answers})
-        if auto_allows(chat, name):
-            return PermissionResultAllow(updated_input=data)
+        path = undo_files.target(name, data, effective) if chat.mode == 'cc' else None
+        changes = undo_files.diff(name, data, path) if path else None
         icon, line = describe(name, data, effective)
+        if auto_allows(chat, name):
+            if path:
+                bridge.checkpoints.remember(chat.id, path)
+                if changes:
+                    bridge.emit(chat, f'{icon} {line}', kind='edit_diff', path=str(path), **changes)
+            return PermissionResultAllow(updated_input=data)
         answer = await bridge.ask_user(chat, 'permission',
             f'{name}\n' + json.dumps(data, ensure_ascii=False)[:16000],
-            ['Разрешить', 'Отклонить', f'Всегда разрешать {name}'], summary=f'{icon} {line}', tool=name)
+            ['Разрешить', 'Отклонить', f'Всегда разрешать {name}'], summary=f'{icon} {line}', tool=name,
+            diff=changes, path=str(path) if path else None)
+        if path and answer in ('1', '3'):
+            bridge.checkpoints.remember(chat.id, path)
         if answer == '3':
             if name not in chat.allowed:
                 chat.allowed.append(name)
@@ -390,6 +400,7 @@ async def run(bridge, chat, text):
     turn = SdkTurn(bridge, chat, None, _types(), trusted_replay=not bridge.config.get('cli_path'))
     turn.cwd = effective
     chat.live = turn
+    bridge.checkpoints.begin(chat.id, text)
     try:
         async with ClaudeSDKClient(options=options) as client:
             turn.attach(client)
@@ -399,4 +410,5 @@ async def run(bridge, chat, text):
         turn.ready.set()
         if chat.live is turn:
             chat.live = None
+        bridge.checkpoints.finish(chat.id)
         bridge.persist()

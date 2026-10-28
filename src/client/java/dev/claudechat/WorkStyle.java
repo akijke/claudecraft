@@ -153,6 +153,43 @@ final class WorkStyle {
                 out.add(line("cc", lit("  " + L.t("Та же сессия: в игре и на ПК видно одно и то же. Не пиши в неё в двух местах одновременно."),
                     b(e, "busy") ? GOLD : FAINT)));
             }
+            case "edit_diff" -> {
+                out.add(line(mode, lit("± ", GOLD).append(lit(s(e, "text"), TEXT)).append(sp())
+                    .append(lit("+" + n(e, "added"), GREEN)).append(lit(" −" + n(e, "removed"), RED)).append(sp())
+                    .append(button("✎", "/edit " + s(e, "path"), false, AQUA, L.t("Открыть во встроенном редакторе"))).append(sp())
+                    .append(button("⟳ " + L.t("откатить"), cmd + "undo", false, GOLD,
+                        L.t("Вернуть все файлы, изменённые Claude в этом запросе")))));
+                editDiff(e, mode, out, 12);
+            }
+            case "undo" -> {
+                out.add(line(mode, lit("⟳ " + L.t("Откат правок Claude"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  «" + s(e, "prompt") + "»", FAINT))));
+                for (String key : new String[]{"restored", "removed", "skipped"}) {
+                    if (!e.has(key)) continue;
+                    String label = key.equals("restored") ? L.t("  восстановлен ") : key.equals("removed")
+                        ? L.t("  удалён (создан Claude) ") : L.t("  не удалось ");
+                    int color = key.equals("skipped") ? RED : key.equals("removed") ? DIM : GREEN;
+                    for (JsonElement p : e.getAsJsonArray(key)) out.add(line(mode, lit(label, color).append(lit(p.getAsString(), TEXT))));
+                }
+                if (n(e, "left") > 0) out.add(line(mode, lit("  " + L.t("Ещё запросов для отката: ") + n(e, "left") + "  ", FAINT)
+                    .append(button("⟳ " + L.t("ещё"), cmd + "undo", false, GOLD, null)).append(sp())
+                    .append(button(L.t("история"), cmd + "undo list", false, AQUA, null))));
+            }
+            case "undo_list" -> {
+                out.add(line(mode, lit("⟳ " + L.t("Правки Claude"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(L.t("   новые сверху; откат идёт по одному запросу"), FAINT))));
+                JsonArray turns = e.getAsJsonArray("turns");
+                if (turns.isEmpty()) out.add(line(mode, lit(L.t("  пока ничего"), DIM)));
+                boolean first = true;
+                for (JsonElement t : turns) {
+                    JsonObject turn = t.getAsJsonObject();
+                    MutableComponent row = lit("  «" + s(turn, "prompt") + "»  ", TEXT)
+                        .append(lit(turn.getAsJsonArray("files").size() + L.t(" файл(ов)"), DIM));
+                    if (first) row.append(sp()).append(button("⟳", cmd + "undo", false, GOLD, L.t("Откатить этот запрос")));
+                    out.add(line(mode, row));
+                    first = false;
+                }
+            }
             case "model" -> {
                 String model = s(e, "model"), effort = s(e, "effort");
                 MutableComponent row = lit("◆ " + L.t("Модель") + ": ", GOLD);
@@ -244,6 +281,22 @@ final class WorkStyle {
             out.add(line("cc", Component.literal("  ").append(button(L.t("Создать на GitHub"), "/cc git github", false, GOLD,
                 L.t("gh repo create (private) + push; нужен gh auth login"))).append(sp())
                 .append(button("origin …", "/cc git remote ", true, AQUA, L.t("Привязать существующий репозиторий: git remote <url>")))));
+    }
+
+    /** Diff of a file edit by Claude (bridge backends/undo.py): unified lines without header. */
+    static void editDiff(JsonObject d, String mode, List<Component> out, int max) {
+        if (d == null || !d.has("lines")) return;
+        JsonArray lines = d.getAsJsonArray("lines");
+        if (b(d, "new")) out.add(line(mode, lit(L.t("  новый файл"), DIM)));
+        int shown = 0;
+        for (JsonElement l : lines) {
+            if (shown++ >= max) break;
+            String raw = l.getAsString();
+            int color = raw.startsWith("+") ? GREEN : raw.startsWith("-") ? RED : raw.startsWith("@@") ? AQUA : DIM;
+            out.add(line(mode, lit("  " + clean(raw), color)));
+        }
+        int more = lines.size() - Math.min(max, lines.size()) + n(d, "more");
+        if (more > 0) out.add(line(mode, lit("  … " + L.t("ещё строк: ") + more, FAINT)));
     }
 
     private static void diff(JsonObject e, String mode, List<Component> out) {

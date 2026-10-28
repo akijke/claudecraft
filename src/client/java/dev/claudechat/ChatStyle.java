@@ -205,6 +205,8 @@ final class ChatStyle {
         out.add(line(mode, lit(L.t("⚠ Разрешить действие?"), GOLD).withStyle(s -> s.withBold(true))));
         out.add(line(mode, lit("  " + summary, TEXT).withStyle(s -> s.withHoverEvent(new HoverEvent.ShowText(
             lit(text.length() > 900 ? text.substring(0, 900) + "…" : text, BLOCK))))));
+        // File edits show what will change before the click.
+        if (e.has("diff") && e.get("diff").isJsonObject()) WorkStyle.editDiff(e.getAsJsonObject("diff"), mode, out, 24);
         JsonArray choices = e.getAsJsonArray("choices");
         MutableComponent row = Component.literal("  ");
         int[] colors = {GREEN, RED, AQUA};
