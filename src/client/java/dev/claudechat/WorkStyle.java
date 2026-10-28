@@ -156,6 +156,27 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "commands" -> {
+                out.add(line(mode, lit("/ " + L.t("Команды"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(L.t("   свои: .claude/commands/*.md в проекте или ~/.claude/commands"), FAINT))));
+                String source = "";
+                for (JsonElement item : e.getAsJsonArray("rows")) {
+                    JsonObject r = item.getAsJsonObject();
+                    if (!s(r, "source").equals(source)) {
+                        source = s(r, "source");
+                        out.add(line(mode, lit("  " + (source.equals("project") ? L.t("проект") : source.equals("user")
+                            ? L.t("пользователь") : L.t("встроенные")), DIM).withStyle(st -> st.withUnderlined(true))));
+                    }
+                    String name = "/" + s(r, "name");
+                    out.add(line(mode, Component.literal("  ").append(button(name, cmd + name + " ", true, AQUA,
+                            s(r, "path").isEmpty() ? null : s(r, "path")))
+                        .append(lit(s(r, "hint").isEmpty() ? "" : " " + s(r, "hint"), FAINT))
+                        .append(lit("  " + s(r, "description"), DIM))));
+                }
+            }
+            case "slash" -> out.add(line(mode, lit("/ ", AQUA).append(lit(s(e, "text"), TEXT))
+                .withStyle(st -> st.withHoverEvent(new HoverEvent.ShowText(lit(s(e, "prompt"), TEXT))))
+                .append(lit(L.t("  → в очередь Claude"), FAINT))));
             case "doctor" -> {
                 String overall = s(e, "overall");
                 out.add(line(mode, lit(L.t("◎ Диагностика"), GOLD).withStyle(st -> st.withBold(true))

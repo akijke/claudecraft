@@ -659,6 +659,17 @@ class Bridge:
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
         elif action == 'tokens':
             self.tokens_report(chat)
+        elif action == 'commands':
+            from backends.commands import listing
+            self.emit(chat, 'Команды', kind='commands', rows=listing(self.chat_cwd(chat) if mode == 'cc' else None))
+        elif action == 'slash' or (action or '').startswith('/'):
+            from backends.commands import expand
+            line = text if action == 'slash' else action + ' ' + text
+            kind, value, extra = expand(self.chat_cwd(chat) if mode == 'cc' else None, line)
+            if kind == 'action':
+                return await self.command({'mode': mode, 'action': value, 'text': extra})
+            self.emit(chat, '/' + line.strip().lstrip('/').split(' ')[0], kind='slash', prompt=value[:300])
+            await self.enqueue(chat, value)
         elif action == 'doctor':
             from backends.doctor import report
             data = await report(self)
@@ -1043,6 +1054,12 @@ def create_app(bridge, token):
         status['github'] = await bridge.github.status()
         return web.json_response(status)
     app.router.add_get('/account', account)
+    async def commands(request):
+        from backends.commands import listing
+        mode = request.query.get('mode', 'cc')
+        chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')
+        return web.json_response({'commands': listing(bridge.chat_cwd(chat) if chat.mode == 'cc' else None)})
+    app.router.add_get('/commands', commands)
 
     async def oauth_callback(request):
         q = request.query

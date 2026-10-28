@@ -407,5 +407,12 @@
   "  есть проблемы": "  problems found",
   "ещё раз": "again",
   "◎ Диагностика": "◎ Diagnostics",
-  "проверить Python, git, gh, node, CLI, вход, порты и права — с советами": "check Python, git, gh, node, CLIs, sign-in, ports and rights — with advice"
+  "проверить Python, git, gh, node, CLI, вход, порты и права — с советами": "check Python, git, gh, node, CLIs, sign-in, ports and rights — with advice",
+  "Команды": "Commands",
+  "   свои: .claude/commands/*.md в проекте или ~/.claude/commands": "   your own: .claude/commands/*.md in the project or ~/.claude/commands",
+  "проект": "project",
+  "пользователь": "user",
+  "встроенные": "built-in",
+  "  → в очередь Claude": "  → queued for Claude",
+  "slash-команды: /review, /init, /test… и свои из .claude/commands (Tab — подсказки) · commands — список": "slash commands: /review, /init, /test… and your own from .claude/commands (Tab completes) · commands — list"
 }

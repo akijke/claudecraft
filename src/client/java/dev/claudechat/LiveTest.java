@@ -116,6 +116,8 @@ final class LiveTest {
         step("/cc undo list (Claude's edits history)", () -> { markEvents(); mod.runLine("cc", "/cc undo list"); },
             () -> event("undo_list"), 20);
         step("/cc model shows the model picker", () -> { markEvents(); mod.runLine("cc", "/cc model"); }, () -> event("model"), 20);
+        step("/cc commands lists slash commands", () -> { markEvents(); mod.runLine("cc", "/cc commands"); },
+            () -> event("commands"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {
@@ -125,6 +127,11 @@ final class LiveTest {
             if (!(screen() instanceof ConversationScreen k)) return false;
             if (waited == 20) { k.inputForTest(""); k.keyPressed(new KeyEvent(InputConstants.KEY_UP, 0, 0)); }
             return waited > 20 && k.inputValue().equals("livetest: earlier prompt");
+        }, 10);
+        step("Tab completes /rev to /review", () -> mod.refreshCommands("cc"), () -> {
+            if (!(screen() instanceof ConversationScreen k)) return false;
+            if (waited == 30) { k.inputForTest("/rev"); k.keyPressed(new KeyEvent(InputConstants.KEY_TAB, 0, 0)); }
+            return waited > 30 && k.inputValue().equals("/review ");
         }, 10);
         step("click 'Files' in the K window", () -> press(L.t("Файлы")),
             () -> screen() instanceof FileScreen && waited > 30, 10);

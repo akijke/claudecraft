@@ -862,6 +862,53 @@ class OAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.bridge.oauth.has_token('fake'))
 
 
+class SlashCommandTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(Path(self.temp.name) / 'b', AsyncMock())
+        self.user = Path(self.temp.name) / 'claude-home'
+        (self.user / 'commands').mkdir(parents=True)
+        (self.user / 'commands' / 'hello.md').write_text('Say hello to $1 and $2', encoding='utf-8')
+        (self.user / 'commands' / 'fix.md').write_text('user version', encoding='utf-8')
+        project = Path(self.bridge.projects.path_of_current())
+        (project / '.claude' / 'commands' / 'front').mkdir(parents=True)
+        (project / '.claude' / 'commands' / 'fix.md').write_text(
+            '---\ndescription: Fix an issue\nargument-hint: <issue>\n---\nFix issue $ARGUMENTS carefully.', encoding='utf-8')
+        (project / '.claude' / 'commands' / 'front' / 'test.md').write_text('# Run UI tests\nnpm test', encoding='utf-8')
+        self.env = mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': str(self.user)})
+        self.env.start()
+
+    async def asyncTearDown(self):
+        self.env.stop()
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    def prompts(self):
+        return [call.args[1] for call in self.bridge.runner.await_args_list]
+
+    async def test_project_user_builtin_and_actions(self):
+        await self.bridge.command({'mode': 'cc', 'action': 'commands'})
+        rows = {r['name']: r for r in [e for e in self.bridge.events if e['kind'] == 'commands'][-1]['rows']}
+        self.assertEqual((rows['fix']['source'], rows['fix']['description'], rows['fix']['hint']),
+                         ('project', 'Fix an issue', '<issue>'))
+        self.assertEqual(rows['front:test']['description'], 'Run UI tests')
+        self.assertEqual(rows['hello']['source'], 'user')
+        self.assertEqual(rows['review']['source'], 'builtin')
+        await self.bridge.command({'mode': 'cc', 'action': '/fix', 'text': '#12 login'})
+        await self.bridge.command({'mode': 'cc', 'action': 'slash', 'text': 'hello Alex Steve'})
+        await self.bridge.command({'mode': 'cc', 'action': 'slash', 'text': 'front:test --watch'})
+        for _ in range(50):
+            if len(self.prompts()) == 3:
+                break
+            await asyncio.sleep(0.02)
+        self.assertEqual(self.prompts(), ['Fix issue #12 login carefully.', 'Say hello to Alex and Steve',
+                                          '# Run UI tests\nnpm test\n\n--watch'])
+        await self.bridge.command({'mode': 'cc', 'action': 'slash', 'text': 'cost'})   # built-in action
+        self.assertEqual([e for e in self.bridge.events][-1]['kind'], 'tokens')
+        with self.assertRaises(ValueError):
+            await self.bridge.command({'mode': 'cc', 'action': 'slash', 'text': 'nope'})
+
+
 class DoctorTests(unittest.IsolatedAsyncioTestCase):
     async def test_report_rows_and_english(self):
         temp = tempfile.TemporaryDirectory()

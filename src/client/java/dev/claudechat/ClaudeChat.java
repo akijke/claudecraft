@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -107,7 +107,20 @@ public final class ClaudeChat implements ClientModInitializer {
                     // Blocks invocations by untrusted server-provided clickable messages.
                     .requires(source -> source.attended())
                     .executes(c -> { help(mode); return 1; })
-                    .then(argument("input", StringArgumentType.greedyString()).executes(c -> {
+                    .then(argument("input", StringArgumentType.greedyString()).suggests((c, builder) -> {
+                        // Tab: actions, and slash commands after "/" (built-in, ~/.claude/commands, project)
+                        String typed = builder.getRemaining();
+                        if (typed.contains(" ")) return builder.buildFuture();
+                        if (typed.startsWith("/")) {
+                            refreshCommands(mode);
+                            for (String[] cmd : slashCommands)
+                                if (("/" + cmd[0]).startsWith(typed))
+                                    builder.suggest("/" + cmd[0], Component.literal(cmd[2]));
+                        } else {
+                            for (String a : new TreeSet<>(ACTIONS)) if (a.startsWith(typed)) builder.suggest(a);
+                        }
+                        return builder.buildFuture();
+                    }).executes(c -> {
                         dispatch(mode, StringArgumentType.getString(c, "input")); return 1;
                     })));
             }
@@ -175,6 +188,28 @@ public final class ClaudeChat implements ClientModInitializer {
     }
 
     void open(Supplier<Screen> screen) { openNext = screen; }
+
+    /** name, argument hint, description of every slash command; refreshed in the background. */
+    static volatile List<String[]> slashCommands = List.of();
+    private volatile long commandsFetched;
+
+    void refreshCommands(String mode) {
+        long now = System.currentTimeMillis();
+        if (now - commandsFetched < 10_000) return;
+        commandsFetched = now;
+        io.execute(() -> {
+            try {
+                JsonObject r = request("/commands?mode=" + mode, null);
+                List<String[]> list = new ArrayList<>();
+                for (JsonElement e : r.getAsJsonArray("commands")) {
+                    JsonObject c = e.getAsJsonObject();
+                    list.add(new String[]{c.get("name").getAsString(), c.get("hint").getAsString(),
+                        c.get("description").getAsString(), c.get("source").getAsString()});
+                }
+                slashCommands = list;
+            } catch (Exception ignored) { }
+        });
+    }
 
     /** Game screenshot for Claude (without HUD and menus); the question goes with it. */
     void screenshot(String mode, String question) {
@@ -255,7 +290,7 @@ public final class ClaudeChat implements ClientModInitializer {
                 default -> {
                     String target = SHORTCUTS.get(parts[0]);
                     if (target != null) dispatch("cc", rest.isBlank() ? target : target + " " + rest);
-                    else notice = L.t("Неизвестная команда: /") + parts[0];
+                    else dispatch(mode, "/" + text.substring(1));  // slash command (/review, project commands …)
                 }
             }
             return;
@@ -268,6 +303,7 @@ public final class ClaudeChat implements ClientModInitializer {
         String action = split[0];
         String text = split.length == 2 ? split[1] : "";
         if (action.equals("help")) { help(mode); return; }
+        if (action.startsWith("/") && action.length() > 1) { send(mode, command(mode, "slash", input.strip().substring(1))); return; }
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
@@ -407,6 +443,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "c", L.t("чаты · new · rename · status · cancel · restart · tokens · auto")},
             {c + "compact", L.t("[фокус] — сжать историю, когда контекст заполнен · context — сколько занято")},
             {c + "model", L.t("модель и усилие для этого чата (opus, sonnet, haiku · low…max)")},
+            {c + "/review", L.t("slash-команды: /review, /init, /test… и свои из .claude/commands (Tab — подсказки) · commands — список")},
             {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},

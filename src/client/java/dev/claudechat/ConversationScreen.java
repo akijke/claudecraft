@@ -261,6 +261,22 @@ final class ConversationScreen extends Screen {
     @Override public boolean keyPressed(KeyEvent event) {
         boolean ctrl = (event.modifiers() & 2) != 0;  // GLFW_MOD_CONTROL
         if (event.key() == InputConstants.KEY_RETURN && ctrl) { submit(""); return true; }
+        // Tab after "/name": complete a slash command
+        if (getFocused() == input && event.key() == InputConstants.KEY_TAB && input.getValue().startsWith("/")
+                && !input.getValue().contains(" ")) {
+            mod.refreshCommands(mode);
+            String typed = input.getValue().substring(1);
+            List<String> names = new java.util.ArrayList<>();
+            for (String[] c : ClaudeChat.slashCommands) if (c[0].startsWith(typed)) names.add(c[0]);
+            if (names.size() == 1) input.setValue("/" + names.get(0) + " ");
+            else if (!names.isEmpty()) {
+                String common = names.get(0);
+                for (String n : names) while (!n.startsWith(common)) common = common.substring(0, common.length() - 1);
+                if (common.length() > typed.length()) input.setValue("/" + common);
+                mod.notice = String.join("  ", names.stream().map(n -> "/" + n).limit(12).toList());
+            }
+            return true;
+        }
         // ↑/↓ walk through sent prompts when the box is empty, while browsing, or with Ctrl
         if (getFocused() == input && (event.key() == InputConstants.KEY_UP || event.key() == InputConstants.KEY_DOWN)) {
             boolean up = event.key() == InputConstants.KEY_UP;

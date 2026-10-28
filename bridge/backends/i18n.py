@@ -157,6 +157,27 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    '[на что смотреть]': '[what to focus on]',
+    '<что объяснить>': '<what to explain>',
+    '[какие тесты]': '[which tests]',
+    '[что сохранить]': '[what to keep]',
+    'Команды': 'Commands',
+    'Нет команды /{}. Список: /cc commands': 'No command /{}. List: /cc commands',
+    'Ревью текущих изменений (git diff): ошибки, риски, что улучшить': 'Review the current changes (git diff): bugs, risks, improvements',
+    'Проверка изменений на уязвимости': 'Security review of the changes',
+    'Создать или обновить CLAUDE.md по коду проекта': 'Create or update CLAUDE.md from the code',
+    'Объяснить файл, функцию или идею проекта': 'Explain a file, function or idea of the project',
+    'Запустить тесты и разобрать падения': 'Run the tests and analyse failures',
+    'Сообщение коммита по текущим изменениям': 'Commit message for the current changes',
+    'Сжать историю разговора': 'Compact the conversation history',
+    'Новый чат (история остаётся в списке чатов)': 'New chat (history stays in the chat list)',
+    'Токены и стоимость': 'Tokens and cost',
+    'Заполнение контекста': 'Context fill',
+    'Модель и усилие': 'Model and effort',
+    'Проверка окружения': 'Environment check',
+    'Откатить правки последнего запроса': "Undo the last request's edits",
+    'Агенты': 'Agents',
+    'Коннекторы MCP': 'MCP connectors',
     'Диагностика': 'Diagnostics',
     'Нужен Python 3.11+': 'Python 3.11+ is needed',
     'pip install -r requirements.txt (мост ставит сам при запуске)': 'pip install -r requirements.txt (the bridge does it on start)',
@@ -314,7 +335,7 @@ def _fill(target, parts):
 
 
 # Event fields that carry bridge-written UI text (never Claude content or paths).
-UI_KEYS = {'note', 'summary', 'step', 'state', 'source', 'group', 'about', 'hint', 'label', 'title'}
+UI_KEYS = {'note', 'summary', 'step', 'state', 'source', 'group', 'about', 'hint', 'label', 'title', 'description'}
 CONTENT_KINDS = {'text', 'text_part', 'file', 'diff', 'history', 'tool_error', 'listing', 'tree', 'found',
                  'cwd', 'git_status', 'git_log', 'git_branches', 'git_none'}
 
@@ -332,7 +353,7 @@ def translate_event(event, lang):
         out['choices'] = [to_english(c) for c in out.get('choices', [])]
     for key in UI_KEYS & out.keys():
         out[key] = to_english(out[key])
-    if isinstance(out.get('rows'), list) and out.get('kind') in ('tokens', 'tasks', 'agents', 'connectors', 'chats', 'projects'):
+    if isinstance(out.get('rows'), list) and out.get('kind') in ('tokens', 'tasks', 'agents', 'connectors', 'chats', 'projects', 'commands'):
         out['rows'] = [{k: (to_english(v) if k in UI_KEYS else v) for k, v in r.items()} if isinstance(r, dict) else r
                        for r in out['rows']]
     if out.get('kind') == 'doctor' and isinstance(out.get('rows'), list):
