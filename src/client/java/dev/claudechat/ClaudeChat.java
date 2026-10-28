@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -447,6 +447,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "perms", L.t("правила разрешений allow/deny/ask: perms allow Bash(git *) · perms rm <правило>")},
             {c + "plan", L.t("<задача> — сначала план (только чтение), потом «Принять / Править / Отклонить»")},
             {c + "replace", L.t("[-r] [-c] [--in *.java] <что> -> <на что> — замена по проекту с превью · в редакторе Ctrl+F / Ctrl+H")},
+            {"/cc worktree", L.t("worktrees параллельных задач: merge · diff · drop (spawn --here — без worktree)")},
             {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},

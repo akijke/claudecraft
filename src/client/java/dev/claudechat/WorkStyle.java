@@ -114,7 +114,32 @@ final class WorkStyle {
             case "tasks" -> tasks(e, out);
             case "spawned" -> out.add(line(mode, lit("◆ ", CODE_MODE).append(lit(s(e, "text"), TEXT)).append(lit("  ", TEXT))
                 .append(button(L.t("открыть"), "/cc select " + s(e, "target"), false, AQUA, L.t("Переключиться на этот чат")))
-                .append(sp()).append(button(L.t("задачи"), "/cc tasks", false, AQUA, null))));
+                .append(sp()).append(button(L.t("задачи"), "/cc tasks", false, AQUA, null))
+                .append(lit(s(e, "branch").isEmpty() ? "" : "  ⇄ " + s(e, "branch"), FAINT)
+                    .withStyle(st -> st.withHoverEvent(new HoverEvent.ShowText(lit(L.t("Свой worktree: ") + s(e, "worktree"), TEXT)))))));
+            case "worktree_ready" -> {
+                String id = s(e, "target");
+                out.add(line(mode, lit("⇄ " + s(e, "text"), GREEN).append(lit("  " + s(e, "branch"), FAINT))));
+                out.add(line(mode, Component.literal("  ")
+                    .append(button("✔ merge", "/cc worktree merge " + id, false, GREEN, L.t("Закоммитить и влить в текущую ветку проекта")))
+                    .append(sp()).append(button("diff", "/cc worktree diff " + id, false, AQUA, L.t("Что поменяла задача")))
+                    .append(sp()).append(button(L.t("открыть чат"), "/cc select " + id, false, AQUA, null))
+                    .append(sp()).append(button("✖ drop", "/cc worktree drop " + id, false, RED, L.t("Удалить worktree и ветку без слияния")))));
+            }
+            case "worktrees" -> {
+                out.add(line(mode, lit("⇄ Worktrees", GOLD).withStyle(st -> st.withBold(true))));
+                JsonArray rows = e.getAsJsonArray("rows");
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  нет — /cc spawn <задача> создаёт worktree в git-проекте"), FAINT)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    String id = s(r, "id");
+                    out.add(line(mode, lit(b(r, "busy") ? "  ▶ " : "  ● ", b(r, "busy") ? GOLD : GREEN).append(lit(s(r, "title"), TEXT))
+                        .append(lit("  " + s(r, "branch") + "  ", FAINT))
+                        .append(button("merge", "/cc worktree merge " + id, false, GREEN, null)).append(sp())
+                        .append(button("diff", "/cc worktree diff " + id, false, AQUA, null)).append(sp())
+                        .append(button("drop", "/cc worktree drop " + id, false, RED, null))));
+                }
+            }
             case "connectors" -> connectors(e, out);
             case "need_key" -> {
                 String id = s(e, "connector");

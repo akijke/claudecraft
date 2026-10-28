@@ -120,6 +120,8 @@ final class LiveTest {
             () -> event("commands"), 20);
         step("/cc perms adds and shows a rule", () -> { markEvents(); mod.runLine("cc", "/cc perms ask Bash(rm:*)"); },
             () -> event("perms"), 20);
+        step("/cc worktree lists worktrees", () -> { markEvents(); mod.runLine("cc", "/cc worktree"); },
+            () -> event("worktrees"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

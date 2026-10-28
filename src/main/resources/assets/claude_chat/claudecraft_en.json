@@ -456,5 +456,12 @@
   "убрать": "unstage",
   "в коммит": "stage",
   "куски": "hunks",
-  "Добавлять в коммит по кускам (stage по ханкам)": "Stage hunk by hunk"
+  "Добавлять в коммит по кускам (stage по ханкам)": "Stage hunk by hunk",
+  "Свой worktree: ": "Own worktree: ",
+  "Закоммитить и влить в текущую ветку проекта": "Commit and merge into the project's current branch",
+  "Что поменяла задача": "What the task changed",
+  "открыть чат": "open chat",
+  "Удалить worktree и ветку без слияния": "Remove the worktree and branch without merging",
+  "  нет — /cc spawn <задача> создаёт worktree в git-проекте": "  none — /cc spawn <task> creates one in a git project",
+  "worktrees параллельных задач: merge · diff · drop (spawn --here — без worktree)": "worktrees of parallel tasks: merge · diff · drop (spawn --here — no worktree)"
 }

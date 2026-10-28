@@ -897,6 +897,63 @@ class HunkTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(git('diff', '--cached'), '')
 
 
+@unittest.skipUnless(shutil.which('git'), 'git is not installed')
+class WorktreeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_spawn_in_worktree_merge_diff_conflict_drop(self):
+        import subprocess
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        env = mock.patch.dict(os.environ, {'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t', 'GIT_COMMITTER_NAME': 't',
+                                           'GIT_COMMITTER_EMAIL': 't@t', 'GIT_CONFIG_GLOBAL': os.devnull})
+        env.start()
+        self.addCleanup(env.stop)
+        async def runner(chat, text):  # stands in for Claude: edits files where the chat works
+            folder = Path(bridge.chat_cwd(chat))
+            name, _, content = text.partition('=')
+            (folder / name).write_text(content, encoding='utf-8')
+        bridge = Bridge(Path(temp.name) / 'b', runner)
+        self.addAsyncCleanup(bridge.close)
+        repo = Path(bridge.projects.path_of_current())
+        git = lambda *a, cwd=repo: subprocess.run(['git', *a], cwd=cwd, capture_output=True, text=True).stdout
+        (repo / 'shared.txt').write_text('base\n', encoding='utf-8')
+        git('init', '-q'); git('add', '.'); git('commit', '-qm', 'init')
+
+        async def spawn(text):
+            await bridge.command({'mode': 'cc', 'action': 'spawn', 'text': text})
+            event = [e for e in bridge.events if e['kind'] == 'spawned'][-1]
+            target = bridge.chats[event['target']]
+            while target.task is not None:
+                await asyncio.sleep(0.02)
+            return event, target
+
+        event, a = await spawn('new.txt=from task A')
+        self.assertTrue(event['worktree'] and event['branch'].startswith('cc/'))
+        self.assertNotEqual(Path(a.worktree), repo)
+        self.assertFalse((repo / 'new.txt').exists())            # the project is untouched while it runs
+        self.assertTrue([e for e in bridge.events if e['kind'] == 'worktree_ready'])
+        await bridge.command({'mode': 'cc', 'action': 'worktree', 'text': 'diff ' + a.id})
+        self.assertIn('+from task A', [e for e in bridge.events if e['kind'] == 'diff'][-1]['text'])
+        await bridge.command({'mode': 'cc', 'action': 'worktree', 'text': 'merge ' + a.id})
+        self.assertEqual((repo / 'new.txt').read_text(encoding='utf-8'), 'from task A')
+        self.assertIsNone(a.worktree)
+        self.assertNotIn('cc/', git('branch'))
+
+        _, b = await spawn('shared.txt=B\n')
+        _, c = await spawn('shared.txt=C\n')
+        await bridge.command({'mode': 'cc', 'action': 'worktree', 'text': 'merge ' + b.id})
+        with self.assertRaises(ValueError) as caught:
+            await bridge.command({'mode': 'cc', 'action': 'worktree', 'text': 'merge ' + c.id})
+        self.assertIn('shared.txt', str(caught.exception))
+        self.assertEqual((repo / 'shared.txt').read_text(encoding='utf-8'), 'B')   # aborted cleanly
+        self.assertEqual(git('status', '--porcelain'), '')
+        await bridge.command({'mode': 'cc', 'action': 'worktree', 'text': 'drop ' + c.id})
+        self.assertIsNone(c.worktree)
+        self.assertEqual(git('worktree', 'list').count('\n'), 1)
+        await bridge.command({'mode': 'cc', 'action': 'spawn', 'text': '--here x.txt=inline'})
+        here = bridge.chats[[e for e in bridge.events if e['kind'] == 'spawned'][-1]['target']]
+        self.assertIsNone(here.worktree)
+
+
 class ReplaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_preview_apply_stale_and_undo(self):
         temp = tempfile.TemporaryDirectory()

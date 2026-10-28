@@ -54,6 +54,9 @@ class Chat:
     context: int = 0                 # tokens in the context at the last model call (0 = unknown)
     context_warned: bool = False     # the >80 % warning was shown (not saved)
     last_replace: dict | None = None  # /cc replace preview waiting for "apply" (not saved)
+    worktree: str | None = None      # /cc spawn in a git project: the task's own checkout
+    wt_branch: str | None = None
+    wt_repo: str | None = None
     cwd: str | None = None           # legacy field (old `cd`), ignored
     run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     step: str = ''                   # last progress line, for the task manager
@@ -66,7 +69,7 @@ class Chat:
 
 
 SAVED = ('id', 'mode', 'backend', 'title', 'sdk_id', 'messages', 'project', 'session_cwd', 'auto',
-         'allowed', 'usage', 'updated', 'origin', 'model', 'effort', 'context')
+         'allowed', 'usage', 'updated', 'origin', 'model', 'effort', 'context', 'worktree', 'wt_branch', 'wt_repo')
 
 
 class Bridge:
@@ -93,6 +96,8 @@ class Bridge:
         self.shell = Shell(self)
         self.github = GitHub(self)
         self.checkpoints = Checkpoints(self.directory / 'undo')
+        from backends.worktrees import Worktrees
+        self.worktrees = Worktrees(self)
         self.terminals = Terminals(self)
         self.oauth = OAuth(self)
         self.port = 18741  # set by main(); used for the OAuth redirect
@@ -277,6 +282,8 @@ class Bridge:
         """Folder Claude works in for this chat."""
         if chat.mode != 'cc':
             return str(self.workspace)
+        if chat.worktree and Path(chat.worktree).is_dir():
+            return chat.worktree
         folder = Path(self.projects.path_of(chat.project))
         return str(folder if folder.is_dir() else self.workspace)
 
@@ -320,6 +327,9 @@ class Bridge:
                               output=u.get('output_tokens', 0), cost=round(u.get('cost_usd', 0.0), 4),
                               context=chat.context, window=context_window(chat))
                     self.context_check(chat)
+                    if chat.worktree and not chat.queue:
+                        self.emit(self.current_chat('cc'), f'Задача «{chat.title}» готова в своём worktree',
+                                  kind='worktree_ready', target=chat.id, branch=chat.wt_branch, path=chat.worktree)
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -642,13 +652,24 @@ class Bridge:
             agent, _, text = text[1:].partition(' ')
             if agent not in self.agents.enabled():
                 raise ValueError(f'Нет включённого агента {agent}: /cc agents')
+        here = text.startswith('--here ')
+        if here:
+            text = text[7:].strip()
         self.check_text(text)
         chat = self.new_chat('cc', 'local', select=False)
         chat.title = ((agent + ': ') if agent else '') + text[:50]
         prompt = f'Use the {agent} subagent to do this: {text}' if agent else text
+        worktree = None
+        if not here and self.config.get('spawn_worktrees', True):
+            try:
+                worktree = await self.worktrees.create(chat, self.chat_cwd(chat))
+            except ValueError as e:
+                self.emit(self.current_chat(mode), f'worktree не создан ({e}) — задача работает в папке проекта',
+                          kind='status')
         self.start(chat, prompt)
         self.emit(self.current_chat(mode), f'Запущено параллельно: {chat.title}', kind='spawned',
-                  target=chat.id, target_title=chat.title)
+                  target=chat.id, target_title=chat.title, worktree=str(worktree) if worktree else None,
+                  branch=chat.wt_branch)
 
     def connectors_menu(self, mode):
         self.emit(self.current_chat(mode), 'Коннекторы', kind='connectors', rows=self.connectors.rows())
@@ -827,6 +848,29 @@ class Bridge:
                 await self.enqueue(self.current_chat('cc'), f'Use the {sub} subagent to do this: {rest.strip()}')
             else:
                 raise ValueError('agent <имя> <задача> | new <имя> <описание> | on/off <имя> | rm <имя>')
+        elif action in ('worktree', 'wt'):
+            sub, _, rest = text.strip().partition(' ')
+            if sub in ('', 'list', 'ls'):
+                rows = [{'id': c.id, 'title': c.title, 'branch': c.wt_branch, 'path': c.worktree,
+                         'busy': c.task is not None} for c in self.chats.values() if c.worktree]
+                self.emit(chat, 'Worktrees', kind='worktrees', rows=rows)
+                return {'ok': True}
+            target = self.find_chat(rest)
+            if target.task is not None and sub in ('merge', 'drop'):
+                raise ValueError('Задача ещё работает — дождись конца или /cc stop')
+            if sub == 'merge':
+                result = await self.worktrees.merge(target)
+                self.emit(chat, f'Слито в проект: {target.title} — {result}', kind='status')
+            elif sub == 'diff':
+                out = await self.worktrees.diff(target)
+                lines = out.splitlines()
+                self.emit(chat, '\n'.join(lines[:400]), kind='diff', path=target.title, staged=False,
+                          truncated=len(lines) > 400, empty=not lines)
+            elif sub in ('drop', 'rm', 'remove'):
+                await self.worktrees.drop(target)
+                self.emit(chat, f'Worktree удалён без слияния: {target.title}', kind='status')
+            else:
+                raise ValueError('worktree: list | merge <чат> | diff <чат> | drop <чат>')
         elif action == 'spawn':
             await self.spawn(mode, text.strip())
         elif action == 'tasks':
