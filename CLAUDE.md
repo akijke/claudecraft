@@ -100,6 +100,16 @@ connectors.py (каталог MCP из npm с проверенными env; се
 (ключи коннекторов, не через чат), WorkStyle (новые kind'ы), Mod Menu (compileOnly
 21.0.0, entrypoint modmenu). Игровые п.2–3 (Claude видит/действует в игре) отложены.
 
+Codexcraft (подпроект codexcraft/, автор коммита 1b7adda — akaeji). Аддон: Codex
+через `codex app-server`, команды /gpt и /codex, клавиша J, порт 18742,
+config/codexcraft. Его build.gradle (generateShared) КОПИРУЕТ наш Java-код и
+bridge/ с заменой строк ('ClaudeChat', '/cc', 'literal(mode)', 'SHORTCUTS.entrySet()',
+'InputConstants.KEY_K', тексты help и т.д.). Поэтому после любой правки основного
+мода собирать ОБА: `gradlew build` (корень включает :codexcraft) и гонять
+`python -m unittest discover -s codexcraft/tests`. Меняя строки, на которые
+опираются замены, — правь и codexcraft/build.gradle. Codex CLI на этом ПК не
+установлен (2026-10-28).
+
 Прочее: /events возвращает boot id моста; мод шлёт его обратно, при смене моста
 курсор сбрасывается (раньше после перезапуска моста события пропадали). Новый
 клиент без boot начинает с текущего момента (старую историю не проигрывает).
