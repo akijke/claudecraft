@@ -383,5 +383,17 @@
   "Забыть вход (токен удаляется из secrets.json)": "Forget the sign-in (the token is removed from secrets.json)",
   "Откроется сайт сервиса; ключи вводить не нужно": "Opens the service's site; no keys to type",
   "выйти": "sign out",
-  "◎ войти через браузер": "◎ sign in with browser"
+  "◎ войти через браузер": "◎ sign in with browser",
+  " МБ": " MB",
+  ". Установи Python 3.11+ с python.org или укажи путь в /c settings": ". Install Python 3.11+ from python.org or set the path in /c settings",
+  "Python не найден, и скачать его не удалось: ": "No Python found, and downloading one failed: ",
+  "в архиве Python нет python": "the Python archive has no python",
+  "в релизе нет Python для ": "the release has no Python for ",
+  "в релизе нет SHA256SUMS — загрузка остановлена": "the release has no SHA256SUMS — download stopped",
+  "для этой системы нет готового Python — установи Python 3.11+ сам": "no ready Python for this system — install Python 3.11+ yourself",
+  "ищу сборку Python": "looking for a Python build",
+  "контрольная сумма Python не совпала — файл удалён": "the Python checksum did not match — file deleted",
+  "нет контрольной суммы для ": "no checksum for ",
+  "распаковываю Python": "unpacking Python",
+  "скачиваю Python: ": "downloading Python: "
 }

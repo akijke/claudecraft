@@ -16,7 +16,8 @@ import java.util.stream.Stream;
  *
  * The bridge sources ship inside the JAR (claudecraft/bridge). On start they are
  * copied to config/claude-chat/runtime/bridge, a private venv is created with the
- * system Python 3.11+, requirements are installed once (re-installed when
+ * system Python 3.11+ (or a private one downloaded once, see PortablePython),
+ * requirements are installed once (re-installed when
  * requirements.txt changes) and bridge.py is started with --game-dir. A bridge that
  * the user already runs by hand is detected and left alone. The process tree is
  * stopped when the game closes.
@@ -207,6 +208,18 @@ final class BridgeLauncher {
                 Result result = exec(command, 20);
                 if (result.code == 0 && result.output.strip().endsWith("True")) return candidate;
             } catch (IOException ignored) { }
+        }
+        // No usable Python: a private one (downloaded once, checked by SHA-256) unless switched off.
+        Path portable = PortablePython.executable(runtime.resolve("python"));
+        if (portable != null) return List.of(portable.toString());
+        if (flag("downloadPython", true)) {
+            try {
+                Path exe = PortablePython.install(runtime.resolve("python"), msg -> set(State.INSTALLING, msg));
+                return List.of(exe.toString());
+            } catch (Exception e) {
+                throw new IOException(L.t("Python не найден, и скачать его не удалось: ") + e.getMessage()
+                    + L.t(". Установи Python 3.11+ с python.org или укажи путь в /c settings"));
+            }
         }
         throw new IOException(L.t("не найден Python 3.11+. Установи его с python.org (галочка «Add to PATH») ")
             + L.t("или укажи путь к python.exe в /c settings"));
