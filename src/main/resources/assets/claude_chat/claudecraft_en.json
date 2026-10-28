@@ -379,5 +379,9 @@
   "Экран скопирован": "Screen copied",
   "история −": "history −",
   "оболочка завершилась — ✕ закрыть, + новая": "the shell has exited — ✕ close, + new one",
-  "скрыть": "hide"
+  "скрыть": "hide",
+  "Забыть вход (токен удаляется из secrets.json)": "Forget the sign-in (the token is removed from secrets.json)",
+  "Откроется сайт сервиса; ключи вводить не нужно": "Opens the service's site; no keys to type",
+  "выйти": "sign out",
+  "◎ войти через браузер": "◎ sign in with browser"
 }

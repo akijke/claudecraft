@@ -368,6 +368,12 @@ async def run(bridge, chat, text):
         bridge.emit(chat, 'Claude перезагрузил расширения: ' + ', '.join(names), kind='status')
         return {'content': [{'type': 'text', 'text': 'Loaded for next request: ' + ', '.join(names)}]}
 
+    if chat.mode == 'cc':
+        for problem in await bridge.oauth.refresh_enabled():
+            bridge.emit(chat, 'Не удалось обновить вход коннектора: ' + problem, kind='error')
+        if any(bridge.connectors.is_oauth(c) for c in bridge.connectors.enabled):
+            bridge.reload_extensions()  # fresh tokens into the MCP configs
+            mcp = dict(bridge.extensions)
     minecraft_tools = [open_browser, reload_tools, minecraft_logs] if chat.mode == 'cc' else [open_browser]
     mcp['minecraft'] = create_sdk_mcp_server(name='minecraft', tools=minecraft_tools)
     # Claude works in the chat's project folder. The CLI stores a session under the

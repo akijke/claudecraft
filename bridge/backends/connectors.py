@@ -81,6 +81,19 @@ CATALOG = {
     'stripe': {'name': 'Stripe', 'group': 'Облака и DevOps', 'package': '@stripe/mcp',
                'vars': {'STRIPE_SECRET_KEY': 'dashboard.stripe.com/apikeys (лучше тестовый ключ)'},
                'args': ['--tools=all', '--api-key=${STRIPE_SECRET_KEY}'], 'about': 'Платежи, клиенты, подписки'},
+    # --- browser sign-in (OAuth): no keys, the player logs in on the service's site ---
+    'linear': {'name': 'Linear', 'group': 'Вход через браузер', 'type': 'http', 'auth': 'oauth',
+               'url': 'https://mcp.linear.app/mcp', 'about': 'Задачи, проекты и циклы Linear'},
+    'atlassian': {'name': 'Jira и Confluence', 'group': 'Вход через браузер', 'type': 'sse', 'auth': 'oauth',
+                  'url': 'https://mcp.atlassian.com/v1/sse', 'about': 'Задачи Jira, страницы Confluence (Atlassian Cloud)'},
+    'notion-oauth': {'name': 'Notion (вход)', 'group': 'Вход через браузер', 'type': 'http', 'auth': 'oauth',
+                     'url': 'https://mcp.notion.com/mcp', 'about': 'Notion без токена интеграции'},
+    'sentry-oauth': {'name': 'Sentry (вход)', 'group': 'Вход через браузер', 'type': 'http', 'auth': 'oauth',
+                     'url': 'https://mcp.sentry.dev/mcp', 'about': 'Ошибки и трейсы, без auth-токена'},
+    'asana': {'name': 'Asana', 'group': 'Вход через браузер', 'type': 'sse', 'auth': 'oauth',
+              'url': 'https://mcp.asana.com/sse', 'about': 'Задачи и проекты Asana'},
+    'vercel': {'name': 'Vercel', 'group': 'Вход через браузер', 'type': 'http', 'auth': 'oauth',
+               'url': 'https://mcp.vercel.com', 'about': 'Деплои, логи, проекты Vercel'},
     # --- work tools -------------------------------------------------------
     'notion': {'name': 'Notion', 'group': 'Работа и дизайн', 'package': '@notionhq/notion-mcp-server',
                'vars': {'NOTION_TOKEN': 'notion.so/profile/integrations'}, 'about': 'Страницы и базы Notion'},
@@ -139,7 +152,13 @@ class Connectors:
                 mine.pop(key, None)
         store_secrets(self.bridge.directory, data)
 
+    @staticmethod
+    def is_oauth(cid):
+        return CATALOG.get(cid, {}).get('auth') == 'oauth'
+
     def missing(self, cid):
+        if self.is_oauth(cid):
+            return [] if self.bridge.oauth.has_token(cid) else ['sign-in']
         have = self.secrets(cid)
         return [v for v in CATALOG[cid].get('vars', {}) if not have.get(v)]
 
@@ -186,6 +205,12 @@ class Connectors:
             spec, values = CATALOG[cid], dict(self.secrets(cid))
             values['BRIDGE_DIR'] = str(self.bridge.directory)
             sub = lambda s: _substitute(s, values)
+            if self.is_oauth(cid):
+                token = self.bridge.oauth.stored(cid).get('access_token')
+                if token:  # not signed in (yet): the server is left out instead of failing
+                    result[cid] = {'type': spec['type'], 'url': spec['url'],
+                                   'headers': {'Authorization': 'Bearer ' + token}}
+                continue
             if spec.get('type') == 'http':
                 result[cid] = {'type': 'http', 'url': spec['url'],
                                'headers': {k: sub(v) for k, v in spec.get('headers', {}).items()}}
@@ -210,6 +235,7 @@ class Connectors:
             rows.append({'id': cid, 'name': spec['name'], 'group': spec['group'], 'about': spec['about'],
                          'enabled': cid in self.enabled, 'missing': self.missing(cid),
                          'needs_node': 'package' in spec and not node,
+                         'oauth': self.is_oauth(cid),
                          'status': self.status.get(cid)})
         return rows
 

@@ -377,6 +377,12 @@ final class WorkStyle {
             if (on) {
                 if (!status.isEmpty()) row.append(lit(status.equals("connected") ? "✔ " : status + " ", status.equals("connected") ? GREEN : RED));
                 row.append(button(L.t("выкл"), "/cc disconnect " + id, false, DIM, null));
+                if (b(r, "oauth")) row.append(sp()).append(button(L.t("выйти"), "/cc connect " + id + " signout", false, DIM,
+                    L.t("Забыть вход (токен удаляется из secrets.json)")));
+            } else if (b(r, "oauth")) {
+                boolean signedIn = r.has("missing") && r.getAsJsonArray("missing").isEmpty();
+                row.append(button(signedIn ? L.t("подключить") : L.t("◎ войти через браузер"), "/cc connect " + id, false, GREEN,
+                    s(r, "about") + "\n" + L.t("Откроется сайт сервиса; ключи вводить не нужно")));
             } else if (b(r, "needs_node")) {
                 row.append(lit(L.t("нужен Node.js"), RED));
             } else {

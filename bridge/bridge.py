@@ -1,5 +1,6 @@
 """Authenticated loopback bridge. Run with --game-dir pointing at the launcher instance."""
 import argparse
+import html
 import asyncio
 from collections import deque
 from dataclasses import dataclass, field
@@ -15,11 +16,12 @@ import uuid
 from aiohttp import web
 from backends.account import Account
 from backends.agents import Agents
-from backends.connectors import Connectors
+from backends.connectors import CATALOG as CONNECTOR_CATALOG, Connectors
 from backends.files import FileManager
 from backends.undo import Checkpoints
 from backends import images
 from backends.ptyterm import Terminals
+from backends.oauth import OAuth
 from backends.gitops import Git
 from backends.shell import Shell
 from backends.github import GitHub
@@ -89,6 +91,8 @@ class Bridge:
         self.github = GitHub(self)
         self.checkpoints = Checkpoints(self.directory / 'undo')
         self.terminals = Terminals(self)
+        self.oauth = OAuth(self)
+        self.port = 18741  # set by main(); used for the OAuth redirect
         self.extensions = {}
         self.reload_extensions()
         self.chats = {}
@@ -731,7 +735,19 @@ class Bridge:
         elif action == 'connectors':
             self.connectors_menu(mode)
         elif action == 'connect':
-            cid = text.strip()
+            cid, _, extra = text.strip().partition(' ')
+            if self.connectors.is_oauth(cid) and extra.strip() == 'signout':
+                self.oauth.forget(cid)
+                self.connectors.disconnect(cid)
+                self.reload_extensions()
+                self.emit(chat, f'{cid}: вход забыт', kind='status')
+                self.connectors_menu(mode)
+                return
+            if self.connectors.is_oauth(cid) and (not self.oauth.has_token(cid) or extra.strip() == 'login'):
+                url = await self.oauth.start(cid, CONNECTOR_CATALOG[cid]['url'])
+                self.emit(chat, f'Войди в {CONNECTOR_CATALOG[cid]["name"]} в браузере — потом всё подключится само.',
+                          kind='url', url=url)
+                return
             missing = self.connectors.connect(cid, data.get('secret'))
             if missing:
                 self.emit(chat, f'{cid}: нужен ключ', kind='need_key', connector=cid,
@@ -876,6 +892,7 @@ class Bridge:
             job.cancel()
         await self.shell.close()
         self.terminals.close_all()
+        await self.oauth.close()
         self.persist()
 
 
@@ -902,6 +919,8 @@ CRASH_PROMPT = ('Investigate the latest Minecraft failure: read the newest crash
 def create_app(bridge, token):
     @web.middleware
     async def authenticate(request, handler):
+        if request.path == '/oauth/callback' and request.method == 'GET':
+            return await oauth_callback(request)  # the browser has no bridge token; `state` protects it
         if not secrets.compare_digest(request.headers.get('Authorization', ''), 'Bearer ' + token):
             return web.json_response({'error': 'Unauthorized'}, status=401)
         if request.headers.get('Origin'):
@@ -983,6 +1002,27 @@ def create_app(bridge, token):
         return web.json_response(status)
     app.router.add_get('/account', account)
 
+    async def oauth_callback(request):
+        q = request.query
+        page = ('<!doctype html><meta charset="utf-8"><title>Claudecraft</title><body style="font-family:sans-serif;'
+                'background:#1e1e22;color:#ddd;display:grid;place-items:center;height:90vh"><div><h2>{}</h2>'
+                '<p>{}</p></div>')
+        chat = bridge.current_chat('cc')
+        try:
+            cid = await bridge.oauth.callback(q.get('state'), q.get('code', ''), q.get('error'))
+            bridge.connectors.connect(cid)
+            bridge.reload_extensions()
+        except Exception as e:
+            bridge.emit(chat, str(e), kind='error')
+            text = html.escape(bridge.tr(str(e)))
+            return web.Response(text=page.format('✖ Claudecraft', text), content_type='text/html', status=400)
+        name = CONNECTOR_CATALOG[cid]['name']
+        bridge.emit(chat, f'Коннектор {cid} подключён — заработает со следующего запроса /cc.', kind='status')
+        bridge.connectors_menu('cc')
+        return web.Response(text=page.format('✔ ' + html.escape(name), html.escape(
+            bridge.tr('Готово — можно вернуться в Minecraft.'))), content_type='text/html')
+    app.router.add_get('/oauth/callback', oauth_callback)
+
     # ---- interactive terminals (in-game terminal window) ----
     def size(data):
         return max(10, min(int(data.get('cols') or 100), 400)), max(3, min(int(data.get('rows') or 30), 200))
@@ -1041,6 +1081,7 @@ def main():
     if not 1024 <= args.port <= 65535:
         parser.error('port must be 1024..65535')
     bridge = Bridge(args.game_dir / 'config' / 'claude-chat')
+    bridge.port = args.port
     connection = bridge.directory / 'connection.json'
     # Persist the random token across restarts so Minecraft can reconnect.
     token_path = bridge.directory / 'bridge-token'

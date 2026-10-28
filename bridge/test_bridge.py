@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from urllib.parse import quote
 from aiohttp.test_utils import make_mocked_request
+from unittest import mock
 from unittest.mock import AsyncMock
 from bridge import Bridge, create_app
 from backends.sdk import SdkTurn, TurnClosed
@@ -776,6 +777,89 @@ class TerminalHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(snap['alive'])
         _, listing = await self.call('POST', '/pty/close', {'id': tid})
         self.assertEqual(listing['terminals'], [])
+
+
+class OAuthTests(unittest.IsolatedAsyncioTestCase):
+    """Browser sign-in for remote MCP connectors against a local fake service."""
+    async def asyncSetUp(self):
+        from aiohttp import web as aweb
+        from aiohttp.test_utils import TestServer
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.bridge.port = 18999
+        self.seen = {}
+        app = aweb.Application()
+        def base():
+            return f'http://127.0.0.1:{self.server.port}'
+        async def mcp(request):  # unauthenticated MCP call → 401 with the metadata pointer
+            return aweb.Response(status=401, headers={'WWW-Authenticate':
+                f'Bearer resource_metadata="{base()}/.well-known/oauth-protected-resource/mcp"'})
+        async def resource(request):
+            return aweb.json_response({'resource': base() + '/mcp', 'authorization_servers': [base()],
+                                       'scopes_supported': ['read', 'write']})
+        async def server_meta(request):
+            return aweb.json_response({'authorization_endpoint': base() + '/authorize',
+                                       'token_endpoint': base() + '/token', 'registration_endpoint': base() + '/register'})
+        async def register(request):
+            self.seen['register'] = await request.json()
+            return aweb.json_response({'client_id': 'cid-1'}, status=201)
+        async def token(request):
+            form = dict(await request.post())
+            self.seen.setdefault('token', []).append(form)
+            if form['grant_type'] == 'authorization_code':
+                import base64, hashlib
+                challenge = base64.urlsafe_b64encode(hashlib.sha256(form['code_verifier'].encode()).digest()).rstrip(b'=').decode()
+                if form['code'] != 'good-code' or challenge != self.seen['challenge']:
+                    return aweb.json_response({'error': 'invalid_grant'}, status=400)
+                return aweb.json_response({'access_token': 'at-1', 'refresh_token': 'rt-1', 'expires_in': 30})
+            return aweb.json_response({'access_token': 'at-2', 'expires_in': 3600})
+        app.router.add_post('/mcp', mcp)
+        app.router.add_get('/.well-known/oauth-protected-resource/mcp', resource)
+        app.router.add_get('/.well-known/oauth-authorization-server', server_meta)
+        app.router.add_post('/register', register)
+        app.router.add_post('/token', token)
+        self.server = TestServer(app, host='127.0.0.1')
+        await self.server.start_server()
+        from backends.connectors import CATALOG
+        self.catalog_patch = mock.patch.dict(CATALOG, {'fake': {'name': 'Fake', 'group': 'x', 'type': 'http',
+                                                                 'auth': 'oauth', 'url': base() + '/mcp', 'about': ''}})
+        self.catalog_patch.start()
+
+    async def asyncTearDown(self):
+        self.catalog_patch.stop()
+        await self.server.close()
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def test_sign_in_refresh_and_server_config(self):
+        from urllib.parse import urlparse, parse_qs
+        await self.bridge.command({'mode': 'cc', 'action': 'connect', 'text': 'fake'})
+        event = [e for e in self.bridge.events if e['kind'] == 'url'][-1]
+        q = {k: v[0] for k, v in parse_qs(urlparse(event['url']).query).items()}
+        self.assertEqual((q['client_id'], q['code_challenge_method'], q['scope']), ('cid-1', 'S256', 'read write'))
+        self.assertEqual(q['redirect_uri'], 'http://127.0.0.1:18999/oauth/callback')
+        self.assertEqual(self.seen['register']['redirect_uris'], [q['redirect_uri']])
+        self.seen['challenge'] = q['code_challenge']
+        # the browser comes back to the bridge without the bridge token
+        app = create_app(self.bridge, 't')
+        request = make_mocked_request('GET', f"/oauth/callback?code=good-code&state={q['state']}")
+        response = await app.middlewares[0](request, None)
+        self.assertEqual(response.status, 200, response.text)
+        self.assertIn('fake', self.bridge.connectors.enabled)
+        self.assertEqual(self.bridge.connectors.servers()['fake']['headers'], {'Authorization': 'Bearer at-1'})
+        # the same state cannot be used twice
+        again = await app.middlewares[0](make_mocked_request('GET', f"/oauth/callback?code=good-code&state={q['state']}"), None)
+        self.assertEqual(again.status, 400)
+        # expires in 30 s < margin → refreshed before the next request, refresh token kept
+        self.assertEqual(await self.bridge.oauth.refresh_enabled(), [])
+        self.assertEqual(self.bridge.connectors.servers()['fake']['headers'], {'Authorization': 'Bearer at-2'})
+        self.assertEqual(self.bridge.oauth.stored('fake')['refresh_token'], 'rt-1')
+        secrets_text = (Path(self.temp.name) / 'secrets.json').read_text(encoding='utf-8')
+        self.assertNotIn('at-2', json.dumps([e for e in self.bridge.events]))
+        self.assertIn('at-2', secrets_text)
+        await self.bridge.command({'mode': 'cc', 'action': 'connect', 'text': 'fake signout'})
+        self.assertNotIn('fake', self.bridge.connectors.enabled)
+        self.assertFalse(self.bridge.oauth.has_token('fake'))
 
 
 class ModelTests(unittest.IsolatedAsyncioTestCase):
