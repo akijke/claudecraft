@@ -284,6 +284,20 @@ final class WorkStyle {
                         .append(lit("  " + firstLine(s(r, "text")), TEXT))));
                 }
             }
+            case "search_results" -> {
+                JsonArray rows = e.getAsJsonArray("rows");
+                out.add(line(mode, lit("🔍 «" + s(e, "text") + "»", GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + rows.size() + L.t(" совпадений"), FAINT))));
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  ничего — попробуй другие слова"), DIM)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    String open = !s(r, "chat").isEmpty() ? cmd + "select " + s(r, "chat") : cmd + "open_session " + s(r, "session");
+                    out.add(line(mode, Component.literal("  ").append(button(firstLine(s(r, "title")), open, false, AQUA,
+                            s(r, "chat").isEmpty() ? L.t("Сессия без чата в игре (напр. с ПК) — откроется как новый чат") : L.t("Открыть чат")))
+                        .append(lit(s(r, "role").equals("user") ? L.t("  ты") : "  Claude", FAINT))));
+                    out.add(line(mode, lit("    " + s(r, "snippet"), DIM)));
+                }
+            }
             case "exported" -> out.add(line(mode, lit("✔ " + s(e, "text") + "  ", GREEN)
                 .append(button(L.t("открыть"), cmd + "open " + s(e, "path"), false, AQUA, s(e, "path"))).append(sp())
                 .append(button("✎", "/edit " + s(e, "path"), false, AQUA, L.t("Во встроенном редакторе")))

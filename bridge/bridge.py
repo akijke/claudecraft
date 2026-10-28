@@ -947,6 +947,21 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action in ('search', 'grep-chats'):
+            from backends import search
+            folder = self.chat_cwd(chat) if mode == 'cc' else str(self.workspace)
+            found = await asyncio.to_thread(search.search, text, folder, list(self.chats.values()))
+            self.emit(chat, text.strip(), kind='search_results', rows=found, folder=folder)
+        elif action == 'open_session':
+            # a search hit from a session this bridge has no chat for (e.g. started on the PC)
+            sid = text.strip()
+            existing = next((c for c in self.chats.values() if c.sdk_id == sid), None)
+            target = existing or self.new_chat('cc', 'local')
+            if not existing:
+                target.sdk_id, target.session_cwd, target.title = sid, self.chat_cwd(chat), 'PC: ' + sid[:8]
+            self.selected['cc'] = target.id
+            self.persist()
+            self.emit(target, 'Сессия открыта — пиши, Claude продолжит её', kind='status')
         elif action == 'export':
             from backends import export
             fmt = 'html' if text.strip().lower() == 'html' else 'md'

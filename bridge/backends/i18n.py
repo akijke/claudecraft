@@ -157,6 +157,7 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Сессия открыта — пиши, Claude продолжит её': 'Session opened — write, Claude continues it',
     'Экспортировать нечего: в чате ещё не было разговора': 'Nothing to export: this chat has no conversation yet',
     'Чат сохранён: {}': 'Chat saved: {}',
     'Ветвить нечего: у чата ещё нет сессии Claude Code': 'Nothing to fork: this chat has no Claude Code session yet',

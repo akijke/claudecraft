@@ -583,5 +583,12 @@
   " записей": " entries",
   "Экспорт чата в Markdown": "Export chat to Markdown",
   "Экспорт чата в HTML": "Export chat to HTML",
-  "[md|html] — сохранить чат в claude-exports/ проекта": "[md|html] — save the chat into the project's claude-exports/"
+  "[md|html] — сохранить чат в claude-exports/ проекта": "[md|html] — save the chat into the project's claude-exports/",
+  " совпадений": " matches",
+  "  ничего — попробуй другие слова": "  nothing — try other words",
+  "Сессия без чата в игре (напр. с ПК) — откроется как новый чат": "A session without a chat in the game (e.g. from the PC) — opens as a new chat",
+  "Открыть чат": "Open the chat",
+  "  ты": "  you",
+  "Поиск по истории чатов…": "Search the chat history…",
+  "<текст> — поиск по всем чатам и сессиям проекта (и начатым на ПК)": "<text> — search all chats and sessions of the project (also those started on the PC)"
 }

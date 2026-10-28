@@ -461,6 +461,23 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertIn('<pre>', page)
         self.assertEqual(Path(md_event['path']).parent.name, 'claude-exports')
 
+    async def test_search_across_sessions(self):
+        await self.start([text('the quick brown fox'), text('nothing here')])
+        a = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(a, 'tell me about foxes')
+        await self.until(lambda: a.task is None)
+        await self.bridge.command({'mode': 'cc', 'action': 'new', 'text': ''})
+        b = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(b, 'unrelated question')
+        await self.until(lambda: b.task is None)
+        await self.bridge.command({'mode': 'cc', 'action': 'search', 'text': 'quick fox'})
+        rows = [e for e in self.bridge.events if e['kind'] == 'search_results'][-1]['rows']
+        self.assertEqual(len(rows), 1, rows)
+        self.assertEqual((rows[0]['chat'], rows[0]['role']), (a.id, 'assistant'))
+        self.assertIn('quick brown fox', rows[0]['snippet'])
+        await self.bridge.command({'mode': 'cc', 'action': 'search', 'text': '"brown fox" unrelated'})
+        self.assertEqual([e for e in self.bridge.events if e['kind'] == 'search_results'][-1]['rows'], [])
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]
