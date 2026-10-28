@@ -46,6 +46,7 @@ final class LiveTest {
     private boolean finished;
     private Path editFile;
     private TerminalScreen terminal;
+    private final List<String> confirmations = new ArrayList<>();
 
     LiveTest(ClaudeChat mod) {
         this.mod = mod;
@@ -101,6 +102,11 @@ final class LiveTest {
             () -> screen() instanceof net.minecraft.client.gui.screens.TitleScreen && mc().gui.overlay() == null && waited > 40, 300);
         quiet("create a test world", () -> CreateWorldScreen.testWorld(mc(), () -> { }), () -> {
             if (screen() instanceof CreateWorldScreen) press(Component.translatable("selectWorld.create").getString());
+            if (screen() instanceof net.minecraft.client.gui.screens.ConfirmScreen c && waited % 20 == 0) {
+                confirmations.add(c.getTitle().getString());
+                for (String key : new String[]{"gui.yes", "gui.proceed", "gui.continue", "selectWorld.create"})
+                    if (press(Component.translatable(key).getString())) break;
+            }
             return mc().player != null && mc().level != null && screen() == null;
         }, 240);
         step("world is loaded", () -> { }, () -> waited > 100, 20);
@@ -112,6 +118,14 @@ final class LiveTest {
         step("/cc model shows the model picker", () -> { markEvents(); mod.runLine("cc", "/cc model"); }, () -> event("model"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
+        step("↑ in the K window recalls the last prompt", () -> {
+            InputHistory.add("livetest: earlier prompt");
+            mc().setScreenAndShow(new ConversationScreen(mod));
+        }, () -> {
+            if (!(screen() instanceof ConversationScreen k)) return false;
+            if (waited == 20) { k.inputForTest(""); k.keyPressed(new KeyEvent(InputConstants.KEY_UP, 0, 0)); }
+            return waited > 20 && k.inputValue().equals("livetest: earlier prompt");
+        }, 10);
         step("click 'Files' in the K window", () -> press(L.t("Файлы")),
             () -> screen() instanceof FileScreen && waited > 30, 10);
         step("terminal runs a command", () -> {
@@ -192,6 +206,7 @@ final class LiveTest {
             md.append("| ").append(i++).append(" | ").append(r.name()).append(" | ").append(r.ok() ? "✔" : "✖ FAIL")
                 .append(" | ").append(String.format("%.1f s", r.seconds())).append(" | ")
                 .append(r.shot() == null ? "" : "screenshots/" + r.shot()).append(" | ").append(r.detail().replace("|", "/")).append(" |\n");
+        if (!confirmations.isEmpty()) md.append("\nConfirmations answered: ").append(String.join(" · ", confirmations)).append("\n");
         try {
             Path out = client.gameDirectory.toPath().resolve("livetest/report.md");
             Files.createDirectories(out.getParent());

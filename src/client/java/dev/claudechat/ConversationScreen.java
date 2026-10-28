@@ -37,6 +37,7 @@ final class ConversationScreen extends Screen {
     private final ClaudeChat mod;
     private JsonObject state;
     private MultiLineEditBox input;
+    private InputHistory history = InputHistory.cursor();
     private final List<FormattedCharSequence> lines = new ArrayList<>();
     private String shownChat = "";
     private int scroll;          // lines scrolled up from the bottom
@@ -66,11 +67,16 @@ final class ConversationScreen extends Screen {
     /** Opens the next conversation window on `m` with `text` already in the input box. */
     static void prefill(String m, String text) { mode = m; draft = text; }
     static void changed() { dirty = true; }
+    String inputValue() { return input == null ? "" : input.getValue(); }
+    void inputForTest(String text) { input.setValue(text); setFocused(input); history = InputHistory.cursor(); }
 
     @Override public void added() { open = true; dirty = true; }
     @Override public void removed() {
         open = false;
-        if (input != null) draft = input.getValue();
+        if (input != null) {
+            draft = input.getValue();
+            InputHistory.setDraft(mode, draft);  // survives closing the window and the game
+        }
     }
     @Override public boolean isPauseScreen() { return false; }
 
@@ -202,6 +208,7 @@ final class ConversationScreen extends Screen {
         input.setX(mainX);
         input.setY(height - 58);
         input.setCharacterLimit(8000);
+        if (draft.isEmpty()) draft = InputHistory.draft(mode);
         input.setValue(draft);
         addRenderableWidget(input);
         int bx = mainX + inputW + 4;
@@ -242,6 +249,9 @@ final class ConversationScreen extends Screen {
         if (text.isEmpty()) return;
         if (text.startsWith("/")) mod.runLine(mode, text);
         else mod.dispatch(mode, prefix.isEmpty() ? "q " + text : prefix + text);
+        InputHistory.add(text);
+        InputHistory.setDraft(mode, "");
+        history = InputHistory.cursor();
         input.setValue("");
         draft = "";
         scroll = 0;
@@ -251,6 +261,15 @@ final class ConversationScreen extends Screen {
     @Override public boolean keyPressed(KeyEvent event) {
         boolean ctrl = (event.modifiers() & 2) != 0;  // GLFW_MOD_CONTROL
         if (event.key() == InputConstants.KEY_RETURN && ctrl) { submit(""); return true; }
+        // ↑/↓ walk through sent prompts when the box is empty, while browsing, or with Ctrl
+        if (getFocused() == input && (event.key() == InputConstants.KEY_UP || event.key() == InputConstants.KEY_DOWN)) {
+            boolean up = event.key() == InputConstants.KEY_UP;
+            if (ctrl || input.getValue().isEmpty() || history.browsing()) {
+                String value = up ? history.older(input.getValue()) : history.newer();
+                if (value != null) { input.setValue(value); return true; }
+                if (up) return true;
+            }
+        }
         return super.keyPressed(event);
     }
 
