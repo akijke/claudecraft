@@ -169,6 +169,10 @@ final class FileScreen extends Screen {
         filter.setValue(filterValue);
         filter.setResponder(v -> { applyFilter(); selected = rows.isEmpty() ? -1 : 0; listScroll = 0; });
         addRenderableWidget(filter);
+        // ✖ clears the search box and shows the whole folder again.
+        addRenderableWidget(Button.builder(Component.literal("✖"), b -> { filter.setValue(""); setFocused(filter); })
+            .bounds(listX + Math.min(listW, 180) + 2, 53, 16, 16)
+            .tooltip(Tooltip.create(Component.literal(L.t("Очистить поиск")))).build());
         applyFilter();
 
         // bottom actions
@@ -430,7 +434,7 @@ final class FileScreen extends Screen {
         }
         String info = rows.size() + " " + L.t("объектов") + (dir.has("more") && dir.get("more").getAsInt() > 0
             ? " (+" + dir.get("more").getAsInt() + ")" : "") + (dir.get("git").getAsBoolean() ? "  ⇄ git" : "");
-        g.text(font, info, listX + Math.min(listW, 180) + 6, 57, FAINT);
+        g.text(font, info, listX + Math.min(listW, 180) + 24, 57, FAINT);
     }
 
     private void drawPreview(GuiGraphicsExtractor g) {

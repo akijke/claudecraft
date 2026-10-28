@@ -311,5 +311,6 @@
   "окно": "window",
   "фильтр…": "filter…",
   "↑↓ выбор · Enter открыть · Backspace вверх · F2 имя · Delete удалить": "↑↓ select · Enter open · Backspace up · F2 rename · Delete delete",
-  "Терминал": "Terminal"
+  "Терминал": "Terminal",
+  "Очистить поиск": "Clear search"
 }
