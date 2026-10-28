@@ -53,6 +53,7 @@ class Chat:
     effort: str | None = None        # None = default; low | medium | high | xhigh | max
     context: int = 0                 # tokens in the context at the last model call (0 = unknown)
     context_warned: bool = False     # the >80 % warning was shown (not saved)
+    last_replace: dict | None = None  # /cc replace preview waiting for "apply" (not saved)
     cwd: str | None = None           # legacy field (old `cd`), ignored
     run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     step: str = ''                   # last progress line, for the task manager
@@ -349,6 +350,48 @@ class Bridge:
                 bucket[key] = bucket.get(key, 0) + int((usage or {}).get(key) or 0)
             bucket['cost_usd'] = bucket.get('cost_usd', 0.0) + float(cost or 0.0)
         chat.usage['turns'] = chat.usage.get('turns', 0) + 1
+
+    def replace(self, mode, chat, text):
+        """/cc replace [-r] [-c] [--in <glob>] [--here] <old> -> <new>  (preview) · replace apply <token>"""
+        from backends import replace as rep
+        words = text.strip()
+        if words.startswith('apply '):
+            token = words[6:].strip()
+            last = getattr(chat, 'last_replace', None)
+            if not last or last['token'] != token:
+                raise ValueError('Нет такого превью — сделай /cc replace заново')
+            if chat.task is not None:
+                raise ValueError('Claude сейчас работает в этом чате — замени после него (или в другом чате)')
+            self.checkpoints.begin(chat.id, f"replace {last['query']} -> {last['replacement']}")
+            try:
+                changed = rep.apply(last['root'], last['query'], last['replacement'], last['regex'], last['case'],
+                                    last['glob'], token, remember=lambda p: self.checkpoints.remember(chat.id, p))
+            finally:
+                self.checkpoints.finish(chat.id)
+            chat.last_replace = None
+            self.emit(chat, f'Заменено в файлах: {len(changed)}', kind='replace_done', files=changed)
+            return
+        flags = {'regex': False, 'case': False, 'glob': None, 'here': False}
+        while True:
+            if words.startswith('-r '):
+                flags['regex'], words = True, words[3:].lstrip()
+            elif words.startswith('-c '):
+                flags['case'], words = True, words[3:].lstrip()
+            elif words.startswith('--here '):
+                flags['here'], words = True, words[7:].lstrip()
+            elif words.startswith('--in '):
+                glob, _, words = words[5:].partition(' ')
+                flags['glob'], words = glob, words.lstrip()
+            else:
+                break
+        if ' -> ' not in words:
+            raise ValueError('replace: /cc replace [-r] [-c] [--in *.java] <что> -> <на что>')
+        query, _, replacement = words.partition(' -> ')
+        folder = self.files.here(mode) if flags['here'] or mode == 'c' else self.chat_cwd(chat)
+        result = rep.preview(folder, query, replacement, flags['regex'], flags['case'], flags['glob'])
+        chat.last_replace = {k: result[k] for k in ('root', 'query', 'replacement', 'regex', 'case', 'glob', 'token')}
+        result.pop('hashes')
+        self.emit(chat, 'Замена', kind='replace_preview', **result)
 
     def undo(self, chat, arg=''):
         """/cc undo — restore files Claude changed in the newest request; /cc undo list — history."""
@@ -672,6 +715,8 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'replace':
+            self.replace(mode, chat, text)
         elif action == 'plan':
             if not text.strip():
                 raise ValueError('plan: /cc plan <задача> — Claude сначала составит план')

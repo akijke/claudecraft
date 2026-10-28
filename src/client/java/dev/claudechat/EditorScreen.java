@@ -72,6 +72,112 @@ final class EditorScreen extends Screen {
     }
 
     private int highlight = -1;
+
+    // ---- find & replace (Ctrl+F / Ctrl+H) ----
+    private net.minecraft.client.gui.components.EditBox findBox, replaceBox;
+    private boolean finding, replacing, findRegex, findCase;
+    private String findValue = "", replaceValue = "";
+    private final List<int[]> matches = new ArrayList<>();  // row, start, end
+    private int matchIndex = -1;
+
+    private void openFind(boolean withReplace) {
+        finding = true;
+        replacing = withReplace || replacing;
+        if (hasSelection() && selection()[0] == selection()[2]) findValue = selectedText();
+        rebuildWidgets();
+        setFocused(findBox);
+    }
+
+    private void closeFind() {
+        finding = replacing = false;
+        matches.clear();
+        rebuildWidgets();
+    }
+
+    private java.util.regex.Pattern findPattern() {
+        if (findValue.isEmpty()) return null;
+        try {
+            int flags = findCase ? 0 : java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE;
+            return java.util.regex.Pattern.compile(findRegex ? findValue : java.util.regex.Pattern.quote(findValue), flags);
+        } catch (java.util.regex.PatternSyntaxException e) {
+            say(L.t("Неверное регулярное выражение"), 0xFFF0626A);
+            return null;
+        }
+    }
+
+    private void refreshMatches() {
+        matches.clear();
+        java.util.regex.Pattern p = findPattern();
+        if (p == null) { matchIndex = -1; return; }
+        for (int r = 0; r < lines.size(); r++) {
+            java.util.regex.Matcher m = p.matcher(lines.get(r));
+            while (m.find()) {
+                if (m.end() == m.start()) { if (m.end() >= lines.get(r).length()) break; continue; }
+                matches.add(new int[]{r, m.start(), m.end()});
+            }
+        }
+        matchIndex = -1;
+        say(matches.isEmpty() ? L.t("Не найдено") : L.t("Найдено: ") + matches.size(), matches.isEmpty() ? 0xFFF2C14E : 0xFF8A8A8A);
+    }
+
+    private void nextMatch(int dir) {
+        if (matches.isEmpty()) return;
+        if (matchIndex < 0) {  // first jump: the match after the cursor
+            matchIndex = 0;
+            for (int i = 0; i < matches.size(); i++) {
+                int[] m = matches.get(i);
+                if (m[0] > row || (m[0] == row && m[1] >= col)) { matchIndex = i; break; }
+            }
+            if (dir < 0) matchIndex = (matchIndex - 1 + matches.size()) % matches.size();
+        } else matchIndex = (matchIndex + dir + matches.size()) % matches.size();
+        int[] m = matches.get(matchIndex);
+        anchorRow = m[0]; anchorCol = m[1]; row = m[0]; col = m[2];
+        reveal();
+        say((matchIndex + 1) + " / " + matches.size(), 0xFF8A8A8A);
+    }
+
+    private String replacementFor(String found) {
+        if (!findRegex) return replaceValue;
+        java.util.regex.Pattern p = findPattern();
+        return p == null ? replaceValue : p.matcher(found).replaceFirst(replaceValue);
+    }
+
+    private void replaceOne() {
+        if (matchIndex < 0 || matchIndex >= matches.size()) { nextMatch(1); return; }
+        int[] m = matches.get(matchIndex);
+        snapshot();
+        String l = lines.get(m[0]);
+        String rep = replacementFor(l.substring(m[1], m[2]));
+        lines.set(m[0], l.substring(0, m[1]) + rep + l.substring(m[2]));
+        row = m[0]; col = m[1] + rep.length(); anchorRow = -1;
+        int keep = matchIndex;
+        refreshMatches();
+        matchIndex = Math.min(keep, matches.size()) - 1;
+        nextMatch(1);
+    }
+
+    private void replaceAll() {
+        java.util.regex.Pattern p = findPattern();
+        if (p == null || matches.isEmpty()) return;
+        snapshot();
+        int n = matches.size();
+        for (int r = 0; r < lines.size(); r++) {
+            java.util.regex.Matcher m = p.matcher(lines.get(r));
+            lines.set(r, findRegex ? m.replaceAll(replaceValue) : m.replaceAll(java.util.regex.Matcher.quoteReplacement(replaceValue)));
+        }
+        refreshMatches();
+        say(L.t("Заменено: ") + n, 0xFF6BD08B);
+    }
+
+    String textForTest() { return String.join("\n", lines); }
+
+    /** Dev/live tests: find and replace without the keyboard. */
+    void findForTest(String find, String replace, boolean all) {
+        openFind(true);
+        findBox.setValue(find);
+        replaceBox.setValue(replace);
+        if (all) replaceAll(); else { nextMatch(1); replaceOne(); }
+    }
     int cursorRow() { return row; }
     boolean isLoaded() { return loaded; }
 
@@ -136,9 +242,40 @@ final class EditorScreen extends Screen {
     // ---- layout -------------------------------------------------------------
     @Override protected void init() {
         areaX = 6;
-        areaY = 30;
+        areaY = finding ? 52 : 30;
         areaW = width - 12;
         areaH = height - areaY - 18;
+        if (finding) {
+            int bw = Math.min(200, (width - 200) / 2);
+            findBox = new net.minecraft.client.gui.components.EditBox(font, 6, 29, bw, 18, Component.literal("find"));
+            findBox.setHint(Component.literal(L.t("найти… (Enter — дальше)")));
+            findBox.setMaxLength(1000);
+            findBox.setValue(findValue);
+            findBox.setResponder(v -> { findValue = v; refreshMatches(); });
+            addRenderableWidget(findBox);
+            int x = 10 + bw;
+            addRenderableWidget(Button.builder(Component.literal(findRegex ? "[.*]" : ".*"), b -> {
+                findRegex = !findRegex; refreshMatches(); rebuildWidgets(); }).bounds(x, 29, 26, 18)
+                .tooltip(Tooltip.create(Component.literal(L.t("Регулярное выражение")))).build());
+            addRenderableWidget(Button.builder(Component.literal(findCase ? "[Aa]" : "Aa"), b -> {
+                findCase = !findCase; refreshMatches(); rebuildWidgets(); }).bounds(x + 28, 29, 26, 18)
+                .tooltip(Tooltip.create(Component.literal(L.t("Учитывать регистр")))).build());
+            x += 58;
+            if (replacing) {
+                replaceBox = new net.minecraft.client.gui.components.EditBox(font, x, 29, bw, 18, Component.literal("replace"));
+                replaceBox.setHint(Component.literal(L.t("заменить на…") + (findRegex ? " ($1)" : "")));
+                replaceBox.setMaxLength(1000);
+                replaceBox.setValue(replaceValue);
+                replaceBox.setResponder(v -> replaceValue = v);
+                addRenderableWidget(replaceBox);
+                x += bw + 4;
+                addRenderableWidget(Button.builder(Component.literal(L.t("Заменить")), b -> replaceOne()).bounds(x, 29, 60, 18).build());
+                addRenderableWidget(Button.builder(Component.literal(L.t("Все")), b -> replaceAll()).bounds(x + 62, 29, 34, 18).build());
+                x += 98;
+            }
+            addRenderableWidget(Button.builder(Component.literal("✕"), b -> closeFind()).bounds(x, 29, 18, 18).build());
+            refreshMatches();
+        }
         int x = width - 6;
         x = button(x, "✕", L.t("Закрыть (Esc)"), this::onClose);
         x = button(x, "→ Claude", L.t("Спросить Claude про этот файл"), () -> {
@@ -299,6 +436,7 @@ final class EditorScreen extends Screen {
 
     // ---- input ----------------------------------------------------------------
     @Override public boolean charTyped(CharacterEvent event) {
+        if (finding && (getFocused() == findBox || (replaceBox != null && getFocused() == replaceBox))) return super.charTyped(event);
         if (!loaded || event.codepoint() < 32) return super.charTyped(event);
         insert(event.codepointAsString());
         return true;
@@ -307,8 +445,16 @@ final class EditorScreen extends Screen {
     @Override public boolean keyPressed(KeyEvent event) {
         int key = event.key();
         boolean ctrl = (event.modifiers() & 2) != 0, shift = (event.modifiers() & 1) != 0;
-        if (key == InputConstants.KEY_ESCAPE) { onClose(); return true; }
+        boolean inFind = finding && (getFocused() == findBox || (replaceBox != null && getFocused() == replaceBox));
+        if (key == InputConstants.KEY_ESCAPE) { if (finding) closeFind(); else onClose(); return true; }
         if (!loaded) return super.keyPressed(event);
+        if (ctrl && key == InputConstants.KEY_F) { openFind(false); return true; }
+        if (ctrl && key == InputConstants.KEY_H) { openFind(true); return true; }
+        if (key == InputConstants.KEY_F3 || (inFind && key == InputConstants.KEY_RETURN)) {
+            if (inFind && getFocused() == replaceBox) replaceOne(); else nextMatch(shift ? -1 : 1);
+            return true;
+        }
+        if (inFind) return super.keyPressed(event);
         if (ctrl) {
             switch (key) {
                 case InputConstants.KEY_S -> { save(confirmOverwrite); return true; }
@@ -451,6 +597,12 @@ final class EditorScreen extends Screen {
             String number = String.valueOf(r + 1);
             g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? 0xFFC6C6C6 : 0xFF5A5A5A);
             g.enableScissor(textX, areaY, areaX + areaW, areaY + areaH);
+            for (int[] m : matches) {
+                if (m[0] != r || m[1] > text.length()) continue;
+                int mx0 = textX - scrollX + font.width(text.substring(0, m[1]));
+                int mx1 = textX - scrollX + font.width(text.substring(0, Math.min(m[2], text.length())));
+                g.fill(mx0, y - 1, mx1, y + LINE - 1, 0x60F2C14E);
+            }
             if (sel != null && r >= sel[0] && r <= sel[2]) {
                 int c0 = r == sel[0] ? sel[1] : 0, c1 = r == sel[2] ? sel[3] : text.length();
                 int x0 = textX - scrollX + font.width(text.substring(0, Math.min(c0, text.length())));

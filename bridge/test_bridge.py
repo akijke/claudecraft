@@ -862,6 +862,38 @@ class OAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.bridge.oauth.has_token('fake'))
 
 
+class ReplaceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_preview_apply_stale_and_undo(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        project = Path(bridge.projects.path_of_current())
+        (project / 'src').mkdir()
+        (project / 'src' / 'A.java').write_bytes(b'class A {\r\n  int oldName = 1; // oldName\r\n}\r\n')
+        (project / 'src' / 'b.py').write_text('oldName = 2\n', encoding='utf-8')
+        (project / 'node_modules').mkdir()
+        (project / 'node_modules' / 'x.js').write_text('oldName', encoding='utf-8')
+        await bridge.command({'mode': 'cc', 'action': 'replace', 'text': '--in *.java oldName -> newName'})
+        p = [e for e in bridge.events if e['kind'] == 'replace_preview'][-1]
+        self.assertEqual((p['count'], p['files']), (2, 1))
+        self.assertEqual(p['changes'][0]['after'], 'int newName = 1; // newName')
+        await bridge.command({'mode': 'cc', 'action': 'replace', 'text': 'apply ' + p['token']})
+        self.assertEqual((project / 'src' / 'A.java').read_bytes(), b'class A {\r\n  int newName = 1; // newName\r\n}\r\n')
+        self.assertEqual((project / 'src' / 'b.py').read_text(encoding='utf-8'), 'oldName = 2\n')
+        self.assertEqual((project / 'node_modules' / 'x.js').read_text(encoding='utf-8'), 'oldName')
+        # regex with groups; a file edited after the preview blocks apply
+        await bridge.command({'mode': 'cc', 'action': 'replace', 'text': r'-r (\w+)Name = (\d) -> \1_name = \2'})
+        p2 = [e for e in bridge.events if e['kind'] == 'replace_preview'][-1]
+        self.assertEqual({c['after'] for c in p2['changes']}, {'old_name = 2', 'int new_name = 1; // newName'})
+        (project / 'src' / 'b.py').write_text('oldName = 3\n', encoding='utf-8')
+        with self.assertRaises(ValueError):
+            await bridge.command({'mode': 'cc', 'action': 'replace', 'text': 'apply ' + p2['token']})
+        # /cc undo restores the first replacement
+        await bridge.command({'mode': 'cc', 'action': 'undo'})
+        self.assertIn(b'oldName', (project / 'src' / 'A.java').read_bytes())
+
+
 class PermissionRuleTests(unittest.IsolatedAsyncioTestCase):
     def test_matching(self):
         from backends.permrules import matches, suggest

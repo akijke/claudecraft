@@ -171,6 +171,26 @@ final class LiveTest {
             } catch (IOException e) { throw new RuntimeException(e); }
             mod.runLine("cc", "/edit livetest-lines.txt:20");
         }, () -> screen() instanceof EditorScreen ed && ed.isLoaded() && ed.cursorRow() == 19 && waited > 20, 10);
+        step("editor Ctrl+H replaces all matches", () -> { }, () -> {
+            if (!(screen() instanceof EditorScreen ed) || !ed.isLoaded()) return false;
+            if (waited == 10) ed.findForTest("line 1", "LINE ONE", true);
+            return waited > 20 && ed.textForTest().contains("LINE ONE0") && !ed.textForTest().contains("line 1\n");
+        }, 10);
+        step("/cc replace previews and applies in the project", () -> {
+            markEvents();
+            mod.runLine("cc", "/cc replace --in livetest-lines.txt line 40 -> last line");
+        }, () -> {
+            if (waited == 10) {
+                for (Deque<JsonObject> events : mod.log.values())
+                    for (JsonObject e : events)
+                        if (e.get("kind").getAsString().equals("replace_preview") && e.get("seq").getAsLong() > mark)
+                            mod.runLine("cc", "/cc replace apply " + e.get("token").getAsString());
+            }
+            try {
+                return waited > 10 && Files.readString(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir()
+                    .resolve("claude-chat/workspace/livetest-lines.txt")).contains("last line");
+            } catch (IOException e) { return false; }
+        }, 20);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);
     }

@@ -156,6 +156,34 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "replace_preview" -> {
+                out.add(line(mode, lit("⇄ " + L.t("Замена"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  «" + s(e, "query") + "» → «" + s(e, "replacement") + "»", TEXT))
+                    .append(lit("  " + n(e, "count") + L.t(" совп. в ") + n(e, "files") + L.t(" файл(ах)")
+                        + (b(e, "regex") ? " · regex" : "") + (s(e, "glob").isEmpty() ? "" : " · " + s(e, "glob")), DIM))));
+                JsonArray changes = e.getAsJsonArray("changes");
+                String file = "";
+                int shown = 0;
+                for (JsonElement item : changes) {
+                    if (shown++ >= 30) break;
+                    JsonObject c = item.getAsJsonObject();
+                    if (!s(c, "path").equals(file)) {
+                        file = s(c, "path");
+                        out.add(line(mode, Component.literal("  ").append(button(file, "/edit " + s(e, "root") + "/" + file
+                            + ":" + n(c, "line"), false, GOLD, null))));
+                    }
+                    out.add(line(mode, lit(String.format("   %4d ", n(c, "line")), FAINT).append(lit("- " + s(c, "before"), RED))));
+                    out.add(line(mode, lit("        ", FAINT).append(lit("+ " + s(c, "after"), GREEN))));
+                }
+                if (changes.size() > 30 || b(e, "truncated")) out.add(line(mode, lit(L.t("  … показаны первые изменения"), FAINT)));
+                if (n(e, "count") > 0)
+                    out.add(line(mode, Component.literal("  ").append(button("✔ " + L.t("Заменить всё"), cmd + "replace apply " + s(e, "token"),
+                        false, GREEN, L.t("Можно откатить: /cc undo"))).append(sp())
+                        .append(button(L.t("изменить"), cmd + "replace " + (b(e, "regex") ? "-r " : "") + s(e, "query") + " -> ", true, AQUA, null))));
+                else out.add(line(mode, lit(L.t("  совпадений нет"), DIM)));
+            }
+            case "replace_done" -> out.add(line(mode, lit("✔ " + s(e, "text") + "  ", GREEN)
+                .append(button("⟳ " + L.t("откатить"), cmd + "undo", false, GOLD, null))));
             case "perms" -> {
                 out.add(line(mode, lit("⚙ " + L.t("Правила разрешений"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit("  " + s(e, "path"), FAINT))));
