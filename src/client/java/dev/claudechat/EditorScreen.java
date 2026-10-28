@@ -29,7 +29,7 @@ final class EditorScreen extends Screen {
     private static final int LINE = 10, GUTTER_PAD = 6;
     private final ClaudeChat mod;
     private final Screen parent;
-    private final String path;
+    private String path;
     private final String lang;
     private final List<String> lines = new ArrayList<>();
     private int row, col, anchorRow = -1, anchorCol;
@@ -53,11 +53,34 @@ final class EditorScreen extends Screen {
         lines.add("");
     }
 
+    private int gotoLine;
+
+    /** Opens on this 1-based line (0 = top). */
+    EditorScreen at(int line) {
+        gotoLine = line;
+        if (loaded) jump();
+        return this;
+    }
+
+    private void jump() {
+        if (gotoLine <= 0) return;
+        row = Math.min(lines.size() - 1, gotoLine - 1);
+        col = lines.get(row).length() - lines.get(row).stripLeading().length();
+        scrollRow = Math.max(0, row - Math.max(1, areaH / LINE) / 2);  // the line in the middle
+        highlight = row;
+        gotoLine = 0;
+    }
+
+    private int highlight = -1;
+    int cursorRow() { return row; }
+    boolean isLoaded() { return loaded; }
+
     /** Dev screenshots: fixed text, no bridge. */
     EditorScreen withText(String text) {
         lines.clear();
         lines.addAll(List.of(text.split("\n", -1)));
         loaded = true;
+        jump();
         return this;
     }
 
@@ -77,6 +100,8 @@ final class EditorScreen extends Screen {
             loaded = true;
             dirty = false;
             say(L.t("Открыт") + " · " + lines.size() + L.t(" строк"), 0xFF8A8A8A);
+            path = r.get("path").getAsString();  // the bridge resolved it (relative → project)
+            jump();
         }));
     }
 
@@ -422,6 +447,7 @@ final class EditorScreen extends Screen {
             int r = scrollRow + i, y = areaY + 2 + i * LINE;
             String text = lines.get(r);
             if (r == row) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, 0xFF26262C);
+            if (r == highlight) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, 0x40F2C14E);
             String number = String.valueOf(r + 1);
             g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? 0xFFC6C6C6 : 0xFF5A5A5A);
             g.enableScissor(textX, areaY, areaX + areaW, areaY + areaH);

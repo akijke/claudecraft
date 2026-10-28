@@ -132,7 +132,7 @@ final class WorkStyle {
                 .append(button("⏹", "/kill " + s(e, "job"), false, RED, L.t("Остановить команду")))));
             case "shell_out" -> {
                 for (String raw : clean(s(e, "text")).split("\\R", -1))
-                    out.add(line(mode, lit("│ ", FAINT).append(lit(raw, 0xD0D0D0))));
+                    out.add(line(mode, lit("│ ", FAINT).append(PathLinks.linkify(raw, 0xD0D0D0, AQUA))));
             }
             case "shell_end" -> {
                 boolean killed = b(e, "killed");

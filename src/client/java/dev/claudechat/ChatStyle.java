@@ -87,7 +87,7 @@ final class ChatStyle {
                 out.add(line(mode, prefix.append(lit(icon + " ", shell ? GREEN : GOLD))
                     .append(lit(text, shell ? TEXT : DIM))));
             }
-            case "tool_error" -> out.add(line(mode, lit("  ✖ ", RED).append(lit(firstLine(text), 0xC9888C))));
+            case "tool_error" -> out.add(line(mode, lit("  ✖ ", RED).append(PathLinks.linkify(firstLine(text), 0xC9888C, AQUA))));
             case "todo" -> {
                 for (JsonElement r : e.getAsJsonArray("rows")) {
                     JsonObject row = r.getAsJsonObject();
@@ -433,9 +433,9 @@ final class ChatStyle {
         Matcher m = INLINE.matcher(text);
         int last = 0;
         while (m.find()) {
-            if (m.start() > last) result.append(lit(text.substring(last, m.start()), color));
+            if (m.start() > last) result.append(PathLinks.linkify(text.substring(last, m.start()), color, AQUA));
             if (m.group(1) != null) result.append(lit(m.group(1), color).withStyle(s -> s.withBold(true)));
-            else if (m.group(2) != null) result.append(lit(m.group(2), CODE));
+            else if (m.group(2) != null) result.append(PathLinks.linkify(m.group(2), CODE, AQUA));
             else {
                 String url = m.group(4);
                 try {
@@ -446,7 +446,7 @@ final class ChatStyle {
             }
             last = m.end();
         }
-        if (last < text.length()) result.append(lit(text.substring(last), color));
+        if (last < text.length()) result.append(PathLinks.linkify(text.substring(last), color, AQUA));
         return result;
     }
 }

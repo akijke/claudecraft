@@ -400,5 +400,6 @@
   "Claude перескажет историю коротко; можно дописать, что сохранить": "Claude retells the history briefly; you can add what to keep",
   "[фокус] — сжать историю, когда контекст заполнен · context — сколько занято": "[focus] — compress the history when the context is full · context — how much is used",
   "сжать": "compact",
-  "◎ Контекст": "◎ Context"
+  "◎ Контекст": "◎ Context",
+  "Открыть в редакторе: строка ": "Open in the editor: line "
 }

@@ -280,8 +280,9 @@ public final class ClaudeChat implements ClientModInitializer {
         }
         if (Set.of("edit", "nano", "vim").contains(action)) {
             if (text.isBlank()) { say(mode, L.t("Формат: /edit <файл>")); return; }
-            String file = text.strip().replaceAll("^\"|\"$", "");
-            open(() -> new EditorScreen(this, null, file));
+            String[] target = PathLinks.splitLine(text.strip().replaceAll("^\"|\"$", ""));
+            int line = target[1] == null ? 0 : Integer.parseInt(target[1]);
+            open(() -> new EditorScreen(this, null, target[0]).at(line));
             return;
         }
         if (Set.of("project", "projects", "p").contains(action) && text.strip().equals("pick")) {

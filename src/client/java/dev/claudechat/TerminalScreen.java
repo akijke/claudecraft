@@ -256,6 +256,35 @@ final class TerminalScreen extends Screen {
         nextPoll = 0;
     }
 
+    /** Text of one screen row (as shown) for link detection. */
+    private String rowText(int r) {
+        if (snap == null) return "";
+        JsonArray rowsJson = snap.getAsJsonArray("rows");
+        if (r < 0 || r >= rowsJson.size()) return "";
+        StringBuilder b = new StringBuilder();
+        for (JsonElement run : rowsJson.get(r).getAsJsonArray()) b.append(run.getAsJsonArray().get(0).getAsString());
+        return b.toString();
+    }
+
+    /** Click on `path:line` (compiler errors, stack traces, grep -n) opens the editor there. */
+    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        if (super.mouseClicked(event, doubleClick)) return true;
+        float z = zoom();
+        int r = (int) ((event.y() - TOP) / (CELL_H * z)), c = (int) ((event.x() - 4) / (CELL_W * z));
+        String text = rowText(r);
+        for (PathLinks.Link link : PathLinks.find(text)) {
+            int start = text.codePointCount(0, link.start()), end = text.codePointCount(0, link.end());
+            if (c >= start && c < end) {
+                String path = link.path();
+                java.io.File f = new java.io.File(path);
+                if (!f.isAbsolute() && snap.has("cwd")) path = new java.io.File(snap.get("cwd").getAsString(), path).getPath();
+                minecraft.setScreenAndShow(new EditorScreen(mod, this, path).at(link.line()));
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override public boolean mouseScrolled(double x, double y, double h, double v) {
         scrollBy((int) Math.signum(v) * 3);
         return true;

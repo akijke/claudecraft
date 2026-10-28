@@ -153,6 +153,15 @@ final class LiveTest {
                 return waited > 60 && Files.readString(editFile).contains("typed in Minecraft");
             } catch (IOException e) { return false; }
         }, 20);
+        step("/edit file:20 opens the editor on line 20", () -> {
+            try {
+                Path f = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("claude-chat/workspace/livetest-lines.txt");
+                StringBuilder b = new StringBuilder();
+                for (int i = 1; i <= 40; i++) b.append("line ").append(i).append('\n');
+                Files.writeString(f, b.toString());
+            } catch (IOException e) { throw new RuntimeException(e); }
+            mod.runLine("cc", "/edit livetest-lines.txt:20");
+        }, () -> screen() instanceof EditorScreen ed && ed.isLoaded() && ed.cursorRow() == 19 && waited > 20, 10);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);
     }

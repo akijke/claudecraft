@@ -114,6 +114,11 @@ class FileManager:
     def load_for_edit(self, mode, arg):
         """Whole text file for the in-game editor: lines untruncated, mtime for conflict checks."""
         path = self.resolve(mode, arg)
+        if not path.is_file() and not Path(os.path.expandvars((arg or '').strip().strip('"'))).is_absolute():
+            # paths in Claude's answers are relative to the project, not to the browsing folder
+            project = (Path(self.bridge.projects.path_of_current()) / arg.strip().strip('"')).resolve()
+            if project.is_file():
+                path = project
         if not path.is_file():
             raise ValueError(f'Нет такого файла: {path}')
         stat = path.stat()
