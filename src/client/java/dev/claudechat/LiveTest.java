@@ -48,6 +48,7 @@ final class LiveTest {
     private TerminalScreen terminal;
     private boolean foldCheck;
     private int lspStage;
+    private boolean blameAsked;
     private final List<String> confirmations = new ArrayList<>();
 
     LiveTest(ClaudeChat mod) {
@@ -291,6 +292,14 @@ final class LiveTest {
                 lspStage = 3;
             }
             return lspStage == 3 && ed.textForTest().endsWith("\nhelper");
+        }, 20);
+        step("Ctrl+B shows git blame of a tracked file", () -> {
+            Path readme = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().toAbsolutePath().getParent().resolve("README.md");
+            mc().setScreenAndShow(new EditorScreen(mod, null, readme.toString()));
+        }, () -> {
+            if (!(screen() instanceof EditorScreen ed) || !ed.isLoaded()) return false;
+            if (!blameAsked) { ed.keyPressed(new KeyEvent(InputConstants.KEY_B, 0, 2)); blameAsked = true; }
+            return ed.blameForTest() && waited > 20;
         }, 20);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);

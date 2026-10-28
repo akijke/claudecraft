@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
  * on disk since it was opened (Claude may have edited it) unless confirmed.
  */
 final class EditorScreen extends Screen {
-    private static final int LINE = 10, GUTTER_PAD = 6;
+    private static final int LINE = 10, GUTTER_PAD = 6, BLAME_W = 120;
     private final ClaudeChat mod;
     private final Screen parent;
     private String path;
@@ -270,6 +270,7 @@ final class EditorScreen extends Screen {
     }
 
     int foldsForTest() { return folds.size(); }
+    boolean blameForTest() { return showBlame && blame != null && !blame.isEmpty(); }
     int diagnosticsForTest() { return diagnostics.size(); }
     int completionsForTest() { return completions.size(); }
     void caretForTest(int r, int c) { row = r; col = c; anchorRow = -1; }
@@ -345,6 +346,22 @@ final class EditorScreen extends Screen {
     }
 
     private void say(String text, int color) { message = text; messageColor = color; }
+
+    // ---- git blame column (#53, Ctrl+B) ----
+    private JsonArray blame;
+    private boolean showBlame;
+
+    private void toggleBlame() {
+        showBlame = !showBlame;
+        if (!showBlame || blame != null) return;
+        CompletableFuture.supplyAsync(() -> {
+            try { return mod.request("/blame?mode=cc&path=" + URLEncoder.encode(path, StandardCharsets.UTF_8), null); }
+            catch (Exception e) { JsonObject o = new JsonObject(); o.addProperty("error", e.getMessage()); return o; }
+        }, mod.io).thenAccept(r -> minecraft.execute(() -> {
+            if (r.has("error")) { say(r.get("error").getAsString(), 0xFFF2C14E); showBlame = false; return; }
+            blame = r.getAsJsonArray("lines");
+        }));
+    }
 
     // ---- language server (#50): diagnostics, F12 definition, Ctrl+Space completion ----
     private JsonArray diagnostics = new JsonArray();
@@ -750,6 +767,7 @@ final class EditorScreen extends Screen {
             }
         }
         if (key == InputConstants.KEY_F8) { nextDiagnostic(); return true; }
+        if (ctrl && key == InputConstants.KEY_B) { toggleBlame(); return true; }
         if (key == InputConstants.KEY_F12) { goToDefinition(); return true; }
         if (ctrl && key == InputConstants.KEY_SPACE) { complete(); return true; }
         if (ctrl && key == InputConstants.KEY_G) { openGoto(); return true; }
@@ -914,7 +932,7 @@ final class EditorScreen extends Screen {
         g.text(font, Component.literal(title).withColor(dirty ? 0xF2C14E : 0xD97757), 6, 10, 0xFFFFFFFF);
         g.text(font, font.plainSubstrByWidth(path, width / 2 - font.width(title)), 14 + font.width(title), 10, 0xFF5E5E5E);
 
-        gutterW = font.width(String.valueOf(lines.size())) + GUTTER_PAD * 2;
+        gutterW = font.width(String.valueOf(lines.size())) + GUTTER_PAD * 2 + (showBlame && blame != null ? BLAME_W : 0);
         g.fill(areaX, areaY, areaX + areaW, areaY + areaH, Theme.PANEL);
         g.fill(areaX, areaY, areaX + gutterW, areaY + areaH, Theme.GUTTER);
         int visible = areaH / LINE, textX = areaX + gutterW + 4;
@@ -933,6 +951,15 @@ final class EditorScreen extends Screen {
             String text = lines.get(r);
             if (r == row) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, Theme.CURRENT_LINE);
             if (r == highlight) g.fill(areaX + gutterW, y - 1, areaX + areaW, y + LINE - 1, 0x40F2C14E);
+            if (showBlame && blame != null && r < blame.size()) {
+                JsonObject b = blame.get(r).getAsJsonObject();
+                String who = b.get("author").getAsString();
+                String label = font.plainSubstrByWidth(who, BLAME_W - 34) ;
+                g.text(font, label, areaX + 3, y, 0xFF7A8A9A, false);
+                g.text(font, b.get("ago").getAsString(), areaX + BLAME_W - 30, y, 0xFF5A6A7A, false);
+                if (mouseX >= areaX && mouseX < areaX + BLAME_W && mouseY >= y - 1 && mouseY < y + LINE - 1)
+                    g.setTooltipForNextFrame(font, Component.literal(b.get("hash").getAsString() + " " + who + " — " + b.get("summary").getAsString()), mouseX, mouseY);
+            }
             String number = String.valueOf(r + 1);
             g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? Theme.LINE_NUMBER_ON : Theme.LINE_NUMBER);
             g.enableScissor(textX, areaY, areaX + areaW, areaY + areaH);

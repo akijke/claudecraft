@@ -619,5 +619,9 @@
   "Форматировать (Ctrl+Shift+F)": "Format (Ctrl+Shift+F)",
   "Ошибок нет": "No problems",
   "Определение не найдено": "Definition not found",
-  "Нет вариантов": "No suggestions"
+  "Нет вариантов": "No suggestions",
+  "граф": "graph",
+  "Граф коммитов всех веток": "Commit graph of all branches",
+  "Граф коммитов": "Commit graph",
+  "   все ветки · клик по хэшу — show": "   all branches · click a hash — show"
 }

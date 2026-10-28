@@ -955,6 +955,35 @@ class WorktreeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(here.worktree)
 
 
+@unittest.skipUnless(shutil.which('git'), 'git is not installed')
+class GraphBlameTests(unittest.IsolatedAsyncioTestCase):
+    async def test_graph_and_blame(self):
+        import subprocess
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        env = mock.patch.dict(os.environ, {'GIT_AUTHOR_NAME': 'Alex', 'GIT_AUTHOR_EMAIL': 'a@a', 'GIT_COMMITTER_NAME': 'Alex',
+                                           'GIT_COMMITTER_EMAIL': 'a@a', 'GIT_CONFIG_GLOBAL': os.devnull})
+        env.start()
+        self.addCleanup(env.stop)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        repo = Path(bridge.projects.path_of_current())
+        git = lambda *a: subprocess.run(['git', *a], cwd=repo, capture_output=True, text=True, check=True)
+        (repo / 'a.txt').write_text('one\ntwo\n', encoding='utf-8')
+        git('init', '-q'); git('add', '.'); git('commit', '-qm', 'first commit')
+        git('checkout', '-qb', 'feature')
+        (repo / 'a.txt').write_text('one\ntwo\nthree\n', encoding='utf-8')
+        git('commit', '-qam', 'add three')
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'graph'})
+        rows = [e for e in bridge.events if e['kind'] == 'git_graph'][-1]['rows']
+        self.assertEqual([r['subject'] for r in rows if r['hash']], ['add three', 'first commit'])
+        self.assertIn('feature', rows[0]['refs'])
+        self.assertTrue(rows[0]['graph'].startswith('*'))
+        blame = await bridge.git.blame(repo / 'a.txt')
+        self.assertEqual([(b['author'], b['summary']) for b in blame],
+                         [('Alex', 'first commit'), ('Alex', 'first commit'), ('Alex', 'add three')])
+
+
 class ReplaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_preview_apply_stale_and_undo(self):
         temp = tempfile.TemporaryDirectory()

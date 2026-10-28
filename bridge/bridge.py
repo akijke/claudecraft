@@ -1493,6 +1493,11 @@ def create_app(bridge, token):
             return web.json_response(await bridge.lsp.complete(path, text, line, col, root))
         raise ValueError('lsp: sync | definition | complete')
     app.router.add_post('/lsp/{op}', lsp)
+    async def blame(request):
+        mode = request.query.get('mode', 'cc')
+        path = bridge.files.resolve(mode if mode in ('c', 'cc') else 'cc', request.query.get('path', ''))
+        return web.json_response({'lines': await bridge.git.blame(path)})
+    app.router.add_get('/blame', blame)
     async def index(request):
         mode = request.query.get('mode', 'cc')
         chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')

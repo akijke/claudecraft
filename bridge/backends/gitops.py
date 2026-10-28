@@ -96,6 +96,7 @@ class Git:
             'switch': self.switch, 'checkout': self.switch, 'remote': self.remote,
             'github': self.github, 'stash': self.stash,
             'hunks': self.hunks, 'stage': self.stage_hunk, 'unstage': self.unstage_hunk,
+            'graph': self.graph,
         }.get(sub)
         if not handler:
             raise ValueError('git: status, diff, hunks, stage, unstage, log, add, commit, push, pull, fetch, branch, '
@@ -178,6 +179,51 @@ class Git:
         path = await self._apply(rest, staged=True, reverse=True)
         self.emit(mode, f'Кусок {path} убран из коммита (unstaged)', kind='status')
         await self.hunks(mode, '')
+
+    async def graph(self, mode, rest):
+        n = int(rest) if rest.isdigit() else 40
+        out = await self.ok('log', '--graph', '--all', f'-n{min(n, 200)}', '--color=never',
+                            '--format=%x1f%h%x1f%d%x1f%s%x1f%an%x1f%cr')
+        rows = []
+        for line in out.splitlines():
+            graph, _, rest_ = line.partition('\x1f')
+            parts = rest_.split('\x1f') if rest_ else []
+            if len(parts) >= 5:
+                rows.append({'graph': graph, 'hash': parts[0], 'refs': parts[1].strip(' ()'), 'subject': parts[2],
+                             'author': parts[3], 'when': parts[4]})
+            else:
+                rows.append({'graph': line, 'hash': '', 'refs': '', 'subject': '', 'author': '', 'when': ''})
+        self.emit(mode, 'git graph', kind='git_graph', rows=rows)
+
+    async def blame(self, path):
+        """Per line of the committed file: hash, author, relative date, summary (for the editor's blame column)."""
+        import time
+        file = Path(path)
+        code, out = await self.run('blame', '--line-porcelain', '--', file.name, cwd=file.parent, timeout=60)
+        if code != 0:
+            raise ValueError('blame: ' + (out.strip().splitlines() or ['не в git'])[-1][:300])
+        lines, current = [], {}
+        for line in out.split('\n'):
+            if line.startswith('\t'):          # the source line closes one entry
+                lines.append(current)
+                current = {}
+                continue
+            key, _, value = line.partition(' ')
+            if len(key) == 40 and all(c in '0123456789abcdef' for c in key):
+                current['hash'] = key[:8]
+            elif key in ('author', 'author-time', 'summary'):
+                current[key] = value
+        now = time.time()
+        def ago(t):
+            d = now - int(t or now)
+            for unit, size in (('y', 31536000), ('mo', 2592000), ('d', 86400), ('h', 3600), ('m', 60)):
+                if d >= size:
+                    return f'{int(d // size)}{unit}'
+            return 'now'
+        uncommitted = '00000000'
+        return [{'hash': l.get('hash', ''), 'author': 'not committed' if l.get('hash') == uncommitted else l.get('author', ''),
+                 'ago': '' if l.get('hash') == uncommitted else ago(l.get('author-time')), 'summary': l.get('summary', '')}
+                for l in lines]
 
     async def log(self, mode, rest):
         n = int(rest) if rest.isdigit() else 15

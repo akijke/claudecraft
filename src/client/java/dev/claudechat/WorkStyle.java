@@ -341,6 +341,26 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "git_graph" -> {
+                out.add(line(mode, lit("⇄ " + L.t("Граф коммитов"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(L.t("   все ветки · клик по хэшу — show"), FAINT))));
+                int[] laneColors = {GREEN, AQUA, GOLD, CODE_MODE, RED};
+                for (JsonElement item : e.getAsJsonArray("rows")) {
+                    JsonObject r = item.getAsJsonObject();
+                    MutableComponent row = Component.literal("  ");
+                    String graph = s(r, "graph");
+                    for (int i = 0; i < graph.length(); i++) {
+                        char ch = graph.charAt(i);
+                        row.append(lit(String.valueOf(ch), ch == '*' ? TEXT : laneColors[(i / 2) % laneColors.length]));
+                    }
+                    if (!s(r, "hash").isEmpty()) {
+                        row.append(sp()).append(button(s(r, "hash"), "/cc sh git show --stat " + s(r, "hash"), false, GOLD, s(r, "author") + " · " + s(r, "when")));
+                        if (!s(r, "refs").isEmpty()) row.append(lit(" (" + s(r, "refs") + ")", GREEN));
+                        row.append(lit(" " + s(r, "subject"), TEXT)).append(lit("  " + s(r, "when"), FAINT));
+                    }
+                    out.add(line(mode, row));
+                }
+            }
             case "git_hunks" -> {
                 out.add(line(mode, lit("± " + L.t("Куски изменений"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit("  " + s(e, "text") + "  ", DIM)).append(button("⟳", "/cc git hunks " + s(e, "path"), false, AQUA, null))
@@ -577,6 +597,7 @@ final class WorkStyle {
         out.add(line("cc", Component.literal("  ")
             .append(button("diff", "/cc git diff", false, AQUA, L.t("Все изменения"))).append(sp())
             .append(button(L.t("куски"), "/cc git hunks", false, AQUA, L.t("Добавлять в коммит по кускам (stage по ханкам)"))).append(sp())
+            .append(button(L.t("граф"), "/cc git graph", false, AQUA, L.t("Граф коммитов всех веток"))).append(sp())
             .append(button("✔ commit", "/cc git commit ", true, GREEN, L.t("Впиши сообщение; пусто — Claude напишет сам"))).append(sp())
             .append(button("✦ commit", "/cc git commit", false, CODE_MODE, L.t("Claude посмотрит diff и закоммитит"))).append(sp())
             .append(button("↑ push", "/cc git push", false, GOLD, null)).append(sp())
