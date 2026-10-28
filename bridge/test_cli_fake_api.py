@@ -382,6 +382,24 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         await self.bridge.command({'mode': 'cc', 'action': 'hooks', 'text': 'rm ' + rows[0]['id']})
         self.assertEqual([e for e in self.bridge.events if e['kind'] == 'hooks'][-1]['rows'], [])
 
+    async def test_background_bash_is_listed_with_output(self):
+        await self.start([tool('Bash', {'command': 'echo BG-LINE', 'run_in_background': True,
+                                        'description': 'print a line'}),
+                          text('waiting', delay=3.0)])
+        await self.bridge.command({'mode': 'cc', 'action': 'auto', 'text': 'all'})
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'start something in the background')
+        await self.until(lambda: self.bridge.bg_tasks)
+        task = next(iter(self.bridge.bg_tasks.values()))
+        await self.until(lambda: task.get('output_file') or task['status'] != 'running', timeout=15)
+        await self.bridge.command({'mode': 'cc', 'action': 'tasks'})
+        listed = [e for e in self.bridge.events if e['kind'] == 'tasks'][-1]['background']
+        self.assertEqual(listed[0]['id'], task['id'])
+        await self.until(lambda: chat.task is None)
+        if task.get('output_file'):
+            await self.bridge.command({'mode': 'cc', 'action': 'bg', 'text': 'out ' + task['id']})
+            self.assertIn('BG-LINE', [e for e in self.bridge.events if e['kind'] == 'shell_out'][-1]['text'])
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

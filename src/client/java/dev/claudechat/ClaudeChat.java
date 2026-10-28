@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "memory", "mem", "#", "remember", "skills", "hooks", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",

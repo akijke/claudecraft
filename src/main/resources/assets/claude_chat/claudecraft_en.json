@@ -561,5 +561,7 @@
   "  хуков нет": "  no hooks",
   "Журнал хуков": "Hook log",
   "  пока ничего не запускалось": "  nothing ran yet",
-  "хуки из settings.json: список, add <Событие> [matcher] -- <команда>, rm, log": "hooks from settings.json: list, add <Event> [matcher] -- <command>, rm, log"
+  "хуки из settings.json: список, add <Событие> [matcher] -- <команда>, rm, log": "hooks from settings.json: list, add <Event> [matcher] -- <command>, rm, log",
+  "  Фоновые процессы Claude": "  Claude's background processes",
+  "вывод": "output"
 }

@@ -113,6 +113,9 @@ final class WorkStyle {
             }
             case "agents" -> agents(e, out);
             case "tasks" -> tasks(e, out);
+            case "bg_task" -> out.add(line(mode, lit("▶ ", GREEN).append(lit(s(e, "text"), DIM)).append(sp())
+                .append(button(L.t("вывод"), cmd + "bg out " + s(e, "task"), false, AQUA, null)).append(sp())
+                .append(button(L.t("⏹ стоп"), cmd + "bg stop " + s(e, "task"), false, RED, null))));
             case "spawned" -> out.add(line(mode, lit("◆ ", CODE_MODE).append(lit(s(e, "text"), TEXT)).append(lit("  ", TEXT))
                 .append(button(L.t("открыть"), "/cc select " + s(e, "target"), false, AQUA, L.t("Переключиться на этот чат")))
                 .append(sp()).append(button(L.t("задачи"), "/cc tasks", false, AQUA, null))
@@ -614,6 +617,17 @@ final class WorkStyle {
                 .append(button(L.t("открыть"), "/" + m + " select " + s(r, "id"), false, AQUA, null)).append(sp())
                 .append(button("f …", "/" + m + " select " + s(r, "id"), false, AQUA, L.t("Открой чат и напиши /") + m + L.t(" f <текст>"))).append(sp())
                 .append(button(L.t("⏹ стоп"), "/cc stop " + s(r, "id"), false, RED, L.t("Остановить и очистить очередь")))));
+        }
+        JsonArray background = e.has("background") ? e.getAsJsonArray("background") : new JsonArray();
+        if (!background.isEmpty()) out.add(line("cc", lit(L.t("  Фоновые процессы Claude"), DIM).withStyle(st -> st.withUnderlined(true))));
+        for (JsonElement item : background) {
+            JsonObject t = item.getAsJsonObject();
+            boolean running = s(t, "status").equals("running");
+            MutableComponent row = lit(running ? "  ▶ " : "  ■ ", running ? GREEN : FAINT).append(lit(s(t, "description"), TEXT))
+                .append(lit("  " + s(t, "status") + "  ", running ? GREEN : FAINT))
+                .append(button(L.t("вывод"), "/cc bg out " + s(t, "id"), false, AQUA, null));
+            if (running && b(t, "live")) row.append(sp()).append(button(L.t("⏹ стоп"), "/cc bg stop " + s(t, "id"), false, RED, null));
+            out.add(line("cc", row));
         }
         out.add(line("cc", Component.literal("  ").append(button(L.t("∥ новая параллельная задача"), "/cc spawn ", true, CODE_MODE,
             L.t("Отдельный чат в этом проекте; текущий не прерывается")))));

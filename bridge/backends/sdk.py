@@ -209,6 +209,10 @@ class SdkTurn:
                                          'allowed_warning' else 'исчерпан'), kind='error' if info.status ==
                                          'rejected' else 'status')
                     continue
+                if isinstance(message, (T.TaskStartedMessage, T.TaskUpdatedMessage, T.TaskNotificationMessage,
+                                        T.TaskProgressMessage)):
+                    self.bridge.background_task(self.chat, message)
+                    continue
                 if isinstance(message, getattr(T, 'HookEventMessage', ())) :
                     from backends import hooks as hook_log
                     row = hook_log.record(message)

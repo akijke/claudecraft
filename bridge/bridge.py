@@ -119,6 +119,7 @@ class Bridge:
         self.runner = runner or self.run_backend
         self.account = Account(self)
         self.rate_limits = {}
+        self.bg_tasks = {}  # Claude's background tasks: id -> info (see background_task)
         state = self.directory / 'chats.json'
         if state.exists():
             data = json.loads(state.read_text(encoding='utf-8'))
@@ -714,6 +715,37 @@ class Bridge:
         raise ValueError('project: list | open <имя> | here [имя] | add <имя> [путь] | new <имя> | '
                          'rename <старое> <новое> | remove <имя>')
 
+    def background_task(self, chat, message):
+        """Claude's background work (Bash run_in_background, background agents) for /cc tasks."""
+        name = type(message).__name__
+        task = self.bg_tasks.setdefault(message.task_id, {'id': message.task_id, 'chat': chat.id, 'status': 'running',
+                                                          'description': '', 'type': '', 'output_file': None,
+                                                          'started': time.time()})
+        data = message.data or {}
+        if name == 'TaskStartedMessage':
+            task.update(description=(message.description or '')[:200], type=message.task_type or '',
+                        output_file=data.get('output_file') or task['output_file'])
+            self.emit(chat, f'Фоновая задача Claude: {task["description"] or task["type"]}', kind='bg_task',
+                      task=task['id'], status='running')
+        elif name == 'TaskUpdatedMessage' and message.status:
+            task['status'] = message.status
+        elif name == 'TaskNotificationMessage':
+            task.update(status=message.status or task['status'], output_file=message.output_file or task['output_file'],
+                        summary=(message.summary or '')[:300])
+        while len(self.bg_tasks) > 50:  # oldest finished ones go first
+            done = [k for k, t in self.bg_tasks.items() if t['status'] != 'running']
+            self.bg_tasks.pop(done[0] if done else next(iter(self.bg_tasks)))
+
+    def bg_output(self, task_id, lines=40):
+        task = self.bg_tasks.get(task_id)
+        if not task:
+            raise ValueError('Нет такой фоновой задачи')
+        path = task.get('output_file')
+        if not path or not Path(path).is_file():
+            return task, ''
+        text = Path(path).read_text(encoding='utf-8', errors='replace').splitlines()
+        return task, '\n'.join(text[-lines:])
+
     def tasks_menu(self, mode):
         rows = []
         now = time.monotonic()
@@ -727,7 +759,10 @@ class Bridge:
                          'step': c.step, 'queue': len(c.queue),
                          'seconds': int(now - c.started) if c.task and c.started else 0,
                          'selected': self.selected.get(c.mode) == c.id})
-        self.emit(self.current_chat(mode), 'Задачи', kind='tasks', rows=rows)
+        background = [{'id': t['id'], 'chat': t['chat'], 'description': t['description'] or t['type'], 'status': t['status'],
+                       'type': t['type'], 'live': self.chats.get(t['chat']) is not None and self.chats[t['chat']].live is not None}
+                      for t in list(self.bg_tasks.values())[-15:]]
+        self.emit(self.current_chat(mode), 'Задачи', kind='tasks', rows=rows, background=background)
 
     async def spawn(self, mode, text):
         """Run a task in a NEW chat of the current project, in parallel, without switching to it."""
@@ -1022,6 +1057,20 @@ class Bridge:
                 raise ValueError('worktree: list | merge <чат> | diff <чат> | drop <чат>')
         elif action == 'spawn':
             await self.spawn(mode, text.strip())
+        elif action in ('bg', 'background'):
+            sub, _, tid = text.strip().partition(' ')
+            if sub == 'out':
+                task, out = self.bg_output(tid.strip())
+                self.emit(chat, out or 'пока нет вывода', kind='shell_out', task=task['id'])
+            elif sub == 'stop':
+                task = self.bg_tasks.get(tid.strip())
+                owner = self.chats.get(task['chat']) if task else None
+                if not owner or not owner.live or not owner.live.client:
+                    raise ValueError('Задача уже не работает (фоновые процессы живут, пока идёт запрос Claude)')
+                await owner.live.client.stop_task(task['id'])
+                self.emit(chat, f'Остановлено: {task["description"]}', kind='status')
+            else:
+                raise ValueError('bg out|stop <id>')
         elif action == 'tasks':
             self.tasks_menu(mode)
         elif action == 'stop':
