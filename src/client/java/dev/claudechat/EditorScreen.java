@@ -443,6 +443,7 @@ final class EditorScreen extends Screen {
     }
 
     @Override public boolean keyPressed(KeyEvent event) {
+        if (PaletteScreen.handleKey(mod, this, event, true)) return true;  // Ctrl+Shift+P / Ctrl+P
         int key = event.key();
         boolean ctrl = (event.modifiers() & 2) != 0, shift = (event.modifiers() & 1) != 0;
         boolean inFind = finding && (getFocused() == findBox || (replaceBox != null && getFocused() == replaceBox));

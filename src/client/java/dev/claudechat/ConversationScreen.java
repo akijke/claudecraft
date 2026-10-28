@@ -259,6 +259,7 @@ final class ConversationScreen extends Screen {
 
     // ---- input -----------------------------------------------------------------
     @Override public boolean keyPressed(KeyEvent event) {
+        if (PaletteScreen.handleKey(mod, this, event, true)) return true;  // Ctrl+Shift+P / Ctrl+P
         boolean ctrl = (event.modifiers() & 2) != 0;  // GLFW_MOD_CONTROL
         if (event.key() == InputConstants.KEY_RETURN && ctrl) { submit(""); return true; }
         // Tab after "/name": complete a slash command

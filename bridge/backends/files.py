@@ -111,6 +111,20 @@ class FileManager:
                 break
         return {'root': str(root), 'query': query, 'matches': found, 'files': files, 'truncated': truncated}
 
+    def index(self, root, limit=20000):
+        """Relative paths of files under `root` for quick open (Ctrl+P); build folders skipped."""
+        root = Path(root)
+        skip = {'.git', 'node_modules', '.gradle', 'build', 'dist', 'target', '__pycache__', '.venv', 'venv', '.idea', 'run'}
+        out = []
+        for folder, dirs, names in os.walk(root):
+            dirs[:] = sorted(d for d in dirs if d not in skip and not d.startswith('.claudecraft'))
+            rel = Path(folder).relative_to(root)
+            for name in sorted(names):
+                out.append(str(rel / name).replace('\\', '/').removeprefix('./'))
+                if len(out) >= limit:
+                    return {'root': str(root), 'files': out, 'truncated': True}
+        return {'root': str(root), 'files': out, 'truncated': False}
+
     def load_for_edit(self, mode, arg):
         """Whole text file for the in-game editor: lines untruncated, mtime for conflict checks."""
         path = self.resolve(mode, arg)

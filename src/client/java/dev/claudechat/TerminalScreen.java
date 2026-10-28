@@ -187,6 +187,7 @@ final class TerminalScreen extends Screen {
     }
 
     @Override public boolean keyPressed(KeyEvent event) {
+        if (PaletteScreen.handleKey(mod, this, event, false)) return true;  // Ctrl+Shift+P / Ctrl+P
         int key = event.key(), mods = event.modifiers();
         boolean ctrl = (mods & 2) != 0, shift = (mods & 1) != 0, alt = (mods & 4) != 0;
         if (key == InputConstants.KEY_ESCAPE) {

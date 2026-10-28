@@ -368,6 +368,7 @@ final class FileScreen extends Screen {
 
     // ---- input ----------------------------------------------------------------
     @Override public boolean keyPressed(KeyEvent event) {
+        if (PaletteScreen.handleKey(mod, this, event, true)) return true;  // Ctrl+Shift+P / Ctrl+P
         boolean typing = getFocused() == filter || (nameInput != null && getFocused() == nameInput);
         int key = event.key();
         if (nameInput != null && getFocused() == nameInput && key == InputConstants.KEY_RETURN) { confirmName(); return true; }

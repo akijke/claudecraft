@@ -144,6 +144,23 @@ final class LiveTest {
             if (waited == 30) { k.inputForTest("/rev"); k.keyPressed(new KeyEvent(InputConstants.KEY_TAB, 0, 0)); }
             return waited > 30 && k.inputValue().equals("/review ");
         }, 10);
+        step("Ctrl+Shift+P opens the palette, 'doct' finds Diagnostics", () -> {
+            if (screen() instanceof ConversationScreen k) k.keyPressed(new KeyEvent(InputConstants.KEY_P, 0, 3));
+        }, () -> {
+            if (!(screen() instanceof PaletteScreen p)) return false;
+            if (waited == 10) p.typeForTest("doct");
+            return waited > 15 && p.firstForTest().contains("doctor");
+        }, 10);
+        step("Ctrl+P lists project files and opens one", () -> {
+            mc().setScreenAndShow(new ConversationScreen(mod));
+        }, () -> {
+            if (waited == 5 && screen() instanceof ConversationScreen k) k.keyPressed(new KeyEvent(InputConstants.KEY_P, 0, 2));
+            if (waited == 40 && screen() instanceof PaletteScreen p) { p.typeForTest("livelines"); }
+            if (waited == 50 && screen() instanceof PaletteScreen p) p.keyPressed(new KeyEvent(InputConstants.KEY_RETURN, 0, 0));
+            return waited > 50 && screen() instanceof EditorScreen ed && ed.isLoaded();
+        }, 15);
+        quiet("back to the K window", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
+            () -> screen() instanceof ConversationScreen && waited > 10, 5);
         step("click 'Files' in the K window", () -> press(L.t("Файлы")),
             () -> screen() instanceof FileScreen && waited > 30, 10);
         step("terminal runs a command", () -> {

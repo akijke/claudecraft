@@ -1224,8 +1224,17 @@ def create_app(bridge, token):
         from backends.commands import listing
         mode = request.query.get('mode', 'cc')
         chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')
-        return web.json_response({'commands': listing(bridge.chat_cwd(chat) if chat.mode == 'cc' else None)})
+        rows = listing(bridge.chat_cwd(chat) if chat.mode == 'cc' else None)
+        for r in rows:  # not an event, so translate here
+            r['description'], r['hint'] = bridge.tr(r['description']), bridge.tr(r['hint'])
+        return web.json_response({'commands': rows})
     app.router.add_get('/commands', commands)
+    async def index(request):
+        mode = request.query.get('mode', 'cc')
+        chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')
+        root = bridge.chat_cwd(chat) if chat.mode == 'cc' else bridge.files.here(chat.mode)
+        return web.json_response(await asyncio.to_thread(bridge.files.index, root))
+    app.router.add_get('/index', index)
 
     async def oauth_callback(request):
         q = request.query

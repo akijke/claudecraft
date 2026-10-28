@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -53,6 +53,8 @@ public final class ClaudeChat implements ClientModInitializer {
             "rm", "open", "code", "git"}) SHORTCUTS.put(a, a);
         SHORTCUTS.put("edit", "edit");
         SHORTCUTS.put("pty", "pty");
+        SHORTCUTS.put("palette", "palette");
+        SHORTCUTS.put("goto", "goto");
         SHORTCUTS.put("nano", "edit");
         SHORTCUTS.put("sh", "sh auto");
         SHORTCUTS.put("ps", "sh ps");
@@ -70,6 +72,7 @@ public final class ClaudeChat implements ClientModInitializer {
     private volatile Supplier<Screen> openNext;
     // /cc shot: hide the GUI for a couple of frames, grab the frame, send it to Claude.
     private int shotTicks;
+    private boolean paletteHeld;
     private String shotMode, shotQuestion;
     private boolean shotHidGui, shotReopen;
     private final DevShots devShots = new DevShots(this);
@@ -143,6 +146,12 @@ public final class ClaudeChat implements ClientModInitializer {
             devShots.tick(client);
             liveTest.tick(client);
             if (shotTicks > 0 && --shotTicks == 0) takeShot(client);
+            // Ctrl+Shift+P in the game (no screen open): the command palette
+            boolean palette = client.gui.screen() == null && client.player != null
+                && InputConstants.isKeyDown(InputConstants.KEY_P) && InputConstants.isKeyDown(InputConstants.KEY_LCONTROL)
+                && InputConstants.isKeyDown(InputConstants.KEY_LSHIFT);
+            if (palette && !paletteHeld) open(() -> new PaletteScreen(this, null, false));
+            paletteHeld = palette;
             while (openKey.consumeClick()) open(() -> new ConversationScreen(this));
             Supplier<Screen> next = openNext;
             if (next != null) {
@@ -356,6 +365,12 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
         if (action.equals("shot") || action.equals("screenshot")) { screenshot(mode, text); return; }
+        if (action.equals("palette") || action.equals("goto")) {
+            refreshCommands(mode);
+            boolean goTo = action.equals("goto");
+            open(() -> new PaletteScreen(this, null, goTo));
+            return;
+        }
         if (action.equals("pty")) {  // real terminal window: /pty, /pty new [shell], /pty <shell>
             String arg = text.strip();
             if (arg.isEmpty()) open(() -> TerminalScreen.reopen(this, null));
@@ -497,6 +512,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "replace", L.t("[-r] [-c] [--in *.java] <что> -> <на что> — замена по проекту с превью · в редакторе Ctrl+F / Ctrl+H")},
             {"/cc worktree", L.t("worktrees параллельных задач: merge · diff · drop (spawn --here — без worktree)")},
             {c + "budget", L.t("лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume")},
+            {"/palette", L.t("все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)")},
             {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
