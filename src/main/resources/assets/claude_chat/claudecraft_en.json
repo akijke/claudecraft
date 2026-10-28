@@ -578,5 +578,10 @@
   "ветка": "branch",
   "Нет файлов для @": "No files for @",
   "IDE: чат | редактор | терминал": "IDE: chat | editor | terminal",
-  "[файл] — чат | редактор | терминал в одном окне (Ctrl+1/2/3, Ctrl+P — файл, разделители тянутся)": "[file] — chat | editor | terminal in one window (Ctrl+1/2/3, Ctrl+P — file, drag the splitters)"
+  "[файл] — чат | редактор | терминал в одном окне (Ctrl+1/2/3, Ctrl+P — файл, разделители тянутся)": "[file] — chat | editor | terminal in one window (Ctrl+1/2/3, Ctrl+P — file, drag the splitters)",
+  "Во встроенном редакторе": "In the built-in editor",
+  " записей": " entries",
+  "Экспорт чата в Markdown": "Export chat to Markdown",
+  "Экспорт чата в HTML": "Export chat to HTML",
+  "[md|html] — сохранить чат в claude-exports/ проекта": "[md|html] — save the chat into the project's claude-exports/"
 }

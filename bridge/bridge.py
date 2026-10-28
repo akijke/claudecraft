@@ -947,6 +947,18 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action == 'export':
+            from backends import export
+            fmt = 'html' if text.strip().lower() == 'html' else 'md'
+            if chat.backend == 'local':
+                if not chat.sdk_id:
+                    raise ValueError('Экспортировать нечего: в чате ещё не было разговора')
+                entries = await asyncio.to_thread(export.entries_from_session, chat.sdk_id, self.session_dir(chat))
+            else:
+                entries = export.entries_from_messages(chat.messages)
+            folder = self.chat_cwd(chat) if chat.mode == 'cc' else self.workspace
+            path = await asyncio.to_thread(export.write, folder, chat.title, entries, fmt)
+            self.emit(chat, f'Чат сохранён: {path.name}', kind='exported', path=str(path), format=fmt, count=len(entries))
         elif action == 'fork':
             await self.fork(chat, text.strip())
         elif action == 'budget':

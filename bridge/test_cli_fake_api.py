@@ -443,6 +443,24 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         await self.until(lambda: chat.task is None)
         self.assertIn('MENTIONED-FILE-CONTENT', json.dumps(self.fake.requests[0], ensure_ascii=False))
 
+    async def test_export_markdown_and_html(self):
+        await self.start([tool('Read', {'file_path': 'nope.txt'}), text('Here is **the answer**\n```py\nprint(1)\n```')])
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'auto', 'text': 'all'})
+        await self.bridge.enqueue(chat, 'EXPORT-QUESTION <b>')
+        await self.until(lambda: chat.task is None)
+        await self.bridge.command({'mode': 'cc', 'action': 'export', 'text': ''})
+        await self.bridge.command({'mode': 'cc', 'action': 'export', 'text': 'html'})
+        md_event, html_event = [e for e in self.bridge.events if e['kind'] == 'exported'][-2:]
+        md = Path(md_event['path']).read_text(encoding='utf-8')
+        page = Path(html_event['path']).read_text(encoding='utf-8')
+        self.assertIn('EXPORT-QUESTION', md)
+        self.assertIn('the answer', md)
+        self.assertIn('Read', md)                                  # the tool call is listed
+        self.assertIn('EXPORT-QUESTION &lt;b&gt;', page)            # escaped in HTML
+        self.assertIn('<pre>', page)
+        self.assertEqual(Path(md_event['path']).parent.name, 'claude-exports')
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

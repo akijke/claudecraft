@@ -76,6 +76,7 @@ final class PaletteScreen extends Screen {
             {L.t("Диагностика"), "/cc doctor", ""}, {L.t("Разобрать крэш Minecraft"), "/cc crash", ""},
             {L.t("Синхронизация с Claude Code на ПК"), "/cc sync", ""}, {L.t("Звуки"), "/claude sound", ""},
             {L.t("Индикатор задач вкл/выкл"), "/claude hud", ""}, {L.t("Справка"), "/cc help", ""},
+            {L.t("Экспорт чата в Markdown"), "/cc export", ""}, {L.t("Экспорт чата в HTML"), "/cc export html", ""},
         };
         for (String[] t : table) e.add(new Entry(t[0], t[1], t[2], t[1].endsWith(" ")));
         for (String[] c : ClaudeChat.slashCommands)

@@ -284,6 +284,10 @@ final class WorkStyle {
                         .append(lit("  " + firstLine(s(r, "text")), TEXT))));
                 }
             }
+            case "exported" -> out.add(line(mode, lit("✔ " + s(e, "text") + "  ", GREEN)
+                .append(button(L.t("открыть"), cmd + "open " + s(e, "path"), false, AQUA, s(e, "path"))).append(sp())
+                .append(button("✎", "/edit " + s(e, "path"), false, AQUA, L.t("Во встроенном редакторе")))
+                .append(lit("  " + n(e, "count") + L.t(" записей"), FAINT))));
             case "forked" -> out.add(line(mode, lit("✦ " + s(e, "text"), AQUA).append(sp())
                 .append(button(L.t("исходный чат"), cmd + "select " + s(e, "source"), false, DIM, null))));
             case "rewound" -> {
