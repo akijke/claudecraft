@@ -256,12 +256,14 @@ final class FileScreen extends Screen {
                 {L.t("Переименовать"), "F2"},
                 {confirmDelete ? L.t("Точно удалить?") : L.t("Удалить"), "Delete"},
                 {L.t("Копировать путь"), null},
+                {"✎ " + L.t("Править"), "F4 · " + L.t("Встроенный редактор с подсветкой")},
             }, new Runnable[]{
                 () -> startName("mkdir"), () -> startName("touch"),
                 () -> { if (current() != null) startName("rename"); },
                 this::delete,
                 () -> { minecraft.keyboardHandler.setClipboard(current() != null ? child(current().get("name").getAsString()) : path());
                         say(L.t("Путь скопирован"), GREEN); },
+                this::editSelected,
             });
         }
         row(bottom2, new String[][]{
@@ -281,6 +283,14 @@ final class FileScreen extends Screen {
             this::onClose,
         });
         if (dir == null) load(lastPath);
+    }
+
+    /** Opens the selected file in the in-game editor. */
+    private void editSelected() {
+        JsonObject r = current();
+        if (r == null || r.get("dir").getAsBoolean()) { say(L.t("Выбери файл"), DIM); return; }
+        String name = r.get("name").getAsString();
+        minecraft.setScreenAndShow(new EditorScreen(mod, this, new File(name).isAbsolute() ? name : child(name)));
     }
 
     private int tool(int x, int y, String label, String tip, Runnable action) {
@@ -372,6 +382,7 @@ final class FileScreen extends Screen {
         }
         if (key == InputConstants.KEY_DELETE && !typing) { delete(); return true; }
         if (key == InputConstants.KEY_F2 && !typing && current() != null) { startName("rename"); return true; }
+        if (key == InputConstants.KEY_F4 && !typing) { editSelected(); return true; }
         return super.keyPressed(event);
     }
 
@@ -538,11 +549,15 @@ final class FileScreen extends Screen {
         }
         int visible = (listH - 14) / 9, y = listY + 14;
         int numW = font.width(String.valueOf(fileStart + fileLines.size())) + 6;
+        String lang = Highlighter.language(name);
+        boolean[] block = {false};
+        for (int i = 0; i < fileScroll && i < fileLines.size(); i++) Highlighter.line(fileLines.get(i), lang, block);
         for (int i = fileScroll; i < Math.min(fileLines.size(), fileScroll + visible); i++) {
             int number = fileStart + i;
             if (number == highlightLine) g.fill(viewX, y - 1, viewX + viewW, y + 8, 0x40F2C14E);
             g.text(font, String.valueOf(number), viewX + 3, y, number == highlightLine ? GOLD : FAINT);
-            g.text(font, font.plainSubstrByWidth(ChatStyle.clean(fileLines.get(i)), viewW - numW - 8), viewX + 3 + numW, y, CODE);
+            g.text(font, Highlighter.line(font.plainSubstrByWidth(ChatStyle.clean(fileLines.get(i)), viewW - numW - 8), lang, block),
+                viewX + 3 + numW, y, CODE);
             y += 9;
         }
     }

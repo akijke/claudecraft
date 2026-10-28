@@ -111,6 +111,37 @@ class FileManager:
                 break
         return {'root': str(root), 'query': query, 'matches': found, 'files': files, 'truncated': truncated}
 
+    def load_for_edit(self, mode, arg):
+        """Whole text file for the in-game editor: lines untruncated, mtime for conflict checks."""
+        path = self.resolve(mode, arg)
+        if not path.is_file():
+            raise ValueError(f'Нет такого файла: {path}')
+        stat = path.stat()
+        if stat.st_size > 3_000_000:
+            raise ValueError('Файл больше 3 МБ — открой во внешнем редакторе')
+        raw = path.read_bytes()
+        if b'\0' in raw[:8000]:
+            raise ValueError('Это двоичный файл — не показываю')
+        text = raw.decode('utf-8', 'replace')
+        return {'path': str(path), 'text': text.replace('\r\n', '\n'), 'eol': '\r\n' if '\r\n' in text else '\n',
+                'mtime': stat.st_mtime_ns, 'size': stat.st_size}
+
+    def save(self, mode, arg, text, mtime=None, eol='\n', force=False):
+        """Atomic write from the editor; refuses if the file changed on disk since it was opened."""
+        path = self.resolve(mode, arg)
+        if path.exists() and mtime is not None and not force and path.stat().st_mtime_ns != int(mtime):
+            raise ValueError('Файл изменился на диске после открытия (возможно, его правил Claude). '
+                             'Сохранить всё равно?')
+        if len(text) > 3_000_000:
+            raise ValueError('Файл больше 3 МБ — открой во внешнем редакторе')
+        data = text.replace('\r\n', '\n')
+        if eol == '\r\n':
+            data = data.replace('\n', '\r\n')
+        temp = path.with_name(path.name + '.claudecraft-tmp')
+        temp.write_bytes(data.encode('utf-8'))
+        temp.replace(path)
+        return {'path': str(path), 'mtime': path.stat().st_mtime_ns}
+
     def read(self, mode, arg, start=1, count=400):
         """Text of a file for the preview pane."""
         path = self.resolve(mode, arg)

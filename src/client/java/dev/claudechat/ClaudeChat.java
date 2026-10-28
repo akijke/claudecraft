@@ -51,6 +51,8 @@ public final class ClaudeChat implements ClientModInitializer {
     static {
         for (String a : new String[]{"ls", "dir", "cd", "pwd", "cat", "tree", "find", "mkdir", "touch", "mv", "cp",
             "rm", "open", "code", "git"}) SHORTCUTS.put(a, a);
+        SHORTCUTS.put("edit", "edit");
+        SHORTCUTS.put("nano", "edit");
         SHORTCUTS.put("sh", "sh auto");
         SHORTCUTS.put("ps", "sh ps");
         SHORTCUTS.put("powershell", "sh ps");
@@ -216,6 +218,12 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
+        if (Set.of("edit", "nano", "vim").contains(action)) {
+            if (text.isBlank()) { say(mode, L.t("Формат: /edit <файл>")); return; }
+            String file = text.strip().replaceAll("^\"|\"$", "");
+            open(() -> new EditorScreen(this, null, file));
+            return;
+        }
         if (Set.of("project", "projects", "p").contains(action) && text.strip().equals("pick")) {
             FolderPicker.pick(this);  // system folder dialog; the bridge gets the chosen path
             return;

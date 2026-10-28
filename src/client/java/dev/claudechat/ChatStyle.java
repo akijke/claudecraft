@@ -363,18 +363,24 @@ final class ChatStyle {
         }
     }
 
+    // Fence language and open block comment per code-state array (identity keys, dropped with the array).
+    private static final java.util.Map<boolean[], Object[]> FENCES =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
     /** One markdown line; code[0] carries the ``` state across lines (and across streamed parts). */
     static MutableComponent markdownLine(String raw, boolean[] code) {
         raw = clean(raw);
         if (raw.strip().startsWith("```")) {
             code[0] = !code[0];
             String lang = raw.strip().substring(3).strip();
+            if (code[0]) FENCES.put(code, new Object[]{lang, new boolean[]{false}});
             return code[0] && !lang.isEmpty() ? lit("┌ " + lang, FAINT) : null;
         }
         MutableComponent content;
         {
             if (code[0]) {
-                content = lit("│ ", FAINT).append(lit(raw, BLOCK));
+                Object[] fence = FENCES.computeIfAbsent(code, k -> new Object[]{"", new boolean[]{false}});
+                content = lit("│ ", FAINT).append(Highlighter.line(raw, (String) fence[0], (boolean[]) fence[1]));
             } else if (raw.isBlank()) {
                 return null;
             } else if (raw.startsWith("#")) {

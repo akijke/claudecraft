@@ -662,6 +662,18 @@ class FileWindowTests(unittest.IsolatedAsyncioTestCase):
         response = await self.app.middlewares[0](request, route.handler)
         return response.status, json.loads(response.text)
 
+    async def test_editor_load_save_and_conflict(self):
+        path = self.bridge.workspace / 'src' / 'C.txt'
+        path.write_bytes(b'one\r\ntwo\r\n')
+        status, data = await self.get('/edit?mode=cc&path=' + quote(str(path)))
+        self.assertEqual((data['text'], data['eol']), ('one\ntwo\n', '\r\n'))
+        saved = self.bridge.files.save('cc', str(path), 'one\nTWO\n', data['mtime'], data['eol'])
+        self.assertEqual(path.read_bytes(), b'one\r\nTWO\r\n')  # line endings kept
+        with self.assertRaisesRegex(ValueError, 'изменился'):
+            self.bridge.files.save('cc', str(path), 'x', data['mtime'])  # stale mtime
+        self.bridge.files.save('cc', str(path), 'x\n', saved['mtime'] - 1, force=True)
+        self.assertEqual(path.read_bytes(), b'x\n')
+
     async def test_grep_in_contents(self):
         ws = self.bridge.workspace
         (ws / 'src' / 'B.java').write_text('class B {\n  // TODO fix\n}\n', encoding='utf-8')

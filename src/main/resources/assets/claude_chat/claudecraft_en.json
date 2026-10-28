@@ -333,5 +333,17 @@
   "текст в файлах… (Enter)": "text in files… (Enter)",
   "в файлах": "in files",
   "имена": "names",
-  "Искать по именам или по содержимому файлов": "Search file names or file contents"
+  "Искать по именам или по содержимому файлов": "Search file names or file contents",
+  "Встроенный редактор с подсветкой": "Built-in editor with highlighting",
+  "Выбери файл": "Select a file",
+  "Есть несохранённые правки: Esc ещё раз — закрыть без сохранения, Ctrl+S — сохранить": "Unsaved changes: Esc again closes without saving, Ctrl+S saves",
+  "Закрыть (Esc)": "Close (Esc)",
+  "Открыт": "Opened",
+  "Править": "Edit",
+  "Сохранено": "Saved",
+  "Сохранить": "Save",
+  "Стр ": "Ln ",
+  "кол ": "Col ",
+  "Формат: /edit <файл>": "Usage: /edit <file>",
+  "ещё раз, чтобы перезаписать": "again to overwrite"
 }

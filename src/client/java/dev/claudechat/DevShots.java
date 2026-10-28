@@ -62,7 +62,9 @@ final class DevShots {
             case 420 -> Screenshot.grab(client, true);
             case 440 -> client.setScreenAndShow(new ChatPreview(WORK));
             case 480 -> Screenshot.grab(client, true);
-            case 500 -> client.stop();
+            case 485 -> client.setScreenAndShow(new EditorScreen(mod, null, "src/main/java/dev/demo/Hello.java").withText(EDITOR));
+            case 495 -> Screenshot.grab(client, true);
+            case 505 -> client.stop();
             default -> { }
         }
     }
@@ -125,6 +127,27 @@ final class DevShots {
         "{\"mode\":\"cc\",\"kind\":\"listing\",\"path\":\"C:/dev/my-mod\",\"parent\":\"C:/dev\",\"project\":\"my-mod\",\"git\":true,\"more\":0,\"rows\":["
             + "{\"name\":\"src\",\"dir\":true,\"size\":0},{\"name\":\"gradle\",\"dir\":true,\"size\":0},{\"name\":\"build.gradle\",\"dir\":false,\"size\":1830},{\"name\":\"README.md\",\"dir\":false,\"size\":9100}]}",
     };
+
+    private static final String EDITOR = String.join("\n",
+        "package dev.demo;",
+        "",
+        "import java.util.List;",
+        "",
+        "/** Says hello to everyone in the list. */",
+        "public final class Hello {",
+        "    private static final int TIMES = 3;",
+        "",
+        "    @Override",
+        "    public String toString() { return \"Hello\"; }",
+        "",
+        "    public static void main(String[] args) {",
+        "        List<String> names = List.of(\"Steve\", \"Alex\");",
+        "        for (int i = 0; i < TIMES; i++) {",
+        "            // greet each player",
+        "            names.forEach(n -> System.out.println(\"Hi, \" + n + \"!\"));",
+        "        }",
+        "    }",
+        "}");
 
     private static final String[] TOOLS = {
         "{\"mode\":\"cc\",\"kind\":\"agents\",\"text\":\"Agents\",\"rows\":["

@@ -878,7 +878,8 @@ def create_app(bridge, token):
             return web.json_response({'error': bridge.tr(str(e))}, status=400)
         except Exception as e:
             return web.json_response({'error': str(e)[:1000]}, status=500)
-    app = web.Application(middlewares=[authenticate], client_max_size=65536)
+    # 4 MB: the in-game editor saves whole files (loopback only, token required).
+    app = web.Application(middlewares=[authenticate], client_max_size=4 * 1024 * 1024)
     async def command(request):
         async with bridge.lock:
             return web.json_response(await bridge.command(await request.json()))
@@ -922,6 +923,24 @@ def create_app(bridge, token):
                                          q.get('q', ''), q.get('case') == '1', q.get('regex') == '1')
         return web.json_response(result)
     app.router.add_get('/grep', grep)
+    async def edit(request):
+        mode = request.query.get('mode', 'cc')
+        return web.json_response(bridge.files.load_for_edit(mode if mode in ('c', 'cc') else 'cc',
+                                                            request.query.get('path', '')))
+    async def save(request):
+        data = await request.json()
+        mode = data.get('mode', 'cc')
+        try:
+            result = bridge.files.save(mode if mode in ('c', 'cc') else 'cc', data.get('path', ''),
+                                       data.get('text', ''), data.get('mtime'), data.get('eol', '\n'),
+                                       bool(data.get('force')))
+        except ValueError as e:
+            if 'изменился на диске' in str(e):  # conflict: the editor asks before overwriting
+                return web.json_response({'error': bridge.tr(str(e)), 'conflict': True}, status=409)
+            raise
+        return web.json_response(result)
+    app.router.add_get('/edit', edit)
+    app.router.add_post('/save', save)
     app.router.add_get('/files', files)
     app.router.add_get('/file', file)
     async def account(request):

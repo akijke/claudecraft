@@ -95,6 +95,9 @@ EN = {
     'Удалить {}?': 'Delete {}?', 'Удалено: {}': 'Deleted: {}', 'Открыто в {}: {}': 'Opened in {}: {}', 'Открыто: {}': 'Opened: {}',
     'Не найден редактор (code, cursor, idea, subl) в PATH': 'No editor (code, cursor, idea, subl) found in PATH',
     'Нужны два пути: откуда и куда': 'Two paths are needed: from and to',
+    'Файл больше 3 МБ — открой во внешнем редакторе': 'File is larger than 3 MB — open it in an external editor',
+    'Файл изменился на диске после открытия (возможно, его правил Claude). Сохранить всё равно?':
+        'The file changed on disk after it was opened (maybe Claude edited it). Save anyway?',
     'Что искать?': 'What should I search for?', 'Неверное регулярное выражение: {}': 'Invalid regular expression: {}',
     # --- git -----------------------------------------------------------------
     'git не найден в PATH — установи Git: git-scm.com': 'git not found in PATH — install Git: git-scm.com',
