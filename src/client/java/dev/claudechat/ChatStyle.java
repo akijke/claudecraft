@@ -439,7 +439,11 @@ final class ChatStyle {
 
     /** Markdown table → aligned rows (pixel widths of the Minecraft font). */
     static List<MutableComponent> table(String[] rows) {
-        var font = net.minecraft.client.Minecraft.getInstance().font;
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        var font = mc == null ? null : mc.font;
+        // no game (unit tests): about 6 px per character
+        java.util.function.ToIntFunction<net.minecraft.network.chat.FormattedText> px =
+            t -> font != null ? font.width(t) : t.getString().length() * 6;
         List<List<String>> data = new ArrayList<>();
         int header = -1;
         for (String r : rows) {
@@ -449,8 +453,8 @@ final class ChatStyle {
         int columns = data.stream().mapToInt(List::size).max().orElse(0);
         int[] width = new int[columns];
         for (List<String> r : data)
-            for (int c = 0; c < r.size(); c++) width[c] = Math.max(width[c], font.width(inline(r.get(c), TEXT)));
-        int space = Math.max(1, font.width(" "));
+            for (int c = 0; c < r.size(); c++) width[c] = Math.max(width[c], px.applyAsInt(inline(r.get(c), TEXT)));
+        int space = Math.max(1, px.applyAsInt(Component.literal(" ")));
         List<MutableComponent> out = new ArrayList<>();
         for (int i = 0; i < data.size(); i++) {
             List<String> r = data.get(i);
@@ -460,14 +464,14 @@ final class ChatStyle {
                 String cell = c < r.size() ? r.get(c) : "";
                 MutableComponent comp = inline(cell, bold ? GOLD : TEXT);
                 if (bold) comp.withStyle(s -> s.withBold(true));
-                int pad = (width[c] - font.width(comp) + space - 1) / space;
+                int pad = (width[c] - px.applyAsInt(comp) + space - 1) / space;
                 line.append(comp).append(lit(" ".repeat(Math.max(0, pad)) + " │ ", FAINT));
             }
             out.add(line);
             if (bold) {
                 int total = 0;
-                for (int w : width) total += w + font.width(" │ ");
-                out.add(lit("├" + "─".repeat(Math.max(3, total / Math.max(1, font.width("─")))), FAINT));
+                for (int w : width) total += w + px.applyAsInt(Component.literal(" │ "));
+                out.add(lit("├" + "─".repeat(Math.max(3, total / Math.max(1, px.applyAsInt(Component.literal("─"))))), FAINT));
             }
         }
         return out;
