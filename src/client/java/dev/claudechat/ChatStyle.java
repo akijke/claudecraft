@@ -402,12 +402,75 @@ final class ChatStyle {
     static void markdown(String mode, String text, List<Component> out) {
         boolean[] code = {false};
         boolean first = true;
-        for (String raw : clean(text).split("\\R")) {
-            MutableComponent content = markdownLine(raw, code);
+        String[] lines = clean(text).split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            MutableComponent content;
+            if (!code[0] && isTableRow(lines[i])) {
+                // whole table at once: columns aligned by pixel width, header row bold
+                int end = i;
+                while (end < lines.length && isTableRow(lines[end])) end++;
+                for (MutableComponent row : table(java.util.Arrays.copyOfRange(lines, i, end))) {
+                    out.add(line(mode, first ? lit("✦ ", CLAUDE).append(row) : Component.literal("  ").append(row)));
+                    first = false;
+                }
+                i = end - 1;
+                continue;
+            }
+            content = markdownLine(lines[i], code);
             if (content == null) continue;
             out.add(line(mode, first ? lit("✦ ", CLAUDE).append(content) : Component.literal("  ").append(content)));
             first = false;
         }
+    }
+
+    static boolean isTableRow(String raw) {
+        String s = raw.strip();
+        return s.length() > 1 && s.startsWith("|") && s.endsWith("|");
+    }
+
+    private static boolean isTableRule(String raw) { return raw.strip().matches("\\|[\\s:|\\-]+\\|") && raw.contains("-"); }
+
+    private static List<String> cells(String raw) {
+        String s = raw.strip();
+        List<String> out = new ArrayList<>();
+        for (String c : s.substring(1, s.length() - 1).split("(?<!\\\\)\\|", -1)) out.add(c.strip());
+        return out;
+    }
+
+    /** Markdown table → aligned rows (pixel widths of the Minecraft font). */
+    static List<MutableComponent> table(String[] rows) {
+        var font = net.minecraft.client.Minecraft.getInstance().font;
+        List<List<String>> data = new ArrayList<>();
+        int header = -1;
+        for (String r : rows) {
+            if (isTableRule(r)) { if (header < 0) header = data.size() - 1; continue; }
+            data.add(cells(r));
+        }
+        int columns = data.stream().mapToInt(List::size).max().orElse(0);
+        int[] width = new int[columns];
+        for (List<String> r : data)
+            for (int c = 0; c < r.size(); c++) width[c] = Math.max(width[c], font.width(inline(r.get(c), TEXT)));
+        int space = Math.max(1, font.width(" "));
+        List<MutableComponent> out = new ArrayList<>();
+        for (int i = 0; i < data.size(); i++) {
+            List<String> r = data.get(i);
+            boolean bold = i == header;
+            MutableComponent line = lit("│ ", FAINT);
+            for (int c = 0; c < columns; c++) {
+                String cell = c < r.size() ? r.get(c) : "";
+                MutableComponent comp = inline(cell, bold ? GOLD : TEXT);
+                if (bold) comp.withStyle(s -> s.withBold(true));
+                int pad = (width[c] - font.width(comp) + space - 1) / space;
+                line.append(comp).append(lit(" ".repeat(Math.max(0, pad)) + " │ ", FAINT));
+            }
+            out.add(line);
+            if (bold) {
+                int total = 0;
+                for (int w : width) total += w + font.width(" │ ");
+                out.add(lit("├" + "─".repeat(Math.max(3, total / Math.max(1, font.width("─")))), FAINT));
+            }
+        }
+        return out;
     }
 
     // Fence language and open block comment per code-state array (identity keys, dropped with the array).
@@ -420,13 +483,32 @@ final class ChatStyle {
         if (raw.strip().startsWith("```")) {
             code[0] = !code[0];
             String lang = raw.strip().substring(3).strip();
-            if (code[0]) FENCES.put(code, new Object[]{lang, new boolean[]{false}});
-            return code[0] && !lang.isEmpty() ? lit("┌ " + lang, FAINT) : null;
+            if (code[0]) {
+                FENCES.put(code, new Object[]{lang, new boolean[]{false}, new StringBuilder()});
+                return !lang.isEmpty() ? lit("┌ " + lang, FAINT) : null;
+            }
+            // closing fence: a copy button with the whole block
+            Object[] fence = FENCES.get(code);
+            String body = fence != null && fence.length > 2 ? fence[2].toString() : "";
+            if (body.isEmpty()) return null;
+            String copied = body.endsWith("\n") ? body.substring(0, body.length() - 1) : body;
+            return lit("└ ", FAINT).append(lit("[⧉ " + L.t("копировать") + "]", AQUA).withStyle(s -> s
+                .withClickEvent(new ClickEvent.CopyToClipboard(copied))
+                .withHoverEvent(new HoverEvent.ShowText(lit(L.t("Скопировать блок: ") + copied.split("\n", -1).length
+                    + L.t(" строк"), TEXT)))));
+        }
+        if (!code[0] && isTableRow(raw)) {
+            // streamed line by line: no alignment possible, but cells and rules are drawn
+            if (isTableRule(raw)) return lit("├──────────", FAINT);
+            MutableComponent row = lit("│ ", FAINT);
+            for (String cell : cells(raw)) row.append(inline(cell, TEXT)).append(lit(" │ ", FAINT));
+            return row;
         }
         MutableComponent content;
         {
             if (code[0]) {
-                Object[] fence = FENCES.computeIfAbsent(code, k -> new Object[]{"", new boolean[]{false}});
+                Object[] fence = FENCES.computeIfAbsent(code, k -> new Object[]{"", new boolean[]{false}, new StringBuilder()});
+                if (fence.length > 2) ((StringBuilder) fence[2]).append(raw).append('\n');
                 content = lit("│ ", FAINT).append(Highlighter.line(raw, (String) fence[0], (boolean[]) fence[1]));
             } else if (raw.isBlank()) {
                 return null;

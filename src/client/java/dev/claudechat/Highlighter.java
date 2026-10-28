@@ -35,6 +35,9 @@ final class Highlighter {
         + "|(?<type>\\b[A-Z][A-Za-z0-9_]*\\b)"
         + "|(?<punct>[{}()\\[\\];,.:<>=+\\-*/%!&|^~?]+)");
 
+    private static final Set<String> PLAIN_LANGS = Set.of("txt", "text", "plain", "plaintext", "log", "csv", "tsv",
+        "output", "out", "lock", "license");
+
     private Highlighter() { }
 
     static String language(String fileName) {
@@ -70,6 +73,7 @@ final class Highlighter {
         lang = alias(lang == null ? "" : lang.toLowerCase(Locale.ROOT));
         MutableComponent out = Component.literal("");
         if (lang.equals("md") || lang.equals("markdown")) return markdown(text);
+        if (PLAIN_LANGS.contains(lang)) return colored(out, text, PLAIN);  // prose and logs: no fake keywords
         boolean hash = HASH.contains(lang), cLike = C_LIKE.contains(lang) || !hash;
         if (lang.equals("xml") || lang.equals("html")) return xml(text);
         int i = 0;

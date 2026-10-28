@@ -68,11 +68,13 @@ final class DevShots {
             case 540 -> Screenshot.grab(client, true);
             case 541 -> client.setScreenAndShow(new ChatPreview(PLAN));
             case 543 -> Screenshot.grab(client, true);
+            case 561 -> client.setScreenAndShow(new ChatPreview(MARKDOWN));
+            case 566 -> Screenshot.grab(client, true);
             case 544 -> client.setScreenAndShow(new ChatPreview(HUNKS));
             case 547 -> Screenshot.grab(client, true);
             case 549 -> client.setScreenAndShow(new ChatPreview(DOCTOR));
             case 557 -> Screenshot.grab(client, true);
-            case 560 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 570 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
             case 720 -> client.stop();
@@ -143,6 +145,13 @@ final class DevShots {
             + "\"text\":\"## Context\\nLogin fails after the 26.3 update: ClientCommands moved.\\n\\n## Steps\\n"
             + "1. Update `src/Main.java:12` to the new ClientCommands API\\n2. Re-register `/login` with **attended()**\\n"
             + "3. Add a test in `src/test/LoginTest.java`\\n\\n## Verify\\n- `gradlew build` and runShots\",\"choices\":[\"Accept\",\"Edit\",\"Reject\"]}",
+    };
+
+    private static final String[] MARKDOWN = {
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text\",\"text\":\"## Benchmarks\\n"
+            + "| Backend | Startup | Cost |\\n|---|---:|---|\\n| SDK (Claude Code) | 1.2 s | $0.004 |\\n"
+            + "| Messages API | 0.3 s | $0.002 |\\n| Codex | 2.1 s | **free** |\\n\\nFix in `src/Main.java:12`:\\n"
+            + "```java\\nfinal class Main {\\n    // register the command\\n    static int retries = 3;\\n}\\n```\"}",
     };
 
     private static final String[] HUNKS = {

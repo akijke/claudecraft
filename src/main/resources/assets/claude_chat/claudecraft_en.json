@@ -491,5 +491,7 @@
   "Любой id звука, напр. ": "Any sound id, e.g. ",
   "…; свои — через ресурспак": "…; your own via a resource pack",
   "сброс": "reset",
-  "звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка": "sounds: done / question / error — a sound for each, volume, test"
+  "звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка": "sounds: done / question / error — a sound for each, volume, test",
+  "копировать": "copy",
+  "Скопировать блок: ": "Copy the block: "
 }
