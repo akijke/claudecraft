@@ -29,7 +29,7 @@ final class DevShots {
         if (!ENABLED) return;
         ticks++;
         switch (ticks) {
-            case 200 -> client.setScreenAndShow(SettingsScreen.preview(mod, status(false, "waiting_code")));
+            case 200 -> client.setScreenAndShow(SettingsScreen.preview(mod, status(true, "done")));
             case 240 -> Screenshot.grab(client, true);
             case 260 -> {
                 Deque<JsonObject> log = new ArrayDeque<>();
@@ -64,8 +64,8 @@ final class DevShots {
 
     private static final String STATE = "{\"selected\":{\"cc\":\"demo\",\"c\":\"x\"},\"project\":\"my-mod\","
         + "\"project_path\":\"C:/dev/my-mod\",\"projects\":[],\"chats\":["
-        + "{\"id\":\"demo\",\"mode\":\"cc\",\"title\":\"Почини сборку\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":3},"
-        + "{\"id\":\"demo2\",\"mode\":\"cc\",\"title\":\"test-writer: тесты utils\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":2},"
+        + "{\"id\":\"demo\",\"mode\":\"cc\",\"title\":\"Fix the build\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":3},"
+        + "{\"id\":\"demo2\",\"mode\":\"cc\",\"title\":\"test-writer: tests for utils\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":2},"
         + "{\"id\":\"demo3\",\"mode\":\"cc\",\"title\":\"README\",\"project\":\"my-mod\",\"running\":false,\"queue\":0,\"updated\":1}]}";
 
     private static final String FILES = "{\"path\":\"C:\\\\dev\\\\my-mod\\\\src\",\"parent\":\"C:\\\\dev\\\\my-mod\",\"more\":0,"
@@ -79,25 +79,25 @@ final class DevShots {
         + "{\"name\":\"notes.md\",\"dir\":false,\"size\":120400,\"mtime\":1790000000,\"hidden\":false}]}";
 
     private static final String[] WORK = {
-        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Почини сборку\",\"text\":\"Думаю…\",\"queued\":0}",
-        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"📄\",\"text\":\"Читаю build.gradle\"}",
-        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"$\",\"text\":\"gradlew build  — Собираю проект\"}",
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Fix the build\",\"text\":\"Думаю…\",\"queued\":0}",
+        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"📄\",\"text\":\"Reading build.gradle\"}",
+        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"$\",\"text\":\"gradlew build  — Building the project\"}",
         "{\"seq\":4,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool_error\",\"text\":\"error: cannot find symbol ClientCommandManager\"}",
-        "{\"seq\":5,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"◆\",\"text\":\"Агент debugger: Найти причину ошибки компиляции\"}",
-        "{\"seq\":6,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"🔍\",\"text\":\"Ищу «ClientCommands» в .gradle\",\"agent\":\"debugger\"}",
-        "{\"seq\":7,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"✎\",\"text\":\"Редактирую src/client/Main.java\"}",
-        "{\"seq\":8,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":true,\"text\":\"## Исправлено\"}",
-        "{\"seq\":9,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"В 26.3 класс переименован в **ClientCommands**:\"}",
+        "{\"seq\":5,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"◆\",\"text\":\"Agent debugger: Find the cause of the compile error\"}",
+        "{\"seq\":6,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"🔍\",\"text\":\"Searching “ClientCommands” in .gradle\",\"agent\":\"debugger\"}",
+        "{\"seq\":7,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"✎\",\"text\":\"Editing src/client/Main.java\"}",
+        "{\"seq\":8,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":true,\"text\":\"## Fixed\"}",
+        "{\"seq\":9,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"In 26.3 the class was renamed to **ClientCommands**:\"}",
         "{\"seq\":10,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```java\"}",
         "{\"seq\":11,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"import static ...ClientCommands.*;\"}",
         "{\"seq\":12,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```\"}",
-        "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- сборка проходит, `gradlew build` ✔\"}",
-        "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Готово\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092}",
-        "{\"seq\":15,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r1\",\"text\":\"Bash\\n{}\",\"summary\":\"$ git push\",\"choices\":[\"Разрешить\",\"Отклонить\",\"Всегда разрешать Bash\"]}",
+        "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- the build passes, `gradlew build` ✔\"}",
+        "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Done\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092}",
+        "{\"seq\":15,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r1\",\"text\":\"Bash\\n{}\",\"summary\":\"$ git push\",\"choices\":[\"Allow\",\"Deny\",\"Always allow Bash\"]}",
     };
 
     private static final String[] PROJECT = {
-        "{\"mode\":\"cc\",\"kind\":\"projects\",\"text\":\"Проекты\",\"browsing\":\"C:/dev\",\"rows\":["
+        "{\"mode\":\"cc\",\"kind\":\"projects\",\"text\":\"Projects\",\"browsing\":\"C:/dev\",\"rows\":["
             + "{\"name\":\"workspace\",\"path\":\"C:/mc/config/claude-chat/workspace\",\"exists\":true,\"git\":false,\"chats\":1,\"running\":0,\"current\":false},"
             + "{\"name\":\"my-mod\",\"path\":\"C:/dev/my-mod\",\"exists\":true,\"git\":true,\"chats\":3,\"running\":2,\"current\":true},"
             + "{\"name\":\"website\",\"path\":\"D:/web/site\",\"exists\":true,\"git\":true,\"chats\":2,\"running\":0,\"current\":false}]}",
@@ -111,19 +111,19 @@ final class DevShots {
     };
 
     private static final String[] TOOLS = {
-        "{\"mode\":\"cc\",\"kind\":\"agents\",\"text\":\"Агенты\",\"rows\":["
-            + "{\"name\":\"code-reviewer\",\"description\":\"Review\",\"source\":\"встроенный\",\"enabled\":true,\"tools\":[]},"
-            + "{\"name\":\"debugger\",\"description\":\"Debug\",\"source\":\"встроенный\",\"enabled\":true,\"tools\":[]},"
-            + "{\"name\":\"lint-fixer\",\"description\":\"Lint\",\"source\":\"проект\",\"enabled\":true,\"tools\":[]},"
-            + "{\"name\":\"docs-writer\",\"description\":\"Docs\",\"source\":\"встроенный\",\"enabled\":false,\"tools\":[]}]}",
-        "{\"mode\":\"cc\",\"kind\":\"tasks\",\"text\":\"Задачи\",\"rows\":["
-            + "{\"id\":\"demo\",\"mode\":\"cc\",\"title\":\"Почини сборку\",\"project\":\"my-mod\",\"state\":\"работает\",\"step\":\"$ gradlew build\",\"queue\":1,\"seconds\":42},"
-            + "{\"id\":\"demo2\",\"mode\":\"cc\",\"title\":\"test-writer: тесты utils\",\"project\":\"my-mod\",\"state\":\"ждёт ответа\",\"step\":\"Создаю src/test/UtilTest.java\",\"queue\":0,\"seconds\":12}]}",
-        "{\"mode\":\"cc\",\"kind\":\"connectors\",\"text\":\"Коннекторы\",\"rows\":["
-            + "{\"id\":\"github\",\"name\":\"GitHub\",\"group\":\"Код и git\",\"about\":\"Issues, PR\",\"enabled\":true,\"missing\":[],\"needs_node\":false,\"status\":\"connected\"},"
-            + "{\"id\":\"sentry\",\"name\":\"Sentry\",\"group\":\"Код и git\",\"about\":\"Ошибки\",\"enabled\":false,\"missing\":[\"SENTRY_ACCESS_TOKEN\"],\"needs_node\":false,\"status\":null},"
-            + "{\"id\":\"playwright\",\"name\":\"Playwright\",\"group\":\"Браузер и веб\",\"about\":\"Браузер\",\"enabled\":true,\"missing\":[],\"needs_node\":false,\"status\":\"failed\"},"
-            + "{\"id\":\"context7\",\"name\":\"Context7\",\"group\":\"Документация и поиск\",\"about\":\"Docs\",\"enabled\":false,\"missing\":[],\"needs_node\":false,\"status\":null}]}",
+        "{\"mode\":\"cc\",\"kind\":\"agents\",\"text\":\"Agents\",\"rows\":["
+            + "{\"name\":\"code-reviewer\",\"description\":\"Review\",\"source\":\"built-in\",\"enabled\":true,\"tools\":[]},"
+            + "{\"name\":\"debugger\",\"description\":\"Debug\",\"source\":\"built-in\",\"enabled\":true,\"tools\":[]},"
+            + "{\"name\":\"lint-fixer\",\"description\":\"Lint\",\"source\":\"project\",\"enabled\":true,\"tools\":[]},"
+            + "{\"name\":\"docs-writer\",\"description\":\"Up-to-date library docs\",\"source\":\"built-in\",\"enabled\":false,\"tools\":[]}]}",
+        "{\"mode\":\"cc\",\"kind\":\"tasks\",\"text\":\"Tasks\",\"rows\":["
+            + "{\"id\":\"demo\",\"mode\":\"cc\",\"title\":\"Fix the build\",\"project\":\"my-mod\",\"state\":\"working\",\"code\":\"running\",\"step\":\"$ gradlew build\",\"queue\":1,\"seconds\":42},"
+            + "{\"id\":\"demo2\",\"mode\":\"cc\",\"title\":\"test-writer: tests for utils\",\"project\":\"my-mod\",\"state\":\"waiting for you\",\"code\":\"waiting\",\"step\":\"Creating src/test/UtilTest.java\",\"queue\":0,\"seconds\":12}]}",
+        "{\"mode\":\"cc\",\"kind\":\"connectors\",\"text\":\"Connectors\",\"rows\":["
+            + "{\"id\":\"github\",\"name\":\"GitHub\",\"group\":\"Code & git\",\"about\":\"Issues, PR\",\"enabled\":true,\"missing\":[],\"needs_node\":false,\"status\":\"connected\"},"
+            + "{\"id\":\"sentry\",\"name\":\"Sentry\",\"group\":\"Code & git\",\"about\":\"Production errors\",\"enabled\":false,\"missing\":[\"SENTRY_ACCESS_TOKEN\"],\"needs_node\":false,\"status\":null},"
+            + "{\"id\":\"playwright\",\"name\":\"Playwright\",\"group\":\"Browser & web\",\"about\":\"Drive a browser\",\"enabled\":true,\"missing\":[],\"needs_node\":false,\"status\":\"failed\"},"
+            + "{\"id\":\"context7\",\"name\":\"Context7\",\"group\":\"Docs & search\",\"about\":\"Up-to-date library docs\",\"enabled\":false,\"missing\":[],\"needs_node\":false,\"status\":null}]}",
     };
 
     /** Draws ChatStyle output like the chat HUD, without needing a world. */

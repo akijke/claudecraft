@@ -312,5 +312,6 @@
   "фильтр…": "filter…",
   "↑↓ выбор · Enter открыть · Backspace вверх · F2 имя · Delete удалить": "↑↓ select · Enter open · Backspace up · F2 rename · Delete delete",
   "Терминал": "Terminal",
-  "Очистить поиск": "Clear search"
+  "Очистить поиск": "Clear search",
+  "Claude Code работает в: ": "Claude Code works in: "
 }

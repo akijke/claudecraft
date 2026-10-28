@@ -1,261 +1,184 @@
-# claudecraft
-open source claude integration for minecraft
+<div align="center">
 
-Аддон **[Codexcraft](codexcraft/README.md)** добавляет `/gpt` и `/codex`, отдельное
-окно на J и подключение официального Codex CLI. Сборка: `gradlew :codexcraft:build`.
+# ✦ Claudecraft
 
-Claudecraft 1.1 — Minecraft Java 26.3 / Fabric. Инструмент программиста внутри
-Minecraft: Claude и Claude Code с проектами, файловым менеджером, git, агентами
-и MCP-коннекторами.
+**Code without leaving Minecraft.**<br>
+Claude and Claude Code inside the game: projects, a file manager, a terminal, git,
+agents and MCP connectors — all from the chat or a dedicated window.
 
-Клиентский мод и локальный Python-мост (мод запускает его сам). Серверный мод не
-нужен. `/c` — разговор, `/cc` — Claude Code с инструментами. **K** — окно переписки.
+![Minecraft 26.3](https://img.shields.io/badge/Minecraft-26.3-62B47A)
+![Fabric](https://img.shields.io/badge/Fabric-0.20.1-DBD0B4)
+![Java 25](https://img.shields.io/badge/Java-25-E76F00)
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)
+![Claude Agent SDK](https://img.shields.io/badge/Claude%20Agent%20SDK-0.2.174-D97757)
 
-## Окно переписки (K)
+<img src="docs/images/conversation.png" width="760" alt="Conversation window: Claude Code fixing a build">
 
-Отдельный экран вместо игрового чата. Слева: вкладки Claude / Code, текущий
-проект, чаты проекта (▶ — работает), «+ Новый чат» и кнопки Файлы, Агенты,
-Задачи, Git, MCP, ⚙. Справа: лента выбранного чата с прокруткой колесом. Кнопки в
-ленте нажимаются, подсказки видны при наведении, правый клик копирует строку.
-Внизу многострочное поле: Ctrl+Enter отправляет, строка с `/` — команда
-(`/cc git`, `/claude`), кнопки «Отправить», `f` (дописать в работу) и ⏹. Ответ
-Claude появляется построчно по мере генерации. Клавишу можно сменить в
-настройках управления («Claudecraft»). Все сообщения дублируются в игровой чат.
+</div>
 
-## Команды
+---
 
-Вместо `<mode>` используй `c` или `cc`. Полные и короткие имена равноправны.
+## What it does
 
-**Сообщения и чаты**
-
-| Команда | Действие |
+| | |
 | --- | --- |
-| `/<mode> <запрос>`, `q`, `queue` | В очередь выбранного чата |
-| `/<mode> f <текст>`, `force` | Дописать Claude, пока он работает: без отмены и перезапуска |
-| `/<mode> cancel` | Остановить текущий запрос и очистить очередь |
-| `/<mode> clearqueue`, `cq` | Очистить очередь, текущий запрос продолжается |
-| `/<mode> restart` | Остановить процесс; следующий запрос продолжит ту же сессию |
-| `/<mode> c`, `chats`, `chat` | Чаты кнопками (`/cc` — чаты текущего проекта) |
-| `/<mode> new local`, `/c new api` | Новый чат (через аккаунт / через Messages API) |
-| `/<mode> rename <имя>`, `status`, `pending`, `reply <id> <ответ>` | Служебные |
-| `/<mode> tokens`, `usage` | Токены: чат, проект, всё; лимиты подписки (5 ч / неделя) |
-| `/<mode> auto off\|edits\|all` | Авторазрешение действий; без аргумента — кнопки |
-| `/<mode> ui` или клавиша K | Окно переписки |
-| `/<mode> settings`, `/claude` | Настройки: мост, вход в аккаунт, API-ключ (также в Mod Menu) |
+| **Claude & Claude Code** | `/c` for conversations, `/cc` for coding. Answers stream in line by line, with progress lines for every step (reading, editing, running commands), a task plan with checkboxes and a summary with time, tokens and cost. |
+| **Talk while it works** | `f <text>` adds a message to the running task without cancelling it — just like typing into Claude Code while it thinks. |
+| **Projects** | A project is a folder Claude works in, with its own chats. Pick any folder on your PC with the system dialog; its Claude Code sessions from the terminal or the Claude app show up automatically, and any game chat can be continued on the PC (`claude --resume`). |
+| **File manager** | A two-pane window (`/files`) and Linux-style commands: `/ls`, `/cd`, `/cat`, `/tree`, `/find`, `/mkdir`, `/mv`, `/cp`, `/rm`, `/open`, `/code`. Browsing never moves Claude. |
+| **Terminal** | `/sh`, `/ps`, `/cmd`, `/bash` run real shell commands with live output, exit codes and a stop button. |
+| **Git & GitHub** | Status, colored diffs, log, branches, commit (or let Claude write the commit), push/pull, clone into a new project, create a GitHub repo. Sign in to GitHub from the game. |
+| **Agents** | Built-in subagents (code-reviewer, test-writer, debugger, explorer, refactorer, docs-writer, security-auditor, planner, minecraft-modder), your own, and `.claude/agents/*.md` from the project. Run tasks in parallel and manage them in `/cc tasks`. |
+| **MCP connectors** | 24 ready connectors: GitHub, GitLab, Sentry, Playwright, Chrome DevTools, Context7, Brave Search, PostgreSQL, MongoDB, Supabase, Kubernetes, Notion, Slack, Figma and more. Keys are entered in a masked window and never reach the chat. |
+| **Minecraft dev helpers** | `/cc crash` reads the latest crash report or `latest.log`, explains it and fixes the cause if it is in your project. |
+| **Your choice** | English or Russian UI, auto-approve modes, subscription or API key, optional Mod Menu integration. |
 
-**Проекты — рабочая папка Claude** (`project` = `p` = `projects`)
+<table>
+<tr>
+<td><img src="docs/images/files.png" alt="File manager window"></td>
+<td><img src="docs/images/settings.png" alt="Settings: bridge, Claude account, GitHub"></td>
+</tr>
+<tr>
+<td align="center"><sub>File manager window</sub></td>
+<td align="center"><sub>Settings: bridge, Claude account, GitHub</sub></td>
+</tr>
+<tr>
+<td><img src="docs/images/projects-git.png" alt="Projects, git status and diff in chat"></td>
+<td><img src="docs/images/agents-tasks-connectors.png" alt="Agents, tasks and connectors"></td>
+</tr>
+<tr>
+<td align="center"><sub>Projects, git status and a colored diff</sub></td>
+<td align="center"><sub>Agents, parallel tasks and MCP connectors</sub></td>
+</tr>
+</table>
 
-| Команда | Действие |
+## Install
+
+1. **Minecraft 26.3** with **Fabric Loader 0.20.1+** and **Fabric API 0.165.0+26.3**.
+2. Put `claude-chat-1.1.0.jar` into the `mods` folder of that profile.
+3. Install **Python 3.11+** (python.org, tick *Add to PATH*). Optional but useful:
+   **Git**, **GitHub CLI** (`gh`), **Node.js** (for most MCP connectors).
+4. Start the game. The mod unpacks its bridge into `config/claude-chat/runtime`,
+   creates a private Python environment, installs dependencies on first start
+   (up to a couple of minutes) and runs it. The bridge stops when the game closes.
+5. Open `/claude` and press **Sign in: Claude subscription** (or Console/API):
+   open the sign-in page, sign in, paste the code. This is the regular
+   `claude auth login`, shared with Claude Code in your terminal.
+6. Optional: in the same screen press **Sign in with GitHub** for `git push`
+   without passwords and the GitHub connector.
+
+Press **K** for the conversation window. `/files` opens the file manager.
+
+<details>
+<summary>Build from source</summary>
+
+JDK 25, then from the repository root:
+
+```bash
+./gradlew build          # Windows: gradlew.bat build
+```
+
+Jars: `build/libs/claude-chat-1.1.0.jar` and `codexcraft/build/libs/codexcraft-1.1.0.jar`.
+The bridge can also be started by hand (the mod detects it):
+`python bridge/bridge.py --game-dir "<profile folder with mods and config>"`.
+</details>
+
+## Commands
+
+Use `/c` (conversation) or `/cc` (Claude Code). Full and short names both work.
+
+**Messages and chats**
+
+| Command | What it does |
 | --- | --- |
-| `/cc project` | Список проектов: путь, git, сколько чатов и сколько работает |
-| `/cc project open <имя>` | Переключить Claude на проект (вернутся его чаты) |
-| `/cc project here [имя]` | Сделать проектом папку, открытую в файловом менеджере |
-| `/cc project add <имя> <путь>` | Проект из любой папки |
-| `/cc project new <имя>` | Новая папка в workspace + проект |
-| `/cc project rename <старое> <новое>`, `remove <имя>` | Переименовать / убрать из списка (файлы не трогаются) |
+| `/cc <request>` · `q` · `queue` | Queue a request in the current chat |
+| `/cc f <text>` · `force` | Add a message to the running task, without cancelling |
+| `/cc cancel` · `restart` · `cq` | Stop and clear the queue · restart keeping history · clear the queue only |
+| `/cc c` · `chats` | Chats of the current project; new, rename, status |
+| `/cc tokens` | Tokens and estimated cost per chat, project and total; subscription limits |
+| `/cc auto off\|edits\|all` | Ask for everything · allow file edits · allow everything |
+| `/claude` · **K** | Settings · conversation window |
 
-**Файловый менеджер** — ходит по диску сам по себе и **не двигает Claude**
+**Projects, files, terminal**
 
-| Команда | Действие |
+| Command | What it does |
 | --- | --- |
-| `ls [папка]` (`dir`), `cd <папка>`, `pwd` | Обзор; `~` — workspace, `@` — папка проекта, `..` — вверх |
-| `cat <файл> [начало-конец]` (`type`) | Показ файла с номерами строк, «дальше» — следующие 150 |
-| `tree [папка] [глубина]`, `find <шаблон>` | Дерево, поиск по имени (`find *.java`, `find Main`) |
-| `mkdir`, `touch`, `mv <откуда> <куда>`, `cp …`, `rm <путь>` | Изменения; `rm` сначала спрашивает |
-| `open <путь>` (`explorer`), `code <путь>` (`edit`) | Открыть в проводнике / в VS Code, Cursor, IDEA |
+| `/cc project` | Projects; `open`, `pick` (system dialog), `here`, `add`, `new`, `rename`, `remove` |
+| `/cc sync` · `/cc pc` | Pull PC sessions of the folder · continue this chat in a terminal on the PC |
+| `/files` | File manager window |
+| `/ls` `/cd` `/pwd` `/cat` `/tree` `/find` | Browse (`~` workspace, `@` project, `..` up) |
+| `/mkdir` `/touch` `/mv` `/cp` `/rm` `/open` `/code` | Change files (`rm` asks first) · open in Explorer / editor |
+| `/sh` `/ps` `/cmd` `/bash` `<command>` · `/kill` | Shell commands with live output · stop them |
 
-**Git текущего проекта** (`git` = `g`)
+**Git, agents, connectors**
 
-| Команда | Действие |
+| Command | What it does |
 | --- | --- |
-| `/cc git` | Ветка, ahead/behind, origin (ссылкой), изменённые файлы (клик — diff) |
-| `/cc git diff [файл] [--staged]`, `log [N]` | Изменения в цвете, история |
-| `/cc git commit <сообщение>` | `add -A` + коммит |
-| `/cc git commit` | **Claude сам** смотрит diff и коммитит с хорошим сообщением |
-| `/cc git push`, `pull`, `fetch` | В фоне, мост не блокируется |
-| `/cc git branch [имя]`, `switch <имя>`, `stash [pop]` | Ветки |
-| `/cc git init`, `clone <url> [имя]` | Новый репозиторий / клон сразу как проект |
-| `/cc git remote <url>`, `github [public]` | Привязать origin / создать репозиторий на GitHub через `gh` и запушить |
+| `/git` | Status: branch, ahead/behind, origin link, changed files (click for diff) |
+| `/git diff` `log` `branch` `switch` `stash` | The usual |
+| `/git commit <msg>` · `/git commit` | Commit everything · let Claude review the diff and commit |
+| `/git push` `pull` `fetch` `clone <url>` `github` | Network ops run in the background; `github` creates the repo with `gh` |
+| `/cc agents` · `agent <name> <task>` | Agents · give a task to one |
+| `/cc spawn [@agent] <task>` · `tasks` · `stop <id>` | Parallel tasks and the task manager |
+| `/cc connectors` · `connect <id>` · `disconnect <id>` | MCP connectors |
+| `/cc crash` | Explain the latest Minecraft crash / log |
 
-**Агенты и задачи**
+## How it works
 
-| Команда | Действие |
-| --- | --- |
-| `/cc agents` | Агенты: code-reviewer, test-writer, debugger, explorer, refactorer, docs-writer, security-auditor, planner, minecraft-modder + свои |
-| `/cc agent <имя> <задача>` | Поручить агенту в текущем чате |
-| `/cc agent new <имя> <описание>`, `on/off <имя>`, `rm <имя>` | Свои агенты; файлы `.claude/agents/*.md` проекта тоже подхватываются |
-| `/cc spawn [@агент] <задача>` (`run`) | Параллельная задача в новом чате проекта, текущая не прерывается |
-| `/cc tasks` (`ps`, `jobs`) | Все работающие задачи: шаг, время, очередь; открыть / стоп |
-| `/cc stop <id>` | Остановить задачу из списка |
+```
+Minecraft (Fabric mod)                       Local bridge (Python, 127.0.0.1)
+┌────────────────────────────┐   HTTP +      ┌──────────────────────────────────────┐
+│ chat commands, buttons,    │   bearer      │ queue per chat, permissions, events  │
+│ conversation & file window │ ────────────▶ │ projects · files · shell · git · gh  │
+│ settings, folder picker    │ ◀──────────── │ agents · MCP connectors · i18n       │
+└────────────────────────────┘   events      └──────────┬───────────────────────────┘
+                                                        │ Claude Agent SDK (streaming input)
+                                                        ▼
+                                            Claude Code CLI  ── shared ~/.claude sessions
+```
 
-Claude Code и сам поручает работу агентам (инструмент Task); их шаги видны в
-ленте с отступом «↳ имя-агента».
+- The mod only draws UI. Credentials, Claude processes and scheduling live in the bridge.
+- `f` writes into the live SDK session. The CLI runs with `--replay-user-messages`
+  and a reply ends only when every message sent was acknowledged, so an `f` that
+  races with the end of an answer is never lost.
+- Sessions are stored by Claude Code itself, so the same session is visible in the
+  game, in the terminal and in the Claude app.
 
-**Коннекторы (MCP)** — `/cc connectors` (`mcp`)
+## Security
 
-GitHub (токен берётся из `gh auth token`), GitLab, Sentry, CircleCI, JetBrains IDE,
-Playwright, Chrome DevTools, Firecrawl, Context7, Brave Search, Exa, Sequential
-Thinking, Memory, PostgreSQL, MongoDB, Supabase, Neon, Kubernetes, Railway, Heroku,
-Stripe, Notion, Slack, Figma. «Подключить» включает коннектор со следующего
-запроса `/cc`; если нужен ключ — откроется окно ввода (ключ не попадает в чат,
-хранится в `secrets.json`). `/cc disconnect <id>` выключает. Статус (подключён /
-ошибка) показывается после первого запроса. Локальным коннекторам нужен Node.js.
+- The bridge listens on `127.0.0.1` only, with a random bearer token; requests with a
+  browser `Origin` are rejected.
+- Mod commands cannot be triggered by clickable messages from a server.
+- Claude and the shell run with the rights of your PC account — no elevation, no UAC bypass.
+- Tool calls ask for permission unless you choose an auto-approve mode.
+- API keys and connector tokens are stored in `config/claude-chat/secrets.json`
+  (owner-only) and never appear in chat events. Do not share `connection.json`,
+  `bridge-token`, `secrets.json` or `chats.json`.
 
-**Minecraft**
+## Codexcraft
 
-| Команда | Действие |
-| --- | --- |
-| `/cc crash` | Claude разбирает последний crash-report или `latest.log` и предлагает исправление |
-| `/cc reload`, `tools` | Перечитать расширения и коннекторы; что есть на машине (git, gh, node, docker…) |
+[`codexcraft/`](codexcraft/README.md) is a companion mod that brings **OpenAI Codex**
+into Minecraft the same way (`/gpt`, `/codex`, window on **J**). Both mods run side by side.
 
-Слова команд зарезервированы; для запроса, начинающегося с такого слова,
-используй `q`. Разные чаты выполняются независимо; в каждом своя очередь до 20
-запросов. Максимальная длина запроса — 8000 символов.
+## Development
 
-### Как работает `f`
+```bash
+cd bridge && python -m unittest -v                         # bridge tests
+CLAUDECRAFT_CLI_IT=1 python -m unittest test_cli_fake_api  # real Claude CLI vs a local fake API
+python -m unittest discover -s codexcraft/tests            # Codexcraft
+./gradlew runShots                                         # screenshots of all screens into run/screenshots
+```
 
-- **Локальные чаты (Agent SDK, `/cc` и `/c new local`).** Сообщение пишется в уже
-  работающую SDK-сессию (streaming input, `ClaudeSDKClient.query()`), Claude учитывает
-  его по ходу работы. Задача не отменяется, процесс не перезапускается, очередь не
-  меняется. Мост запускает CLI с `--replay-user-messages` и завершает ответ, только
-  когда CLI подтвердил все отправленные сообщения, поэтому ответ на `f` не теряется,
-  даже если `f` пришло одновременно с концом ответа.
-- Что делает CLI с `f` (проверено на Claude Code 2.1.310): если Claude вызывает
-  инструменты, сообщение добавляется к следующему результату инструмента и
-  учитывается в том же ходе. Если Claude пишет текст без инструментов, после ответа
-  начинается отдельный ход с ответом на `f` — в том же процессе. Если `f` пришло
-  до того, как CLI взял первый запрос, оба склеиваются в одно сообщение.
-- Если Claude успел закончить ответ раньше, чем `f` дошло до сессии, мост об этом
-  пишет и выполняет сообщение следующим в том же чате (тоже без отмены).
-- Если Claude сейчас не работает, `f` просто запускает запрос сразу.
-- Если CLI не подтверждает входящие сообщения (старая версия), `f` отклоняется с
-  объяснением; текущая работа продолжается.
-- **API-чаты (`/c new api`).** Уже отправленный HTTP-запрос Messages API нельзя
-  дополнить. Пока идёт ответ, `f` отклоняется с явной ошибкой: текущий ответ не
-  отменяется и сообщение молча в очередь не ставится. Используй `q` или `cancel`.
+More: [extensions, permissions, shells and Docker](docs/EXTENSIONS.md).
 
-## Установка
+## Status
 
-1. Minecraft **26.3**, Fabric Loader **0.20.1**, Fabric API **0.165.0+26.3**.
-   Положи `claude-chat-1.1.0.jar` в `mods`.
-2. Установи **Python 3.11+** (python.org, галочка «Add to PATH»).
-3. Запусти игру. Мод сам распакует мост в `config/claude-chat/runtime`, создаст
-   там отдельное окружение Python, при первом запуске установит зависимости
-   (до пары минут) и запустит мост. При закрытии игры мост останавливается.
-4. Открой настройки: `/c settings` или `/claude`. Там:
-   - **Мост** — состояние, перезапуск, автозапуск, путь к Python (если не найден сам);
-   - **Аккаунт Claude** — «Войти: подписка Claude» или «Войти: Console (API)»:
-     открой страницу входа, войди, скопируй код со страницы, вставь в поле
-     (Ctrl+V) и нажми «Отправить». Это обычный `claude auth login`, вход
-     сохраняется там же, где у Claude Code в терминале;
-   - **API-ключ** для `/c new api` (хранится в `config/claude-chat/secrets.json`,
-     в игре показывается только замаскированным).
-5. `/c c` или `/cc c` — выбор чатов. В Windows для shell-инструментов Claude Code
-   нужен Git Bash.
+Working and tested: the bridge (unit tests and the real Claude Code CLI against a fake
+API), the shell on real PowerShell/cmd, GitHub sign-in with the real `gh`, builds for
+Minecraft 26.3, and every screen checked on in-game screenshots.
 
-Ручной запуск моста по-прежнему работает (мод заметит его и не будет запускать
-второй): `python bridge/bridge.py --game-dir "<папка профиля с mods и config>"`.
-Сборка из исходников: JDK 25, `./gradlew build` (Windows: `gradlew.bat build`).
-Лог моста: `config/claude-chat/runtime/bridge.log`.
+Still to verify in a live world: every button click path, push/clone over the network,
+connectors with real keys, Docker and SSH. Interactive terminal programs (vim, password
+prompts) are not supported in the in-game shell.
 
-Мод читает `config/claude-chat/connection.json` и подключается только к
-127.0.0.1. Мост использует случайный bearer-токен. Браузерные HTTP-запросы с Origin
-отклоняются. Не публикуй connection.json, bridge-token и историю чатов.
-
-## Настройки и расширения
-
-После первого запуска смотри `config/claude-chat/bridge-config.json`:
-
-- `workspace` — каталог проектов, доступный Claude Code.
-- `api_model` — идентификатор модели для `/c new api`; поменяй на доступную аккаунту.
-- `cli_path` — необязательный абсолютный путь к Claude CLI.
-- `mcp_servers` — дополнительные MCP-серверы для `/cc`.
-
-[Структура расширений, Docker, SSH, CMD и права администратора](docs/EXTENSIONS.md).
-
-Кратко: положи manifest и MCP-сервер в `<workspace>/extensions/<id>/` и выполни
-`/cc reload`. Есть пример `examples/extensions/system-info`. Claude Code может
-создать такое расширение и вызвать встроенный `minecraft.reload_extensions`.
-Изменения действуют на следующий запрос, Minecraft не перезапускается.
-Текущий запрос продолжает использовать старые инструменты. Мост не устанавливает
-зависимости расширений автоматически.
-
-## Как выглядит работа Claude
-
-Пока Claude работает, в чате идут короткие строки о том, что он делает:
-«📄 Читаю src/Main.java», «✎ Редактирую …», «$ gradlew build — Собираю проект»,
-«🔍 Ищу «TODO»», план задач с галочками (☑ сделано, ▶ в работе, ☐ впереди),
-ошибки инструментов красным. Ответ оформлен: заголовки, списки, **жирный**,
-`код`, блоки кода, ссылки. В конце — «✔ Готово · время · токены · ≈стоимость».
-Цветная полоска слева показывает режим: оранжевая `/c`, фиолетовая `/cc`.
-
-Запрос разрешения показывает, что именно Claude хочет сделать (полный JSON —
-при наведении), и три кнопки: Разрешить, Отклонить, Всегда разрешать этот
-инструмент в этом чате. `/cc auto off` сбрасывает и «всегда».
-
-Claude работает в папке проекта (`/cc project`). Сессия Claude Code хранится по
-папке, поэтому у каждого проекта свои чаты, и при переключении проекта
-возвращаются именно они. `cd` в файловом менеджере на Claude не влияет.
-
-## Кнопки и браузер
-
-Запросы разрешений SDK выводятся кнопками «Разрешить / Отклонить» для одного
-действия. AskUserQuestion показывает варианты и кнопку своего ответа. При
-множественном выборе введи номера через запятую, например `1,3`. Старые кнопки
-не подтверждают новые запросы. Ожидание ответа — до 10 минут, затем запрос завершается.
-
-Инструмент `minecraft.open_browser` показывает HTTP(S)-ссылку для внешнего
-браузера и ждёт подтверждения «Готово». Открытие требует клика пользователя.
-Дополнительные браузерные действия доступны через MCP, например Playwright.
-Встроенный Chromium/CEF-экран в Minecraft не реализован; произвольные терминальные
-программы с интерактивными prompt, UAC, sudo, MFA не преобразуются в игровой UI.
-Авторизацию Claude Code надо пройти отдельно перед использованием моста.
-
-## Данные и поведение
-
-Истории и SDK session IDs сохраняются на диске в `chats.json`; API-контекст
-ограничен последними 40 сообщениями. Локальные SDK-сессии сохраняет также Claude
-Code. Это локальные сессии SDK/CLI и чаты этого моста, а не история claude.ai.
-Запросы и ответы отправляются провайдеру с твоими лимитами и тарификацией.
-Ключ API остаётся только в окружении моста. Сообщения могут попасть в игровые логи.
-Координаты, инвентарь, серверный чат и мир автоматически не отправляются.
-
-Переключение чата не останавливает работающий запрос: сообщения помечены режимом
-и коротким ID чата. Выход из мира останавливает запросы всех чатов и очищает
-очереди, но сохраняет историю. `restart` сохраняет контекст; для чистого диалога
-нужен `new`. API-запрос и уже совершённые shell-операции могут иметь эффект на
-стороне провайдера/системы даже после локальной отмены; отмена не является откатом.
-
-## Проверка
-
-43 быстрые проверки ядра: очередь, `f` без отмены (в том числе гонки с концом
-ответа и склеенные сообщения), потоковый вывод без дублей, шаги субагентов,
-проекты (переключение папки и чатов, сохранение), файловый менеджер (не двигает
-Claude, `rm` с подтверждением, защита корня), git на настоящем репозитории (init,
-status, commit, diff, ветки, log, «коммит пишет Claude»), агенты (встроенные, свои,
-`.claude/agents/*.md`), параллельные задачи и их остановка, коннекторы (ключи не
-попадают в события, общий secrets.json, токен из gh), логи Minecraft, вход в
-аккаунт, токены, разрешения, HTTP. Запуск: `cd bridge` → `python -m unittest -v`.
-
-Мост + **настоящий** Claude Code CLI против локального фейкового API
-([fake_anthropic.py](bridge/fake_anthropic.py), без ключей и без трат):
-`CLAUDECRAFT_CLI_IT=1 python -m unittest test_cli_fake_api -v` — `f` посреди хода
-с инструментом, `f` во время текстового ответа (построчный поток), возобновление
-сессии между запросами очереди, отмена. Все 4 проходят.
-
-Вид экранов проверяется скриншотами из игры: `gradlew runShots`.
-
-Проверка на настоящем Claude (тратит токены, нужен `claude auth login`):
-`CLAUDECRAFT_SDK_IT=1 python -m unittest test_sdk_integration -v`.
-
-Проверено: Gradle-сборка с JDK 25 (Temurin 25.0.5) против Minecraft 26.3,
-Loader 0.20.1, Fabric API 0.165.0+26.3, Loom 1.19.3 — JAR собирается.
-**Не проверены**: клики по кнопкам в игровом чате и в окне переписки в живом
-мире, ответы настоящей модели (тест выше с `CLAUDECRAFT_SDK_IT`), реальные
-коннекторы с ключами, push/clone по сети, Docker image, SSH.
-
-Основные источники:
-- https://github.com/FabricMC/fabric-example-mod/tree/26.3
-- https://code.claude.com/docs/en/agent-sdk/python
-- https://code.claude.com/docs/en/agent-sdk/user-input
-- https://code.claude.com/docs/en/agent-sdk/permissions
+<sub>Not affiliated with Mojang, Microsoft or Anthropic. Minecraft is a trademark of Mojang Studios.</sub>

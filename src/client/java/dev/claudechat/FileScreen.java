@@ -53,6 +53,7 @@ final class FileScreen extends Screen {
     private int listX, listY, listW, listH, viewX, viewW;
     private final List<int[]> crumbs = new ArrayList<>();   // x0, x1, index into crumbPaths
     private final List<String> crumbPaths = new ArrayList<>();
+    private int workX0, workX1;  // clickable "… works in" label
 
     FileScreen(ClaudeChat mod, Screen parent) { this(mod, parent, null); }
 
@@ -354,6 +355,7 @@ final class FileScreen extends Screen {
         for (int[] c : crumbs) {
             if (y >= 20 && y < 30 && x >= c[0] && x < c[1]) { load(crumbPaths.get(c[2])); return true; }
         }
+        if (dir != null && y >= 5 && y < 16 && x >= workX0 && x < workX1) { load(dir.get("claude").getAsString()); return true; }
         return super.mouseClicked(event, doubleClick);
     }
 
@@ -369,8 +371,12 @@ final class FileScreen extends Screen {
         g.text(font, Component.literal("📁 " + L.t("Файлы")).withColor(0xD97757), 6, 7, TEXT);
         if (dir != null) {
             String project = dir.has("project") && !dir.get("project").isJsonNull() ? dir.get("project").getAsString() : null;
-            String claude = L.t("Claude работает в: ") + dir.get("current_project").getAsString();
-            g.text(font, claude, width - font.width(claude) - 6, 7, ACCENT);
+            // "Claude Code works in: <project>" — click opens that folder (Codexcraft shows "Codex works in").
+            String claude = L.t("Claude Code работает в: ") + dir.get("current_project").getAsString();
+            workX0 = width - font.width(claude) - 6;
+            workX1 = width - 6;
+            boolean hover = mouseY >= 5 && mouseY < 16 && mouseX >= workX0 && mouseX < workX1;
+            g.text(font, Component.literal(claude).withStyle(st -> st.withUnderlined(hover)), workX0, 7, hover ? GOLD : ACCENT);
             if (project != null) g.text(font, "✦ " + project, 60, 7, ACCENT);
             drawCrumbs(g, mouseX, mouseY);
         }
