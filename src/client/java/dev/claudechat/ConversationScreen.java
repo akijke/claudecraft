@@ -38,6 +38,8 @@ final class ConversationScreen extends Screen {
     private JsonObject state;
     private MultiLineEditBox input;
     private InputHistory history = InputHistory.cursor();
+    private String mentionPrefix, mentionValue;
+    private int mentionIndex = -1;
     private final List<FormattedCharSequence> lines = new ArrayList<>();
     private String shownChat = "";
     private int scroll;          // lines scrolled up from the bottom
@@ -209,6 +211,7 @@ final class ConversationScreen extends Screen {
         input.setY(height - 58);
         input.setCharacterLimit(8000);
         if (draft.isEmpty()) draft = InputHistory.draft(mode);
+        mod.refreshFiles();
         input.setValue(draft);
         addRenderableWidget(input);
         int bx = mainX + inputW + 4;
@@ -262,6 +265,23 @@ final class ConversationScreen extends Screen {
         if (PaletteScreen.handleKey(mod, this, event, true)) return true;  // Ctrl+Shift+P / Ctrl+P
         boolean ctrl = (event.modifiers() & 2) != 0;  // GLFW_MOD_CONTROL
         if (event.key() == InputConstants.KEY_RETURN && ctrl) { submit(""); return true; }
+        // Tab after "@part": complete a project file path (Claude Code attaches @files to the prompt)
+        if (getFocused() == input && event.key() == InputConstants.KEY_TAB) {
+            String value = input.getValue();
+            int start = Math.max(value.lastIndexOf(' '), value.lastIndexOf('\n')) + 1;
+            if (value.startsWith("@", start)) {
+                mod.refreshFiles();
+                String part = value.substring(start + 1);
+                if (mentionPrefix == null || !value.equals(mentionValue)) { mentionPrefix = part; mentionIndex = -1; }
+                List<String> found = ClaudeChat.mentionCandidates(mentionPrefix, 8);
+                if (found.isEmpty()) { mod.notice = L.t("Нет файлов для @") + mentionPrefix; return true; }
+                mentionIndex = (mentionIndex + 1) % found.size();  // Tab again: the next candidate
+                mentionValue = value.substring(0, start) + "@" + found.get(mentionIndex);
+                input.setValue(mentionValue);
+                mod.notice = String.join("  ", found.stream().map(f -> f.substring(f.lastIndexOf('/') + 1)).toList());
+                return true;
+            }
+        }
         // Tab after "/name": complete a slash command
         if (getFocused() == input && event.key() == InputConstants.KEY_TAB && input.getValue().startsWith("/")
                 && !input.getValue().contains(" ")) {

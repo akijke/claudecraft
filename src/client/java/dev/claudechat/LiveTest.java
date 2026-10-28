@@ -169,6 +169,17 @@ final class LiveTest {
         }, 15);
         quiet("back to the K window", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 10, 5);
+        step("Tab completes @livelin to a project file", () -> {
+            try {
+                Path f = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("claude-chat/workspace/livetest-lines.txt");
+                if (!Files.exists(f)) Files.writeString(f, "line 1");
+            } catch (IOException e) { throw new RuntimeException(e); }
+            mod.refreshFiles();
+        }, () -> {
+            if (!(screen() instanceof ConversationScreen k)) return false;
+            if (waited == 30) { k.inputForTest("look at @livelin"); k.keyPressed(new KeyEvent(InputConstants.KEY_TAB, 0, 0)); }
+            return waited > 30 && k.inputValue().equals("look at @livetest-lines.txt");
+        }, 10);
         step("click 'Files' in the K window", () -> press(L.t("Файлы")),
             () -> screen() instanceof FileScreen && waited > 30, 10);
         step("terminal runs a command", () -> {

@@ -575,5 +575,6 @@
   "исходный чат": "original chat",
   "[номер] — новый чат-ветка с этого места разговора (исходный не меняется)": "[number] — a new branch chat from this point of the conversation (the original stays)",
   "   ⟳ — откатить разговор и файлы к моменту перед запросом · «ветка» — новый чат после ответа": "   ⟳ — roll back the conversation and files to before the request · “branch” — a new chat after the answer",
-  "ветка": "branch"
+  "ветка": "branch",
+  "Нет файлов для @": "No files for @"
 }

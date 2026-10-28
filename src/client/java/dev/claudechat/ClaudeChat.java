@@ -113,6 +113,13 @@ public final class ClaudeChat implements ClientModInitializer {
                     .then(argument("input", StringArgumentType.greedyString()).suggests((c, builder) -> {
                         // Tab: actions, and slash commands after "/" (built-in, ~/.claude/commands, project)
                         String typed = builder.getRemaining();
+                        int at = typed.lastIndexOf(' ') + 1;
+                        if (typed.startsWith("@", at)) {  // @path: suggest project files
+                            refreshFiles();
+                            var sub = builder.createOffset(builder.getStart() + at);
+                            for (String f : mentionCandidates(typed.substring(at + 1), 20)) sub.suggest("@" + f);
+                            return sub.buildFuture();
+                        }
                         if (typed.contains(" ")) return builder.buildFuture();
                         if (typed.startsWith("/")) {
                             refreshCommands(mode);
@@ -197,6 +204,32 @@ public final class ClaudeChat implements ClientModInitializer {
     }
 
     void open(Supplier<Screen> screen) { openNext = screen; }
+
+    /** Project files (relative paths) for @-mentions; refreshed in the background. */
+    static volatile List<String> projectFiles = List.of();
+    private volatile long filesFetched;
+
+    void refreshFiles() {
+        long now = System.currentTimeMillis();
+        if (now - filesFetched < 3_000) return;
+        filesFetched = now;
+        io.execute(() -> {
+            try {
+                JsonObject r = request("/index?mode=cc", null);
+                List<String> list = new ArrayList<>();
+                for (JsonElement e : r.getAsJsonArray("files")) list.add(e.getAsString());
+                projectFiles = list;
+            } catch (Exception ignored) { }
+        });
+    }
+
+    /** Best project files for "@query" (fuzzy, like Ctrl+P). */
+    static List<String> mentionCandidates(String query, int limit) {
+        String q = query.toLowerCase(Locale.ROOT);
+        return projectFiles.stream().map(f -> new Object[]{f, PaletteScreen.score(f, q)})
+            .filter(o -> (int) o[1] > 0).sorted((a, b) -> Integer.compare((int) b[1], (int) a[1]))
+            .limit(limit).map(o -> (String) o[0]).toList();
+    }
 
     /** name, argument hint, description of every slash command; refreshed in the background. */
     static volatile List<String[]> slashCommands = List.of();

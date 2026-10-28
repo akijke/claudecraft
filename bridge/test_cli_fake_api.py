@@ -433,6 +433,16 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         await self.until(lambda: chat.task is None)
         self.assertIn('SECOND-Q', json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False))
 
+    async def test_at_mention_attaches_the_file(self):
+        await self.start([text('ok')])
+        os.makedirs(os.path.join(self.bridge.workspace, 'src'))
+        with open(os.path.join(self.bridge.workspace, 'src', 'notes.txt'), 'w', encoding='utf-8') as f:
+            f.write('MENTIONED-FILE-CONTENT')
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'what is in @src/notes.txt ?')
+        await self.until(lambda: chat.task is None)
+        self.assertIn('MENTIONED-FILE-CONTENT', json.dumps(self.fake.requests[0], ensure_ascii=False))
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]
