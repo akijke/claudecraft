@@ -451,6 +451,10 @@ async def run(bridge, chat, text):
     extra_dirs = [effective] if Path(effective) != Path(session_dir) else []
     if extra_dirs:
         text = f'[Рабочая папка проекта: {effective}]\n{text}'
+    from backends import skills as skill_files
+    skills = skill_files.sdk_option(effective, set(bridge.config.get('skills_disabled', []))) if chat.mode == 'cc' else None
+    if skills:
+        tools = tools + ['Skill']
     if plan_mode:
         tools = tools + ['ExitPlanMode'] if 'ExitPlanMode' not in tools else tools
     options = ClaudeAgentOptions(cwd=session_dir, resume=chat.sdk_id, add_dirs=extra_dirs,
@@ -462,7 +466,7 @@ async def run(bridge, chat, text):
         include_partial_messages=True,
         hooks={'PreToolUse': [HookMatcher(matcher='Write|Edit|MultiEdit|NotebookEdit', hooks=[snapshot_hook])]}
         if chat.mode == 'cc' else None,
-        model=chat.model, effort=chat.effort,
+        model=chat.model, effort=chat.effort, skills=skills,
         agents=bridge.agents.definitions(effective) if chat.mode == 'cc' else None,
         # Echo accepted prompts so `f` messages can be matched against ResultMessage.
         extra_args={'replay-user-messages': None},

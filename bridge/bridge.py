@@ -820,6 +820,21 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'skills':
+            from backends import skills
+            from backends.util import save_json
+            sub, _, name = text.strip().partition(' ')
+            disabled = set(self.config.get('skills_disabled', []))
+            if sub in ('on', 'off'):
+                if name.strip() not in skills.discover(self.chat_cwd(chat)):
+                    raise ValueError(f'Нет скилла {name.strip()}')
+                (disabled.discard if sub == 'on' else disabled.add)(name.strip())
+                self.config['skills_disabled'] = sorted(disabled)
+                save_json(self.directory / 'bridge-config.json', self.config)
+            elif sub:
+                raise ValueError('skills [on|off <имя>]')
+            self.emit(chat, 'Скиллы', kind='skills', rows=skills.rows(self.chat_cwd(chat), disabled),
+                      project=str(Path(self.chat_cwd(chat)) / '.claude' / 'skills'), user=str(skills.user_dir()))
         elif action in ('memory', 'mem'):
             from backends import memory
             sub, _, rest = text.strip().partition(' ')

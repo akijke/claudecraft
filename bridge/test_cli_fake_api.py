@@ -343,6 +343,25 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         with open(target, encoding='utf-8') as f:
             self.assertEqual(f.read(), 'original')
 
+    async def test_skills_listing_and_switching_off(self):
+        await self.start([text('ok')])
+        ws = self.bridge.workspace
+        for name, desc in (('deploy-helper', 'SKILL-DEPLOY-DESCRIPTION'), ('secret-skill', 'SKILL-HIDDEN-DESCRIPTION')):
+            os.makedirs(os.path.join(ws, '.claude', 'skills', name))
+            with open(os.path.join(ws, '.claude', 'skills', name, 'SKILL.md'), 'w', encoding='utf-8') as f:
+                f.write(f'---\nname: {name}\ndescription: {desc}\n---\nSteps.\n')
+        await self.bridge.command({'mode': 'cc', 'action': 'skills', 'text': 'off secret-skill'})
+        rows = [e for e in self.bridge.events if e['kind'] == 'skills'][-1]['rows']
+        self.assertEqual({r['name']: r['enabled'] for r in rows}, {'deploy-helper': True, 'secret-skill': False})
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'hello')
+        await self.until(lambda: chat.task is None)
+        self.assertEqual(self.errors(), [])
+        request = json.dumps(self.fake.requests[0], ensure_ascii=False)
+        self.assertIn('SKILL-DEPLOY-DESCRIPTION', request)
+        self.assertNotIn('SKILL-HIDDEN-DESCRIPTION', request)
+        self.assertIn('Skill', [t['name'] for t in self.fake.requests[0].get('tools', [])])
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

@@ -157,6 +157,7 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Скиллы': 'Skills', 'Нет скилла {}': 'No skill {}', 'skills [on|off <имя>]': 'skills [on|off <name>]',
     'Память': 'Memory', 'Память Claude': "Claude's memory",
     'memory [edit <файл> | on | off]': 'memory [edit <file> | on | off]',
     'Запомнено в {}': 'Remembered in {}',

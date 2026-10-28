@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "memory", "mem", "#", "remember", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "memory", "mem", "#", "remember", "skills", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -520,6 +520,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/palette", L.t("все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)")},
             {c + "rewind", L.t("[номер] — откатить разговор и файлы к любому прошлому запросу")},
             {c + "memory", L.t("CLAUDE.md проекта и пользователя: открыть, вкл/выкл · /cc # <заметка> — дописать в CLAUDE.md")},
+            {c + "skills", L.t("скиллы .claude/skills проекта и ~/.claude/skills: вкл/выкл, открыть SKILL.md")},
             {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},

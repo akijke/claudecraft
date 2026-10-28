@@ -182,6 +182,21 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "skills" -> {
+                out.add(line(mode, lit("✦ " + L.t("Скиллы"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(L.t("   Claude сам берёт включённые, когда нужны"), FAINT))));
+                JsonArray rows = e.getAsJsonArray("rows");
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  нет — положи папку со SKILL.md в ") + s(e, "project") + L.t(" или ") + s(e, "user"), FAINT)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    boolean on = b(r, "enabled");
+                    out.add(line(mode, lit(on ? "  ● " : "  ○ ", on ? GREEN : FAINT).append(lit(s(r, "name"), on ? TEXT : DIM))
+                        .append(lit("  " + (s(r, "source").equals("project") ? L.t("проект") : L.t("пользователь")) + "  ", FAINT))
+                        .append(button(on ? L.t("выкл") : L.t("вкл"), cmd + "skills " + (on ? "off " : "on ") + s(r, "name"), false, on ? DIM : GREEN, null))
+                        .append(sp()).append(button("SKILL.md", "/edit " + s(r, "path"), false, AQUA, null))));
+                    if (!s(r, "description").isEmpty()) out.add(line(mode, lit("      " + s(r, "description"), FAINT)));
+                }
+            }
             case "memory" -> {
                 boolean loaded = b(e, "loaded");
                 out.add(line(mode, lit("☰ " + L.t("Память Claude"), GOLD).withStyle(st -> st.withBold(true))

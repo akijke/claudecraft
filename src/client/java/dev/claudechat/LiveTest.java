@@ -134,6 +134,7 @@ final class LiveTest {
             mod.runLine("cc", "/cc # livetest note");
             mod.runLine("cc", "/cc memory");
         }, () -> event("memory"), 20);
+        step("/cc skills lists skills", () -> { markEvents(); mod.runLine("cc", "/cc skills"); }, () -> event("skills"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

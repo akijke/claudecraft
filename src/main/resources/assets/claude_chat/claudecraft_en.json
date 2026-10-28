@@ -547,5 +547,10 @@
   "создать": "create",
   "быстрая заметка": "quick note",
   "Допишет строку в раздел ## Notes файла CLAUDE.md проекта": "Appends a line to ## Notes of the project's CLAUDE.md",
-  "CLAUDE.md проекта и пользователя: открыть, вкл/выкл · /cc # <заметка> — дописать в CLAUDE.md": "project and user CLAUDE.md: open, on/off · /cc # <note> — append to CLAUDE.md"
+  "CLAUDE.md проекта и пользователя: открыть, вкл/выкл · /cc # <заметка> — дописать в CLAUDE.md": "project and user CLAUDE.md: open, on/off · /cc # <note> — append to CLAUDE.md",
+  "Скиллы": "Skills",
+  "   Claude сам берёт включённые, когда нужны": "   Claude uses the enabled ones when they fit",
+  "  нет — положи папку со SKILL.md в ": "  none — put a folder with SKILL.md into ",
+  " или ": " or ",
+  "скиллы .claude/skills проекта и ~/.claude/skills: вкл/выкл, открыть SKILL.md": "skills from the project's .claude/skills and ~/.claude/skills: on/off, open SKILL.md"
 }
