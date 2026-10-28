@@ -95,9 +95,10 @@ class Git:
             'fetch': self.fetch, 'branch': self.branch, 'branches': self.branch,
             'switch': self.switch, 'checkout': self.switch, 'remote': self.remote,
             'github': self.github, 'stash': self.stash,
+            'hunks': self.hunks, 'stage': self.stage_hunk, 'unstage': self.unstage_hunk,
         }.get(sub)
         if not handler:
-            raise ValueError('git: status, diff, log, add, commit, push, pull, fetch, branch, '
+            raise ValueError('git: status, diff, hunks, stage, unstage, log, add, commit, push, pull, fetch, branch, '
                              'switch, remote, github, stash, init, clone')
         if handler in (self.status, self.push, self.pull, self.fetch):
             return await handler(mode)
@@ -138,6 +139,45 @@ class Git:
         lines = out.splitlines()
         self.emit(mode, '\n'.join(lines[:400]), kind='diff', path=path, staged=staged,
                   truncated=len(lines) > 400, empty=not lines)
+
+    # ---- hunks: stage / unstage one piece of a diff ----------------------------
+    async def _diff_files(self, staged, path=''):
+        from backends import hunks
+        args = ['diff', '--no-color', '--no-ext-diff', '-U3'] + (['--cached'] if staged else []) + (['--', path] if path else [])
+        return hunks.parse(await self.ok(*args))
+
+    async def hunks(self, mode, rest):
+        from backends import hunks
+        path = ' '.join(p for p in rest.split() if not p.startswith('--'))
+        unstaged = hunks.summary(await self._diff_files(False, path))
+        staged = hunks.summary(await self._diff_files(True, path))
+        self.emit(mode, path or 'все изменения', kind='git_hunks', path=path, unstaged=unstaged, staged=staged)
+
+    async def _apply(self, hunk_id, staged, reverse):
+        from backends import hunks
+        import tempfile
+        files = await self._diff_files(staged)
+        patch, path = hunks.patch_for(files, hunk_id.strip())
+        if patch is None:
+            raise ValueError('Этот кусок уже изменился или применён — обнови список: /cc git hunks')
+        with tempfile.NamedTemporaryFile('w', suffix='.patch', delete=False, encoding='utf-8', newline='\n') as f:
+            f.write(patch)
+            name = f.name
+        try:
+            await self.ok('apply', '--cached', '--recount', '--whitespace=nowarn', *(['-R'] if reverse else []), name)
+        finally:
+            os.unlink(name)
+        return path
+
+    async def stage_hunk(self, mode, rest):
+        path = await self._apply(rest, staged=False, reverse=False)
+        self.emit(mode, f'Кусок {path} добавлен в коммит (staged)', kind='status')
+        await self.hunks(mode, '')
+
+    async def unstage_hunk(self, mode, rest):
+        path = await self._apply(rest, staged=True, reverse=True)
+        self.emit(mode, f'Кусок {path} убран из коммита (unstaged)', kind='status')
+        await self.hunks(mode, '')
 
     async def log(self, mode, rest):
         n = int(rest) if rest.isdigit() else 15

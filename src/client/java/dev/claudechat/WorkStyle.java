@@ -156,6 +156,33 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "git_hunks" -> {
+                out.add(line(mode, lit("± " + L.t("Куски изменений"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + s(e, "text") + "  ", DIM)).append(button("⟳", "/cc git hunks " + s(e, "path"), false, AQUA, null))
+                    .append(sp()).append(button("✔ commit", "/cc git commit ", true, GREEN, L.t("Закоммитить то, что в коммите (staged)")))));
+                for (String group : new String[]{"unstaged", "staged"}) {
+                    JsonArray list = e.getAsJsonArray(group);
+                    boolean isStaged = group.equals("staged");
+                    out.add(line(mode, lit(isStaged ? L.t("  В коммите (staged)") : L.t("  Не в коммите"), isStaged ? GREEN : GOLD)
+                        .withStyle(st -> st.withUnderlined(true))));
+                    if (list.isEmpty()) out.add(line(mode, lit(L.t("    — нет"), FAINT)));
+                    for (JsonElement item : list) {
+                        JsonObject h = item.getAsJsonObject();
+                        out.add(line(mode, Component.literal("  ")
+                            .append(button(isStaged ? "− " + L.t("убрать") : "+ " + L.t("в коммит"),
+                                "/cc git " + (isStaged ? "unstage " : "stage ") + s(h, "id"), false, isStaged ? RED : GREEN, null))
+                            .append(lit("  " + s(h, "path"), TEXT)).append(lit("  " + s(h, "header").replaceAll("@@ (.*?) @@.*", "$1"), AQUA))
+                            .append(lit("  +" + n(h, "added"), GREEN)).append(lit(" −" + n(h, "removed"), RED))));
+                        int shown = 0;
+                        for (JsonElement l : h.getAsJsonArray("lines")) {
+                            String raw = l.getAsString();
+                            if (!raw.startsWith("+") && !raw.startsWith("-")) continue;  // context lines only in the window K
+                            if (shown++ >= 6) { out.add(line(mode, lit("      …", FAINT))); break; }
+                            out.add(line(mode, lit("      " + clean(raw), raw.startsWith("+") ? GREEN : RED)));
+                        }
+                    }
+                }
+            }
             case "replace_preview" -> {
                 out.add(line(mode, lit("⇄ " + L.t("Замена"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit("  «" + s(e, "query") + "» → «" + s(e, "replacement") + "»", TEXT))
@@ -364,6 +391,7 @@ final class WorkStyle {
         if (n(e, "more") > 0) out.add(line("cc", lit(L.t("  … и ещё ") + n(e, "more"), DIM)));
         out.add(line("cc", Component.literal("  ")
             .append(button("diff", "/cc git diff", false, AQUA, L.t("Все изменения"))).append(sp())
+            .append(button(L.t("куски"), "/cc git hunks", false, AQUA, L.t("Добавлять в коммит по кускам (stage по ханкам)"))).append(sp())
             .append(button("✔ commit", "/cc git commit ", true, GREEN, L.t("Впиши сообщение; пусто — Claude напишет сам"))).append(sp())
             .append(button("✦ commit", "/cc git commit", false, CODE_MODE, L.t("Claude посмотрит diff и закоммитит"))).append(sp())
             .append(button("↑ push", "/cc git push", false, GOLD, null)).append(sp())

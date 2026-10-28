@@ -862,6 +862,41 @@ class OAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.bridge.oauth.has_token('fake'))
 
 
+@unittest.skipUnless(shutil.which('git'), 'git is not installed')
+class HunkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stage_and_unstage_one_hunk(self):
+        import subprocess
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        env = mock.patch.dict(os.environ, {'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t', 'GIT_COMMITTER_NAME': 't',
+                                           'GIT_COMMITTER_EMAIL': 't@t', 'GIT_CONFIG_GLOBAL': os.devnull})
+        env.start()
+        self.addCleanup(env.stop)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        repo = Path(bridge.projects.path_of_current())
+        lines = [f'line {i}' for i in range(1, 31)]
+        (repo / 'f.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        git = lambda *a: subprocess.run(['git', *a], cwd=repo, capture_output=True, text=True, check=True).stdout
+        git('init', '-q'); git('add', '.'); git('commit', '-qm', 'init')
+        lines[1], lines[27] = 'CHANGED TOP', 'CHANGED BOTTOM'
+        (repo / 'f.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'hunks'})
+        event = [e for e in bridge.events if e['kind'] == 'git_hunks'][-1]
+        self.assertEqual(len(event['unstaged']), 2)
+        top = next(h for h in event['unstaged'] if '+CHANGED TOP' in h['lines'])
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'stage ' + top['id']})
+        staged = git('diff', '--cached')
+        self.assertIn('+CHANGED TOP', staged)
+        self.assertNotIn('CHANGED BOTTOM', staged)
+        self.assertIn('+CHANGED BOTTOM', git('diff'))
+        with self.assertRaises(ValueError):  # the same card again: already applied
+            await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'stage ' + top['id']})
+        event = [e for e in bridge.events if e['kind'] == 'git_hunks'][-1]
+        await bridge.command({'mode': 'cc', 'action': 'git', 'text': 'unstage ' + event['staged'][0]['id']})
+        self.assertEqual(git('diff', '--cached'), '')
+
+
 class ReplaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_preview_apply_stale_and_undo(self):
         temp = tempfile.TemporaryDirectory()

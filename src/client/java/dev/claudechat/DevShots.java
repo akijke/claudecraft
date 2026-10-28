@@ -68,8 +68,10 @@ final class DevShots {
             case 540 -> Screenshot.grab(client, true);
             case 541 -> client.setScreenAndShow(new ChatPreview(PLAN));
             case 543 -> Screenshot.grab(client, true);
-            case 545 -> client.setScreenAndShow(new ChatPreview(DOCTOR));
-            case 556 -> Screenshot.grab(client, true);
+            case 544 -> client.setScreenAndShow(new ChatPreview(HUNKS));
+            case 547 -> Screenshot.grab(client, true);
+            case 549 -> client.setScreenAndShow(new ChatPreview(DOCTOR));
+            case 557 -> Screenshot.grab(client, true);
             case 560 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
@@ -141,6 +143,15 @@ final class DevShots {
             + "\"text\":\"## Context\\nLogin fails after the 26.3 update: ClientCommands moved.\\n\\n## Steps\\n"
             + "1. Update `src/Main.java:12` to the new ClientCommands API\\n2. Re-register `/login` with **attended()**\\n"
             + "3. Add a test in `src/test/LoginTest.java`\\n\\n## Verify\\n- `gradlew build` and runShots\",\"choices\":[\"Accept\",\"Edit\",\"Reject\"]}",
+    };
+
+    private static final String[] HUNKS = {
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"git_hunks\",\"text\":\"all changes\",\"path\":\"\","
+            + "\"unstaged\":[{\"id\":\"a1\",\"path\":\"src/Main.java\",\"header\":\"@@ -10,6 +10,7 @@ class Main\",\"added\":2,\"removed\":1,"
+            + "\"lines\":[\" ctx\",\"-import old.Commands;\",\"+import new.ClientCommands;\",\"+import new.Hud;\"]},"
+            + "{\"id\":\"a2\",\"path\":\"README.md\",\"header\":\"@@ -3,3 +3,3 @@\",\"added\":1,\"removed\":1,\"lines\":[\"-Old title\",\"+New title\"]}],"
+            + "\"staged\":[{\"id\":\"b1\",\"path\":\"build.gradle\",\"header\":\"@@ -1,4 +1,4 @@\",\"added\":1,\"removed\":1,"
+            + "\"lines\":[\"-version = '1.0'\",\"+version = '1.1'\"]}]}",
     };
 
     private static final String[] EDITS = {

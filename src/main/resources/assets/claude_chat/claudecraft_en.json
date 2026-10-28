@@ -448,5 +448,13 @@
   "Можно откатить: /cc undo": "Can be undone: /cc undo",
   "изменить": "change",
   "  совпадений нет": "  no matches",
-  "[-r] [-c] [--in *.java] <что> -> <на что> — замена по проекту с превью · в редакторе Ctrl+F / Ctrl+H": "[-r] [-c] [--in *.java] <find> -> <replace> — project-wide replace with preview · in the editor Ctrl+F / Ctrl+H"
+  "[-r] [-c] [--in *.java] <что> -> <на что> — замена по проекту с превью · в редакторе Ctrl+F / Ctrl+H": "[-r] [-c] [--in *.java] <find> -> <replace> — project-wide replace with preview · in the editor Ctrl+F / Ctrl+H",
+  "Куски изменений": "Hunks",
+  "Закоммитить то, что в коммите (staged)": "Commit what is staged",
+  "  В коммите (staged)": "  Staged",
+  "  Не в коммите": "  Not staged",
+  "убрать": "unstage",
+  "в коммит": "stage",
+  "куски": "hunks",
+  "Добавлять в коммит по кускам (stage по ханкам)": "Stage hunk by hunk"
 }
