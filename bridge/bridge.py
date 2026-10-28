@@ -444,6 +444,45 @@ class Bridge:
         result.pop('hashes')
         self.emit(chat, 'Замена', kind='replace_preview', **result)
 
+    def session_dir(self, chat):
+        return chat.session_cwd or self.chat_cwd(chat)
+
+    async def rewind(self, chat, arg):
+        """/cc rewind — the chat's prompts; /cc rewind <n> — back to before prompt n (history and files)."""
+        from backends import rewind
+        if chat.backend != 'local' or not chat.sdk_id:
+            raise ValueError('Откатывать нечего: у чата ещё нет сессии Claude Code')
+        if not arg:
+            found, _ = await asyncio.to_thread(rewind.prompts, chat.sdk_id, self.session_dir(chat))
+            rows = [{'n': n, 'text': images.display(t)[:160]} for n, _, t, _ in found][-30:]
+            self.emit(chat, 'История запросов', kind='rewind_list', rows=rows, chat_id=chat.id)
+            return
+        if chat.task is not None:
+            raise ValueError('Claude ещё работает в этом чате — дождись конца или /cc cancel')
+        if not arg.isdigit():
+            raise ValueError('rewind: /cc rewind — список · /cc rewind <номер>')
+        new_id, dropped = await asyncio.to_thread(rewind.branch, chat.sdk_id, self.session_dir(chat), int(arg), False)
+        old = chat.sdk_id
+        chat.sdk_id = new_id
+        if new_id is None:
+            chat.session_cwd = None
+        # files: undo the checkpoints of the dropped requests, newest first
+        norm = lambda t: images.parse(t or '')[0][:150]
+        dropped_texts = {norm(t) for t in dropped}
+        restored, removed = [], []
+        while True:
+            turns = self.checkpoints.load(chat.id)
+            if not turns or norm(turns[-1].get('prompt')) not in dropped_texts:
+                break
+            r, m, _, _ = self.checkpoints.undo(chat.id)
+            restored += r
+            removed += m
+        chat.context = 0
+        self.persist()
+        self.emit(chat, f'Откат к сообщению {arg}: убрано запросов из истории — {len(dropped)}', kind='rewound',
+                  restored=restored, removed=removed, prompt=images.display(dropped[0])[:2000] if dropped else '',
+                  old_session=old, session=new_id)
+
     def undo(self, chat, arg=''):
         """/cc undo — restore files Claude changed in the newest request; /cc undo list — history."""
         if arg in ('list', 'ls', 'history'):
@@ -781,6 +820,8 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'rewind':
+            await self.rewind(chat, text.strip())
         elif action == 'budget':
             sub, _, rest = text.strip().partition(' ')
             if sub == 'resume':

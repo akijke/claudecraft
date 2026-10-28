@@ -74,7 +74,9 @@ final class DevShots {
             case 547 -> Screenshot.grab(client, true);
             case 549 -> client.setScreenAndShow(new ChatPreview(DOCTOR));
             case 557 -> Screenshot.grab(client, true);
-            case 570 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 568 -> client.setScreenAndShow(new ChatPreview(REWIND));
+            case 572 -> Screenshot.grab(client, true);
+            case 575 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
             case 720 -> client.stop();
@@ -152,6 +154,15 @@ final class DevShots {
             + "| Backend | Startup | Cost |\\n|---|---:|---|\\n| SDK (Claude Code) | 1.2 s | $0.004 |\\n"
             + "| Messages API | 0.3 s | $0.002 |\\n| Codex | 2.1 s | **free** |\\n\\nFix in `src/Main.java:12`:\\n"
             + "```java\\nfinal class Main {\\n    // register the command\\n    static int retries = 3;\\n}\\n```\"}",
+    };
+
+    private static final String[] REWIND = {
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"rewind_list\",\"text\":\"Request history\",\"rows\":["
+            + "{\"n\":1,\"text\":\"Fix the build after the 26.3 update\"},{\"n\":2,\"text\":\"Add a /login command\"},"
+            + "{\"n\":3,\"text\":\"Rename everything to snake_case\"}]}",
+        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"rewound\",\"text\":\"Rewound to message 3: requests removed from the history — 1\","
+            + "\"restored\":[\"C:/dev/my-mod/src/Main.java\",\"C:/dev/my-mod/src/Login.java\"],\"removed\":[\"C:/dev/my-mod/src/naming.txt\"],"
+            + "\"prompt\":\"Rename everything to snake_case\"}",
     };
 
     private static final String[] HUNKS = {

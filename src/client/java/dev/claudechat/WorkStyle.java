@@ -182,6 +182,25 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "rewind_list" -> {
+                out.add(line(mode, lit("⟳ " + L.t("История запросов"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(L.t("   ⟳ — откатить разговор и файлы к моменту перед запросом"), FAINT))));
+                for (JsonElement item : e.getAsJsonArray("rows")) {
+                    JsonObject r = item.getAsJsonObject();
+                    int number = n(r, "n");
+                    out.add(line(mode, lit(String.format("  %2d ", number), FAINT)
+                        .append(button("⟳", cmd + "rewind " + number, false, GOLD, L.t("Вернуться к моменту перед этим запросом")))
+                        .append(lit("  " + firstLine(s(r, "text")), TEXT))));
+                }
+            }
+            case "rewound" -> {
+                out.add(line(mode, lit("⟳ " + s(e, "text"), GOLD).withStyle(st -> st.withBold(true))));
+                for (JsonElement p : e.getAsJsonArray("restored")) out.add(line(mode, lit(L.t("  восстановлен ") + p.getAsString(), GREEN)));
+                for (JsonElement p : e.getAsJsonArray("removed")) out.add(line(mode, lit(L.t("  удалён (создан Claude) ") + p.getAsString(), DIM)));
+                if (!s(e, "prompt").isEmpty())
+                    out.add(line(mode, Component.literal("  ").append(button("✎ " + L.t("изменить и отправить заново"),
+                        cmd + firstLine(s(e, "prompt")), true, AQUA, s(e, "prompt")))));
+            }
             case "budget_hit" -> {
                 out.add(line(mode, lit("⏸ " + s(e, "text"), GOLD).withStyle(st -> st.withBold(true))));
                 out.add(line(mode, Component.literal("  ")

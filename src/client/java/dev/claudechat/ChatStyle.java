@@ -201,7 +201,7 @@ final class ChatStyle {
         return String.join(", ", s);
     }
 
-    private static String firstLine(String text) {
+    static String firstLine(String text) {
         String t = clean(text).strip();
         int nl = t.indexOf('\n');
         return nl < 0 ? t : t.substring(0, nl) + " …";

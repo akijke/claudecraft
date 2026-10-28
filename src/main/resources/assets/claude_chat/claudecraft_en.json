@@ -530,5 +530,10 @@
   "Команда…": "Command…",
   "Перейти к файлу": "Go to file",
   "ничего не найдено": "nothing found",
-  "все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)": "all commands with search (Ctrl+Shift+P) · /goto — jump to a file (Ctrl+P in the mod's windows)"
+  "все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)": "all commands with search (Ctrl+Shift+P) · /goto — jump to a file (Ctrl+P in the mod's windows)",
+  "История запросов": "Request history",
+  "   ⟳ — откатить разговор и файлы к моменту перед запросом": "   ⟳ — roll the conversation and files back to before the request",
+  "Вернуться к моменту перед этим запросом": "Go back to just before this request",
+  "изменить и отправить заново": "edit and send again",
+  "[номер] — откатить разговор и файлы к любому прошлому запросу": "[number] — roll the conversation and files back to any earlier request"
 }

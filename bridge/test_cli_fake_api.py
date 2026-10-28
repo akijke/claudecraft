@@ -279,6 +279,37 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.runs, ['expensive', 'cheap one'])
         self.assertIn('second request done', self.texts())
 
+    async def test_rewind_history_and_files(self):
+        await self.start([])
+        ws = self.bridge.workspace
+        f = lambda n: os.path.join(ws, f'f{n}.txt')
+        self.fake.script = [
+            tool('Write', {'file_path': f(1), 'content': 'one'}), text('wrote 1'),
+            tool('Write', {'file_path': f(2), 'content': 'two'}, tool_id='toolu_2'), text('wrote 2'),
+            tool('Write', {'file_path': f(3), 'content': 'three'}, tool_id='toolu_3'), text('wrote 3'),
+            text('after rewind')]
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'auto', 'text': 'all'})
+        for p in ('PROMPT-ONE', 'PROMPT-TWO', 'PROMPT-THREE'):
+            await self.bridge.enqueue(chat, p)
+        await self.until(lambda: chat.task is None and not chat.queue)
+        self.assertTrue(all(os.path.exists(f(n)) for n in (1, 2, 3)))
+        await self.bridge.command({'mode': 'cc', 'action': 'rewind', 'text': ''})
+        rows = [e for e in self.bridge.events if e['kind'] == 'rewind_list'][-1]['rows']
+        self.assertEqual([r['text'] for r in rows], ['PROMPT-ONE', 'PROMPT-TWO', 'PROMPT-THREE'])
+        old = chat.sdk_id
+        await self.bridge.command({'mode': 'cc', 'action': 'rewind', 'text': '2'})
+        self.assertNotEqual(chat.sdk_id, old)
+        self.assertTrue(os.path.exists(f(1)))
+        self.assertFalse(os.path.exists(f(2)) or os.path.exists(f(3)))   # files of dropped requests are gone
+        await self.bridge.enqueue(chat, 'PROMPT-NEW')
+        await self.until(lambda: chat.task is None)
+        sent = json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False)
+        self.assertIn('PROMPT-ONE', sent)
+        self.assertNotIn('PROMPT-TWO', sent)
+        self.assertNotIn('PROMPT-THREE', sent)
+        self.assertIn('after rewind', self.texts())
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]
