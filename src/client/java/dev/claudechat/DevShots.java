@@ -66,6 +66,8 @@ final class DevShots {
             case 495 -> Screenshot.grab(client, true);
             case 510 -> client.setScreenAndShow(new ChatPreview(EDITS));
             case 540 -> Screenshot.grab(client, true);
+            case 541 -> client.setScreenAndShow(new ChatPreview(PLAN));
+            case 543 -> Screenshot.grab(client, true);
             case 545 -> client.setScreenAndShow(new ChatPreview(DOCTOR));
             case 556 -> Screenshot.grab(client, true);
             case 560 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
@@ -132,6 +134,13 @@ final class DevShots {
             + "{\"name\":\"Claude account\",\"status\":\"ok\",\"value\":\"claude.ai pro\",\"hint\":\"\"},"
             + "{\"name\":\"Free disk space\",\"status\":\"ok\",\"value\":\"129.3 GB\",\"hint\":\"\"},"
             + "{\"name\":\"Rights\",\"status\":\"info\",\"value\":\"regular user\",\"hint\":\"\"}]}",
+    };
+
+    private static final String[] PLAN = {
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"plan\",\"request\":\"p1\",\"path\":\"C:/Users/me/.claude/plans/fix-login.md\","
+            + "\"text\":\"## Context\\nLogin fails after the 26.3 update: ClientCommands moved.\\n\\n## Steps\\n"
+            + "1. Update `src/Main.java:12` to the new ClientCommands API\\n2. Re-register `/login` with **attended()**\\n"
+            + "3. Add a test in `src/test/LoginTest.java`\\n\\n## Verify\\n- `gradlew build` and runShots\",\"choices\":[\"Accept\",\"Edit\",\"Reject\"]}",
     };
 
     private static final String[] EDITS = {

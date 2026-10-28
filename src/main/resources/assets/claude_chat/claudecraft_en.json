@@ -421,5 +421,13 @@
   "  (~/.claude, только чтение)": "  (~/.claude, read-only)",
   "Удалить правило": "Remove the rule",
   "  deny важнее ask, ask важнее allow; без совпадения — режим /cc auto": "  deny beats ask, ask beats allow; no match — the /cc auto mode",
-  "правила разрешений allow/deny/ask: perms allow Bash(git *) · perms rm <правило>": "permission rules allow/deny/ask: perms allow Bash(git *) · perms rm <rule>"
+  "правила разрешений allow/deny/ask: perms allow Bash(git *) · perms rm <правило>": "permission rules allow/deny/ask: perms allow Bash(git *) · perms rm <rule>",
+  "☰ План Claude": "☰ Claude's plan",
+  "  … план длиннее — полностью в окне K": "  … the plan is longer — full text in the K window",
+  "Принять": "Accept",
+  "Claude начнёт выполнять план": "Claude starts executing the plan",
+  "Напиши, что изменить, — Claude перепишет план": "Type what to change — Claude rewrites the plan",
+  "Отклонить": "Reject",
+  "Открыть файл плана": "Open the plan file",
+  "<задача> — сначала план (только чтение), потом «Принять / Править / Отклонить»": "<task> — a plan first (read-only), then Accept / Edit / Reject"
 }

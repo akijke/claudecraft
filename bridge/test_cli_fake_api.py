@@ -5,6 +5,7 @@ Spawns real CLI processes (a few seconds each), so it is opt-in:
     CLAUDECRAFT_CLI_IT=1 python -m unittest test_cli_fake_api -v
 """
 import asyncio
+import re
 import json
 import os
 import tempfile
@@ -214,6 +215,48 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         results = json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False)
         self.assertIn('rule-ok', results)
         self.assertIn('Denied by the permission rule Bash(git push:*)', results)
+
+    async def answer_plans(self, answers):
+        """Answers plan cards in order, like the Minecraft buttons."""
+        async def loop():
+            queue = list(answers)
+            while queue:
+                for request, p in list(self.bridge.pending.items()):
+                    if p['kind'] == 'plan' and not p['future'].done():
+                        await self.bridge.command({'mode': 'cc', 'action': 'reply', 'request': request,
+                                                   'text': queue.pop(0)})
+                await asyncio.sleep(0.05)
+        return asyncio.create_task(loop())
+
+    async def test_plan_mode_revise_then_accept_and_execute(self):
+        def write_plan(content, tid):
+            # The CLI names the plan file in its plan-mode system prompt; Claude writes it with Write.
+            def reply(body):
+                found = re.search(r'create your plan at (\S+?\.md)', json.dumps(body, ensure_ascii=False))
+                path = found.group(1).replace('\\\\', '\\')
+                return tool('Write', {'file_path': path, 'content': content}, tool_id=tid)
+            return reply
+        await self.start([
+            write_plan('1. Read the file\n2. Fix it', 'toolu_1'), tool('ExitPlanMode', {}, tool_id='toolu_2'),
+            write_plan('1. Read the file\n2. Fix it\n3. Add a test', 'toolu_3'), tool('ExitPlanMode', {}, tool_id='toolu_4'),
+            text('executing the plan')])
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'plan', 'text': 'fix the bug'})
+        answers = await self.answer_plans(['also add a test', '1'])
+        try:
+            await self.until(lambda: chat.task is None)
+        finally:
+            answers.cancel()
+        self.assertEqual(self.errors(), [])
+        plans = [e for e in self.bridge.events if e['kind'] == 'plan']
+        self.assertEqual(len(plans), 2)
+        self.assertIn('3. Add a test', plans[1]['text'])
+        self.assertIn('executing the plan', self.texts())
+        sent = json.dumps([r['messages'] for r in self.fake.requests], ensure_ascii=False)
+        self.assertIn('also add a test', sent)               # the revision reached Claude
+        self.assertNotIn('[[plan]]', sent)                    # the marker is never sent
+        self.assertIn('plan mode', sent.lower())              # the CLI really ran in plan mode
+        self.assertEqual(chat.title, '[plan] fix the bug')
 
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])

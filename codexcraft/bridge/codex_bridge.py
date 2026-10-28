@@ -21,7 +21,7 @@ class CodexBridge(Bridge):
         mode = data.get('mode')
         if mode not in ('c', 'cc'):
             raise ValueError('Invalid mode')
-        if action in ('local', 'sync', 'terminal', 'agents', 'agent'):
+        if action in ('local', 'sync', 'terminal', 'agents', 'agent', 'plan'):
             raise ValueError('Эта команда относится к Claude. Для Codex используй new, chats, spawn и tasks; '
                              'настройки агентов — в AGENTS.md проекта.')
         if action == 'spawn' and data.get('text', '').startswith('@'):

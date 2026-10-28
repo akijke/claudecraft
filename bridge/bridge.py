@@ -396,7 +396,7 @@ class Bridge:
         else:
             chat.queue.append(text)
         if chat.title == 'Новый чат':
-            chat.title = images.display(text)[:60]
+            chat.title = images.display(text.replace('[[plan]]\n', '[plan] '))[:60]
             self.persist()
         if chat.task is None:
             chat.task = asyncio.create_task(self.pump(chat))
@@ -672,6 +672,13 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'plan':
+            if not text.strip():
+                raise ValueError('plan: /cc plan <задача> — Claude сначала составит план')
+            if chat.backend == 'api':
+                raise ValueError('План работает в чатах Claude Code (SDK)')
+            from backends.sdk import PLAN_MARK
+            await self.enqueue(chat, PLAN_MARK + text.strip())
         elif action == 'commands':
             from backends.commands import listing
             self.emit(chat, 'Команды', kind='commands', rows=listing(self.chat_cwd(chat) if mode == 'cc' else None))

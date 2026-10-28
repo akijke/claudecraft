@@ -125,6 +125,7 @@ final class ChatStyle {
             }
             case "status" -> out.add(line(mode, lit("· " + text, DIM).withStyle(s -> s.withItalic(true))));
             case "permission" -> permission(e, mode, out);
+            case "plan" -> plan(e, mode, text, out);
             case "question" -> question(e, mode, text, out);
             case "chats" -> chats(e, mode, out);
             case "listing" -> listing(e, mode, out);
@@ -224,6 +225,27 @@ final class ChatStyle {
             row.append(button(label, prefix + (i + 1), false, i < colors.length ? colors[i] : AQUA, null))
                 .append(Component.literal(" "));
         }
+        out.add(line(mode, row));
+    }
+
+    /** /cc plan: the plan as markdown, then Accept / Edit (type changes) / Reject. */
+    private static void plan(JsonObject e, String mode, String text, List<Component> out) {
+        String prefix = "/" + mode + " reply " + str(e, "request") + " ";
+        out.add(line(mode, lit(L.t("☰ План Claude"), GOLD).withStyle(s -> s.withBold(true))
+            .append(lit(str(e, "path").isEmpty() ? "" : "  " + new java.io.File(str(e, "path")).getName(), FAINT))));
+        List<Component> body = new java.util.ArrayList<>();
+        markdown(mode, text, body);
+        int limit = 40;
+        out.addAll(body.subList(0, Math.min(limit, body.size())));
+        if (body.size() > limit) out.add(line(mode, lit(L.t("  … план длиннее — полностью в окне K"), FAINT)));
+        MutableComponent row = Component.literal("  ")
+            .append(button("✔ " + L.t("Принять"), prefix + "1", false, GREEN, L.t("Claude начнёт выполнять план")))
+            .append(Component.literal(" "))
+            .append(button("✎ " + L.t("Править"), prefix, true, AQUA, L.t("Напиши, что изменить, — Claude перепишет план")))
+            .append(Component.literal(" "))
+            .append(button("✖ " + L.t("Отклонить"), prefix + "3", false, RED, null));
+        if (!str(e, "path").isEmpty())
+            row.append(Component.literal(" ")).append(button("☰", "/edit " + str(e, "path"), false, DIM, L.t("Открыть файл плана")));
         out.add(line(mode, row));
     }
 

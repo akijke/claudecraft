@@ -54,6 +54,8 @@ class FakeAnthropic:
                 'stop_sequence': None, 'usage': {'input_tokens': 1, 'output_tokens': 1}})
         self.requests.append(body)
         reply = self.script.pop(0) if self.script else text('(script exhausted)')
+        if callable(reply):  # replies that depend on the request (e.g. a path from the system prompt)
+            reply = reply(body)
         response = web.StreamResponse(headers={'Content-Type': 'text/event-stream'})
         await response.prepare(request)
 

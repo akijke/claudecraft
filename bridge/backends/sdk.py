@@ -25,6 +25,7 @@ from backends import permrules
 
 
 log = logging.getLogger('claudecraft.sdk')
+PLAN_MARK = '[[plan]]\n'  # queue item marker: run this request in plan mode (/cc plan)
 
 
 class TurnClosed(Exception):
@@ -308,6 +309,10 @@ def _types():
 
 
 async def run(bridge, chat, text):
+    plan_mode = text.startswith(PLAN_MARK)
+    if plan_mode:
+        text = text[len(PLAN_MARK):]
+    plan_file = [None]  # set when Claude writes its plan (plan mode)
     from claude_agent_sdk import (ClaudeAgentOptions, ClaudeSDKClient, PermissionResultAllow,
         PermissionResultDeny, tool, create_sdk_mcp_server)
 
@@ -320,6 +325,31 @@ async def run(bridge, chat, text):
             return PermissionResultDeny(message='No answer from the Minecraft user in time')
 
     async def decide(name, data):
+        if plan_mode and name in ('Write', 'Edit', 'MultiEdit') and Path(str(data.get('file_path', ''))).parent.name == 'plans':
+            plan_file[0] = Path(data['file_path'])  # the plan file the CLI asked for: no question
+            return PermissionResultAllow(updated_input=data)
+        if name == 'ExitPlanMode':
+            # /cc plan: Claude explored read-only and proposes a plan. Accept → it carries on and
+            # executes it; any other text → it revises the plan; 3 → stop.
+            plan = str(data.get('plan') or '')
+            if not plan and plan_file[0] is not None:
+                try:
+                    plan = plan_file[0].read_text(encoding='utf-8', errors='replace')
+                except OSError:
+                    pass
+            answer = await bridge.ask_user(chat, 'plan', plan[:20000] or '(пустой план)',
+                                           ['Принять', 'Править', 'Отклонить'],
+                                           path=str(plan_file[0]) if plan_file[0] else None)
+            if answer.strip() == '1':
+                bridge.emit(chat, 'План принят — выполняю.', kind='status')
+                return PermissionResultAllow(updated_input=data)
+            if answer.strip() in ('3', '2'):
+                bridge.emit(chat, 'План отклонён.', kind='status')
+                return PermissionResultDeny(message='The user rejected the plan. Stop and wait for new instructions.',
+                                            interrupt=True)
+            bridge.emit(chat, 'Отправил правки к плану.', kind='status')
+            return PermissionResultDeny(message='The user wants changes to the plan: ' + answer.strip()
+                                        + '\nRevise the plan and present it again with ExitPlanMode.')
         if name == 'AskUserQuestion':
             answers = {}
             for question in data.get('questions', []):
@@ -408,9 +438,11 @@ async def run(bridge, chat, text):
     extra_dirs = [effective] if Path(effective) != Path(session_dir) else []
     if extra_dirs:
         text = f'[Рабочая папка проекта: {effective}]\n{text}'
+    if plan_mode:
+        tools = tools + ['ExitPlanMode'] if 'ExitPlanMode' not in tools else tools
     options = ClaudeAgentOptions(cwd=session_dir, resume=chat.sdk_id, add_dirs=extra_dirs,
         tools=tools, mcp_servers=mcp, can_use_tool=permission,
-        permission_mode='default', setting_sources=[],
+        permission_mode='plan' if plan_mode else 'default', setting_sources=[],
         # Lines of the answer are shown while they are generated.
         include_partial_messages=True,
         model=chat.model, effort=chat.effort,
