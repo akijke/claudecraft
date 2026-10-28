@@ -269,7 +269,9 @@ class SdkTurn:
                 elif isinstance(message, T.ResultMessage):
                     self.chat.sdk_id = message.session_id or self.chat.sdk_id
                     cost = message.total_cost_usd or 0.0
-                    self.bridge.add_usage(self.chat, message.usage, max(cost - self.cost_seen, 0.0))
+                    models = message.model_usage or {}
+                    model = max(models, key=lambda m: (models[m] or {}).get('costUSD', 0)) if models else None
+                    self.bridge.add_usage(self.chat, message.usage, max(cost - self.cost_seen, 0.0), model)
                     self.cost_seen = max(cost, self.cost_seen)
                     if self.acked == 0 and self.replay is not False:
                         self._no_echo()

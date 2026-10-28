@@ -601,5 +601,13 @@
   "уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл": "Windows notifications and a flashing taskbar button while the game is minimized — on/off",
   "лимит ": "limit ",
   "очередь ": "queue ",
-  "⏸ пауза": "⏸ paused"
+  "⏸ пауза": "⏸ paused",
+  "токены": "tokens",
+  " дн.": " d",
+  "Расходы": "Spending",
+  "за %d дн.: %s · %s токенов · %d ходов": "%d days: %s · %s tokens · %d turns",
+  "Модели": "Models",
+  "Оценка Claude Code по ценам API; на подписке тратится лимит, а не деньги": "Claude Code's estimate at API prices; on a subscription it is your limit, not money",
+  "Расходы: графики": "Spending: charts",
+  "графики расходов по дням, проектам и моделям": "spending charts by day, project and model"
 }

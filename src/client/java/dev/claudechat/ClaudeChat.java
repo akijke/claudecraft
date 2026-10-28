@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "fork", "ide", "export", "search", "open_session", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "style", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "fork", "ide", "export", "search", "open_session", "dashboard", "spend", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "style", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -457,6 +457,7 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
         if (action.equals("shot") || action.equals("screenshot")) { screenshot(mode, text); return; }
+        if (action.equals("dashboard") || action.equals("spend")) { open(() -> new DashboardScreen(this, null)); return; }
         if (action.equals("ide")) {
             String file = text.isBlank() ? null : text.strip();
             open(() -> new IdeScreen(this, file));
@@ -613,6 +614,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "plan", L.t("<задача> — сначала план (только чтение), потом «Принять / Править / Отклонить»")},
             {c + "replace", L.t("[-r] [-c] [--in *.java] <что> -> <на что> — замена по проекту с превью · в редакторе Ctrl+F / Ctrl+H")},
             {"/cc worktree", L.t("worktrees параллельных задач: merge · diff · drop (spawn --here — без worktree)")},
+            {c + "dashboard", L.t("графики расходов по дням, проектам и моделям")},
             {c + "budget", L.t("лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume")},
             {"/ide", L.t("[файл] — чат | редактор | терминал в одном окне (Ctrl+1/2/3, Ctrl+P — файл, разделители тянутся)")},
             {"/palette", L.t("все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)")},

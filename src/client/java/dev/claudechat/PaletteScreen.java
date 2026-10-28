@@ -63,7 +63,7 @@ final class PaletteScreen extends Screen {
             {L.t("Остановить работу"), "/cc cancel", ""}, {L.t("Очистить очередь"), "/cc cq", ""},
             {L.t("План задачи…"), "/cc plan ", "plan mode"}, {L.t("Параллельная задача…"), "/cc spawn ", "worktree"},
             {L.t("Модель и усилие"), "/cc model", ""}, {L.t("Токены"), "/cc tokens", ""}, {L.t("Контекст"), "/cc context", ""},
-            {L.t("Сжать историю"), "/cc compact", ""}, {L.t("Бюджет"), "/cc budget", ""},
+            {L.t("Сжать историю"), "/cc compact", ""}, {L.t("Бюджет"), "/cc budget", ""}, {L.t("Расходы: графики"), "/cc dashboard", ""},
             {L.t("Откатить правки Claude"), "/cc undo", ""}, {L.t("История правок"), "/cc undo list", ""},
             {L.t("Правила разрешений"), "/cc perms", ""}, {L.t("Автоодобрение"), "/cc auto", ""},
             {L.t("Скриншот → Claude"), "/cc shot", ""}, {L.t("Картинка → Claude…"), "/cc img ", ""},

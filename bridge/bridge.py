@@ -104,6 +104,8 @@ class Bridge:
         self.worktrees = Worktrees(self)
         from backends.budget import Budget
         self.budget = Budget(self)
+        from backends.ledger import Ledger
+        self.ledger = Ledger(self.directory)
         self.terminals = Terminals(self)
         self.oauth = OAuth(self)
         self.port = 18741  # set by main(); used for the OAuth redirect
@@ -389,7 +391,7 @@ class Bridge:
         elif pct < 80:
             chat.context_warned = False
 
-    def add_usage(self, chat, usage, cost=0.0):
+    def add_usage(self, chat, usage, cost=0.0, model=None):
         """Add one turn's tokens (and cost delta) to the chat totals and the running item."""
         for bucket in (chat.usage, chat.run_usage):
             for key in USAGE_KEYS:
@@ -398,6 +400,7 @@ class Bridge:
         chat.usage['turns'] = chat.usage.get('turns', 0) + 1
         from backends.budget import tokens_of
         self.budget.add(cost, tokens_of(usage or {}))
+        self.ledger.add(chat.project if chat.mode == 'cc' else 'chat', chat.mode, model or chat.model, usage, cost)
         self.budget_check(chat)
 
     def budget_check(self, chat, live_tokens=0):
@@ -1457,6 +1460,10 @@ def create_app(bridge, token):
             r['description'], r['hint'] = bridge.tr(r['description']), bridge.tr(r['hint'])
         return web.json_response({'commands': rows})
     app.router.add_get('/commands', commands)
+    async def usage(request):
+        days = max(1, min(int(request.query.get('days') or 14), 90))
+        return web.json_response(await asyncio.to_thread(bridge.ledger.aggregate, days))
+    app.router.add_get('/usage', usage)
     async def index(request):
         mode = request.query.get('mode', 'cc')
         chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')

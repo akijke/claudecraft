@@ -1121,6 +1121,27 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bridge.runner.await_args.args[1], 'waits')
 
 
+class LedgerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_usage_by_day_project_model(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(temp.name, AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        chat = bridge.current_chat('cc')
+        bridge.add_usage(chat, {'input_tokens': 1000, 'output_tokens': 200}, 0.30, 'claude-opus-x')
+        bridge.add_usage(chat, {'input_tokens': 500, 'cache_read_input_tokens': 500, 'output_tokens': 0}, 0.10, 'claude-haiku-x')
+        bridge.add_usage(bridge.current_chat('c'), {'input_tokens': 10, 'output_tokens': 10}, 0.0)
+        app = create_app(bridge, 't')
+        request = make_mocked_request('GET', '/usage?days=7', headers={'Authorization': 'Bearer t'})
+        route = await app.router.resolve(request)
+        data = json.loads((await app.middlewares[0](request, route.handler)).text)
+        self.assertEqual(len(data['days']), 7)
+        self.assertEqual((data['days'][-1]['tokens'], data['days'][-1]['cost']), (2220, 0.4))
+        self.assertEqual([m['key'] for m in data['models']], ['claude-opus-x', 'claude-haiku-x', 'default'])
+        self.assertEqual({p['key'] for p in data['projects']}, {bridge.projects.current, 'chat'})
+        self.assertEqual(data['total']['turns'], 3)
+
+
 class StatusLineTests(unittest.IsolatedAsyncioTestCase):
     async def test_status_in_state(self):
         temp = tempfile.TemporaryDirectory()

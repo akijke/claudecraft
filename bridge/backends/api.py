@@ -17,7 +17,7 @@ async def run(bridge, chat, text):
             if response.status != 200:
                 raise ValueError(f'Anthropic API HTTP {response.status}: '
                                  + str(data.get('error', {}).get('message', 'Request failed'))[:500])
-    bridge.add_usage(chat, data.get('usage'))
+    bridge.add_usage(chat, data.get('usage'), model=data.get('model'))
     answer = '\n'.join(b['text'] for b in data['content'] if b['type'] == 'text')
     if not answer:
         raise ValueError('API returned no text')

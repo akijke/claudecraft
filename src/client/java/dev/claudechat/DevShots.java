@@ -81,8 +81,8 @@ final class DevShots {
             case 557 -> Screenshot.grab(client, true);
             case 568 -> client.setScreenAndShow(new ChatPreview(REWIND));
             case 572 -> Screenshot.grab(client, true);
-            case 576 -> client.setScreenAndShow(new IdeScreen(mod, "src/main/java/dev/demo/Hello.java"));
-            case 600 -> Screenshot.grab(client, true);
+            case 576 -> client.setScreenAndShow(new DashboardScreen(mod, null).withData(parse(USAGE)));
+            case 590 -> Screenshot.grab(client, true);
             case 610 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
@@ -171,6 +171,20 @@ final class DevShots {
             + "\"restored\":[\"C:/dev/my-mod/src/Main.java\",\"C:/dev/my-mod/src/Login.java\"],\"removed\":[\"C:/dev/my-mod/src/naming.txt\"],"
             + "\"prompt\":\"Rename everything to snake_case\"}",
     };
+
+    private static final String USAGE = "{\"days\":["
+        + "{\"key\":\"2026-10-16\",\"tokens\":120000,\"cost\":0.42},{\"key\":\"2026-10-17\",\"tokens\":0,\"cost\":0},"
+        + "{\"key\":\"2026-10-18\",\"tokens\":340000,\"cost\":1.10},{\"key\":\"2026-10-19\",\"tokens\":80000,\"cost\":0.21},"
+        + "{\"key\":\"2026-10-20\",\"tokens\":610000,\"cost\":2.35},{\"key\":\"2026-10-21\",\"tokens\":220000,\"cost\":0.74},"
+        + "{\"key\":\"2026-10-22\",\"tokens\":150000,\"cost\":0.51},{\"key\":\"2026-10-23\",\"tokens\":0,\"cost\":0},"
+        + "{\"key\":\"2026-10-24\",\"tokens\":410000,\"cost\":1.42},{\"key\":\"2026-10-25\",\"tokens\":520000,\"cost\":1.95},"
+        + "{\"key\":\"2026-10-26\",\"tokens\":90000,\"cost\":0.30},{\"key\":\"2026-10-27\",\"tokens\":880000,\"cost\":3.20},"
+        + "{\"key\":\"2026-10-28\",\"tokens\":1250000,\"cost\":4.65},{\"key\":\"2026-10-29\",\"tokens\":300000,\"cost\":1.02}],"
+        + "\"projects\":[{\"key\":\"my-mod\",\"tokens\":3100000,\"cost\":11.4},{\"key\":\"website\",\"tokens\":1200000,\"cost\":4.1},"
+        + "{\"key\":\"chat\",\"tokens\":670000,\"cost\":2.4}],"
+        + "\"models\":[{\"key\":\"claude-opus-5-5\",\"tokens\":2200000,\"cost\":12.9},{\"key\":\"claude-sonnet-5-5\",\"tokens\":2400000,\"cost\":4.6},"
+        + "{\"key\":\"claude-haiku-5-5\",\"tokens\":370000,\"cost\":0.4}],"
+        + "\"total\":{\"tokens\":4970000,\"cost\":17.9,\"turns\":412}}";
 
     private static final String[] HUNKS = {
         "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"git_hunks\",\"text\":\"all changes\",\"path\":\"\","
