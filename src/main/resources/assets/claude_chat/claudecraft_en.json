@@ -570,5 +570,10 @@
   "нет  ": "none  ",
   "Напр.: «отвечай по-русски, код комментируй по-английски»": "E.g. “answer in Russian, comment code in English”",
   "  свои стили: .claude/output-styles/*.md · действует со следующего запроса": "  your own styles: .claude/output-styles/*.md · applies from the next request",
-  "стиль ответов на проект (concise, explanatory, learning…) · style append <текст> — добавка к промпту": "output style per project (concise, explanatory, learning…) · style append <text> — prompt addition"
+  "стиль ответов на проект (concise, explanatory, learning…) · style append <текст> — добавка к промпту": "output style per project (concise, explanatory, learning…) · style append <text> — prompt addition",
+  "Новый чат: история до этого ответа включительно": "New chat: the history up to and including this answer",
+  "исходный чат": "original chat",
+  "[номер] — новый чат-ветка с этого места разговора (исходный не меняется)": "[number] — a new branch chat from this point of the conversation (the original stays)",
+  "   ⟳ — откатить разговор и файлы к моменту перед запросом · «ветка» — новый чат после ответа": "   ⟳ — roll back the conversation and files to before the request · “branch” — a new chat after the answer",
+  "ветка": "branch"
 }

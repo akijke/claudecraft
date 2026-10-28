@@ -274,15 +274,18 @@ final class WorkStyle {
             }
             case "rewind_list" -> {
                 out.add(line(mode, lit("⟳ " + L.t("История запросов"), GOLD).withStyle(st -> st.withBold(true))
-                    .append(lit(L.t("   ⟳ — откатить разговор и файлы к моменту перед запросом"), FAINT))));
+                    .append(lit(L.t("   ⟳ — откатить разговор и файлы к моменту перед запросом · «ветка» — новый чат после ответа"), FAINT))));
                 for (JsonElement item : e.getAsJsonArray("rows")) {
                     JsonObject r = item.getAsJsonObject();
                     int number = n(r, "n");
                     out.add(line(mode, lit(String.format("  %2d ", number), FAINT)
                         .append(button("⟳", cmd + "rewind " + number, false, GOLD, L.t("Вернуться к моменту перед этим запросом")))
+                        .append(sp()).append(button(L.t("ветка"), cmd + "fork " + number, false, AQUA, L.t("Новый чат: история до этого ответа включительно")))
                         .append(lit("  " + firstLine(s(r, "text")), TEXT))));
                 }
             }
+            case "forked" -> out.add(line(mode, lit("✦ " + s(e, "text"), AQUA).append(sp())
+                .append(button(L.t("исходный чат"), cmd + "select " + s(e, "source"), false, DIM, null))));
             case "rewound" -> {
                 out.add(line(mode, lit("⟳ " + s(e, "text"), GOLD).withStyle(st -> st.withBold(true))));
                 for (JsonElement p : e.getAsJsonArray("restored")) out.add(line(mode, lit(L.t("  восстановлен ") + p.getAsString(), GREEN)));

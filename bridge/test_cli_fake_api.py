@@ -413,6 +413,26 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertIn('STYLE-ADDITION-77', request)
         self.assertIn('Output style \\"concise\\"', request)
 
+    async def test_fork_continues_from_an_answer_in_a_new_chat(self):
+        await self.start([text('answer one'), text('answer two'), text('branch reply'), text('original reply')])
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'FIRST-Q')
+        await self.bridge.enqueue(chat, 'SECOND-Q')
+        await self.until(lambda: chat.task is None and not chat.queue)
+        await self.bridge.command({'mode': 'cc', 'action': 'fork', 'text': '1'})
+        branch = self.bridge.chats[self.bridge.selected['cc']]
+        self.assertNotEqual(branch.id, chat.id)
+        self.assertNotEqual(branch.sdk_id, chat.sdk_id)
+        await self.bridge.enqueue(branch, 'BRANCH-Q')
+        await self.until(lambda: branch.task is None)
+        sent = json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False)
+        self.assertIn('FIRST-Q', sent)
+        self.assertIn('answer one', sent)
+        self.assertNotIn('SECOND-Q', sent)
+        await self.bridge.enqueue(chat, 'ORIGINAL-Q')                # the original keeps its whole history
+        await self.until(lambda: chat.task is None)
+        self.assertIn('SECOND-Q', json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False))
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

@@ -157,6 +157,9 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Ветвить нечего: у чата ещё нет сессии Claude Code': 'Nothing to fork: this chat has no Claude Code session yet',
+    'Ветка от сообщения {} чата «{}» — продолжай здесь, исходный чат не изменился':
+        'Branch from message {} of “{}” — continue here, the original chat is unchanged',
     'Стиль ответов': 'Output style',
     'Стиль задаётся для проекта: используй /cc style': 'A style is set per project: use /cc style',
     'Нет стиля {}. Есть: {}': 'No style {}. Available: {}',

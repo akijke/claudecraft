@@ -484,6 +484,22 @@ class Bridge:
                   restored=restored, removed=removed, prompt=images.display(dropped[0])[:2000] if dropped else '',
                   old_session=old, session=new_id)
 
+    async def fork(self, chat, arg):
+        """/cc fork [n] — a new chat that continues from prompt n's answer (default: the latest); files untouched."""
+        from backends import rewind
+        if chat.backend != 'local' or not chat.sdk_id:
+            raise ValueError('Ветвить нечего: у чата ещё нет сессии Claude Code')
+        found, _ = await asyncio.to_thread(rewind.prompts, chat.sdk_id, self.session_dir(chat))
+        number = int(arg) if arg.isdigit() else len(found)
+        new_id, _ = await asyncio.to_thread(rewind.branch, chat.sdk_id, self.session_dir(chat), number, True)
+        branch = self.new_chat(chat.mode, 'local', chat.project)
+        branch.sdk_id, branch.session_cwd = new_id, self.session_dir(chat)
+        branch.model, branch.effort, branch.auto = chat.model, chat.effort, chat.auto
+        branch.title = ('✦ ' + chat.title)[:60]
+        self.persist()
+        self.emit(branch, f'Ветка от сообщения {number} чата «{chat.title}» — продолжай здесь, исходный чат не изменился',
+                  kind='forked', source=chat.id, number=number)
+
     def undo(self, chat, arg=''):
         """/cc undo — restore files Claude changed in the newest request; /cc undo list — history."""
         if arg in ('list', 'ls', 'history'):
@@ -931,6 +947,8 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action == 'fork':
+            await self.fork(chat, text.strip())
         elif action == 'budget':
             sub, _, rest = text.strip().partition(' ')
             if sub == 'resume':
