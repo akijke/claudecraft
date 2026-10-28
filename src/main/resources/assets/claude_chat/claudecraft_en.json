@@ -367,5 +367,17 @@
   "откатить файлы, изменённые Claude в последнем запросе · undo list — история": "restore files Claude changed in the last request · undo list — history",
   "[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка": "[question] — game screenshot for Claude · img <file> [question] — any picture",
   "Скриншот": "Screenshot",
-  "Снимок игры без интерфейса → Claude; текст из поля уйдёт вопросом": "Game screenshot without the GUI → Claude; the text in the box goes along as the question"
+  "Снимок игры без интерфейса → Claude; текст из поля уйдёт вопросом": "Game screenshot without the GUI → Claude; the text in the box goes along as the question",
+  "[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один": "[ps|cmd|bash|pwsh|wsl] — real terminal (vim, htop, REPLs) · /pty new — another one",
+  "Закрыть терминал (завершить оболочку)": "Close the terminal (ends the shell)",
+  "Запускаю ": "Starting ",
+  "Настоящий терминал в этой папке (PowerShell / bash)": "Real terminal in this folder (PowerShell / bash)",
+  "Новый терминал (shell: ps, cmd, bash, pwsh, wsl — /pty new <shell>)": "New terminal (shell: ps, cmd, bash, pwsh, wsl — /pty new <shell>)",
+  "Оболочка продолжит работать; /pty — вернуться (Ctrl+Shift+W)": "The shell keeps running; /pty brings it back (Ctrl+Shift+W)",
+  "Размер шрифта (Ctrl+= / Ctrl+-)": "Font size (Ctrl+= / Ctrl+-)",
+  "Скрыть": "Hide",
+  "Экран скопирован": "Screen copied",
+  "история −": "history −",
+  "оболочка завершилась — ✕ закрыть, + новая": "the shell has exited — ✕ close, + new one",
+  "скрыть": "hide"
 }

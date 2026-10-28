@@ -271,7 +271,7 @@ final class FileScreen extends Screen {
             {L.t("Редактор"), "VS Code / Cursor / IDEA"},
             {"→ Claude", L.t("Спросить Claude про выбранный файл или папку")},
             {"✦ " + L.t("Проект"), L.t("Сделать проектом") + ": " + L.t("Claude будет работать в этой папке")},
-            {"$ " + L.t("Терминал"), L.t("Окно K с командой оболочки в этой папке")},
+            {"$ " + L.t("Терминал"), L.t("Настоящий терминал в этой папке (PowerShell / bash)")},
             {CommonComponents.GUI_DONE.getString(), null},
         }, new Runnable[]{
             () -> run("open", current() != null ? child(current().get("name").getAsString()) : path(), null),
@@ -279,7 +279,7 @@ final class FileScreen extends Screen {
             this::askClaude,
             () -> run("project", "pick " + (current() != null && current().get("dir").getAsBoolean()
                 ? child(current().get("name").getAsString()) : path()), L.t("Проект открыт")),
-            () -> openConversation("$ "),
+            () -> minecraft.setScreenAndShow(new TerminalScreen(mod, this, "auto", path())),
             this::onClose,
         });
         if (dir == null) load(lastPath);

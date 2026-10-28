@@ -66,7 +66,10 @@ final class DevShots {
             case 495 -> Screenshot.grab(client, true);
             case 510 -> client.setScreenAndShow(new ChatPreview(EDITS));
             case 540 -> Screenshot.grab(client, true);
-            case 550 -> client.stop();
+            case 550 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
+            case 700 -> Screenshot.grab(client, true);
+            case 720 -> client.stop();
             default -> { }
         }
     }
@@ -139,6 +142,8 @@ final class DevShots {
         "{\"mode\":\"cc\",\"kind\":\"listing\",\"path\":\"C:/dev/my-mod\",\"parent\":\"C:/dev\",\"project\":\"my-mod\",\"git\":true,\"more\":0,\"rows\":["
             + "{\"name\":\"src\",\"dir\":true,\"size\":0},{\"name\":\"gradle\",\"dir\":true,\"size\":0},{\"name\":\"build.gradle\",\"dir\":false,\"size\":1830},{\"name\":\"README.md\",\"dir\":false,\"size\":9100}]}",
     };
+
+    private TerminalScreen term;
 
     private static final String EDITOR = String.join("\n",
         "package dev.demo;",

@@ -19,6 +19,7 @@ from backends.connectors import Connectors
 from backends.files import FileManager
 from backends.undo import Checkpoints
 from backends import images
+from backends.ptyterm import Terminals
 from backends.gitops import Git
 from backends.shell import Shell
 from backends.github import GitHub
@@ -87,6 +88,7 @@ class Bridge:
         self.shell = Shell(self)
         self.github = GitHub(self)
         self.checkpoints = Checkpoints(self.directory / 'undo')
+        self.terminals = Terminals(self)
         self.extensions = {}
         self.reload_extensions()
         self.chats = {}
@@ -873,6 +875,7 @@ class Bridge:
         for job in list(self.git.jobs):
             job.cancel()
         await self.shell.close()
+        self.terminals.close_all()
         self.persist()
 
 
@@ -979,6 +982,50 @@ def create_app(bridge, token):
         status['github'] = await bridge.github.status()
         return web.json_response(status)
     app.router.add_get('/account', account)
+
+    # ---- interactive terminals (in-game terminal window) ----
+    def size(data):
+        return max(10, min(int(data.get('cols') or 100), 400)), max(3, min(int(data.get('rows') or 30), 200))
+    async def pty_open(request):
+        data = await request.json()
+        mode = data.get('mode') if data.get('mode') in ('c', 'cc') else 'cc'
+        cwd = bridge.files.resolve(mode, data.get('cwd') or '')
+        if not cwd.is_dir():
+            raise ValueError(f'Нет такой папки: {cwd}')
+        cols, rows = size(data)
+        term = await asyncio.to_thread(bridge.terminals.open, str(data.get('shell') or 'auto'), cwd, cols, rows)
+        return web.json_response(term.snapshot())
+    async def pty_input(request):
+        data = await request.json()
+        text = data.get('data', '')
+        if not isinstance(text, str) or len(text) > 65536:
+            raise ValueError('input: up to 64 KB of text')
+        await asyncio.to_thread(bridge.terminals.get(data.get('id', '')).write, text)
+        return web.json_response({'ok': True})
+    async def pty_resize(request):
+        data = await request.json()
+        bridge.terminals.get(data.get('id', '')).resize(*size(data))
+        return web.json_response({'ok': True})
+    async def pty_screen(request):
+        term = bridge.terminals.get(request.query.get('id', ''))
+        scroll = int(request.query.get('scroll') or 0)
+        with term.lock:
+            version = term.screen.version
+        if request.query.get('version') == str(version) and scroll == int(request.query.get('was') or -1):
+            return web.json_response({'same': True, 'alive': term.ended is None})
+        return web.json_response(term.snapshot(scroll))
+    async def pty_close(request):
+        data = await request.json()
+        bridge.terminals.close(data.get('id', ''))
+        return web.json_response({'terminals': bridge.terminals.list()})
+    async def pty_list(request):
+        return web.json_response({'terminals': bridge.terminals.list()})
+    app.router.add_post('/pty/open', pty_open)
+    app.router.add_post('/pty/input', pty_input)
+    app.router.add_post('/pty/resize', pty_resize)
+    app.router.add_get('/pty/screen', pty_screen)
+    app.router.add_post('/pty/close', pty_close)
+    app.router.add_get('/pty/list', pty_list)
     async def cleanup(app):
         await bridge.close()
     app.on_cleanup.append(cleanup)

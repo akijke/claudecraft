@@ -706,6 +706,78 @@ class FileWindowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('No such folder', data['error'])
 
 
+class ScreenTests(unittest.TestCase):
+    """The VT emulator behind the in-game terminal."""
+    def test_text_colors_cursor_and_erase(self):
+        from backends.vt import Screen
+        replies = []
+        s = Screen(20, 4, reply=replies.append)
+        s.feed('ab\x1b[31mred\x1b[0m\r\nline2\x1b[2;3H#\x1b[6n')
+        snap = s.snapshot()
+        self.assertEqual(snap['rows'][0], [['ab', None, None, False], ['red', 0xC50F1F, None, False]])
+        self.assertEqual(''.join(r[0] for r in snap['rows'][1]), 'li#e2')
+        self.assertEqual(replies, ['\x1b[2;4R'])
+        s.feed('\x1b[1;1H\x1b[2K')
+        self.assertEqual(s.snapshot()['rows'][0], [])
+
+    def test_scrollback_wrap_and_alt_screen(self):
+        from backends.vt import Screen
+        s = Screen(10, 3)
+        s.feed('1\r\n2\r\n3\r\n4\r\n0123456789AB')
+        self.assertEqual(s.text().split('\n'), ['1', '2', '3', '4', '0123456789', 'AB'])
+        s.feed('\x1b[?1049h\x1b[Hvim')
+        self.assertEqual(''.join(r[0] for r in s.snapshot()['rows'][0]), 'vim')
+        s.feed('\x1b[?1049l')
+        self.assertEqual(''.join(r[0] for r in s.snapshot()['rows'][-1]), 'AB')
+        self.assertEqual(s.snapshot(scroll=2)['rows'][0], [['2', None, None, False]])
+
+
+class TerminalHttpTests(unittest.IsolatedAsyncioTestCase):
+    """A real shell in a pseudo console through the HTTP API."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.app = create_app(self.bridge, 't')
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def call(self, method, path, body=None):
+        request = make_mocked_request(method, path, headers={'Authorization': 'Bearer t'})
+        if body is not None:
+            request.json = AsyncMock(return_value=body)
+        route = await self.app.router.resolve(request)
+        response = await self.app.middlewares[0](request, route.handler)
+        return response.status, json.loads(response.text)
+
+    async def test_shell_roundtrip(self):
+        status, term = await self.call('POST', '/pty/open', {'mode': 'cc', 'cols': 70, 'rows': 12,
+                                                             'shell': 'cmd' if os.name == 'nt' else 'sh'})
+        self.assertEqual(status, 200, term)
+        tid = term['id']
+        await self.call('POST', '/pty/input', {'id': tid, 'data': 'echo okpty\r'})
+        text = ''
+        for _ in range(100):
+            await asyncio.sleep(0.1)
+            _, snap = await self.call('GET', f'/pty/screen?id={tid}')
+            text = '\n'.join(''.join(r[0] for r in row) for row in snap['rows'])
+            if text.count('okpty') >= 2:  # the typed command and its output
+                break
+        self.assertGreaterEqual(text.count('okpty'), 2, text)
+        _, same = await self.call('GET', f"/pty/screen?id={tid}&version={snap['version']}&was=0")
+        self.assertTrue(same.get('same') or same.get('version'))
+        await self.call('POST', '/pty/input', {'id': tid, 'data': 'exit\r'})
+        for _ in range(60):
+            await asyncio.sleep(0.1)
+            _, snap = await self.call('GET', f'/pty/screen?id={tid}')
+            if not snap['alive']:
+                break
+        self.assertFalse(snap['alive'])
+        _, listing = await self.call('POST', '/pty/close', {'id': tid})
+        self.assertEqual(listing['terminals'], [])
+
+
 class ModelTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()

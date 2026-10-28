@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "img", "image",
+        "tokens", "usage", "auto", "model", "effort", "undo", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -52,6 +52,7 @@ public final class ClaudeChat implements ClientModInitializer {
         for (String a : new String[]{"ls", "dir", "cd", "pwd", "cat", "tree", "find", "mkdir", "touch", "mv", "cp",
             "rm", "open", "code", "git"}) SHORTCUTS.put(a, a);
         SHORTCUTS.put("edit", "edit");
+        SHORTCUTS.put("pty", "pty");
         SHORTCUTS.put("nano", "edit");
         SHORTCUTS.put("sh", "sh auto");
         SHORTCUTS.put("ps", "sh ps");
@@ -269,6 +270,12 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
         if (action.equals("shot") || action.equals("screenshot")) { screenshot(mode, text); return; }
+        if (action.equals("pty")) {  // real terminal window: /pty, /pty new [shell], /pty <shell>
+            String arg = text.strip();
+            if (arg.isEmpty()) open(() -> TerminalScreen.reopen(this, null));
+            else open(() -> new TerminalScreen(this, null, arg.startsWith("new") ? arg.substring(3).strip() : arg, ""));
+            return;
+        }
         if (Set.of("edit", "nano", "vim").contains(action)) {
             if (text.isBlank()) { say(mode, L.t("Формат: /edit <файл>")); return; }
             String file = text.strip().replaceAll("^\"|\"$", "");
@@ -398,6 +405,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "model", L.t("модель и усилие для этого чата (opus, sonnet, haiku · low…max)")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
+            {"/pty", L.t("[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один")},
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},
