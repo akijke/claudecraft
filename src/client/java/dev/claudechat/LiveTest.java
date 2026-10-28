@@ -241,6 +241,17 @@ final class LiveTest {
             if (waited == 40) ide.typeForTest("echo ide-ok\r");
             return waited > 90;
         }, 15);
+        step("key binds for every window are registered", () -> { }, () -> java.util.Arrays.stream(mc().options.keyMappings)
+            .map(net.minecraft.client.KeyMapping::getName).filter(n -> n.startsWith("key.claude_chat.")).count() >= 8, 5);
+        final int[] gameScale = {0};
+        step("/claude scale 1 applies only inside the mod's windows", () -> {
+            mc().setScreenAndShow(null);
+            gameScale[0] = mc().getWindow().getGuiScale();
+            Theme.setScale(1);
+            mc().setScreenAndShow(new ConversationScreen(mod));
+        }, () -> waited > 10 && mc().getWindow().getGuiScale() == 1, 10);
+        quiet("the game's scale returns", () -> { Theme.setScale(0); mc().setScreenAndShow(null); },
+            () -> waited > 5 && mc().getWindow().getGuiScale() == gameScale[0], 10);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);
     }

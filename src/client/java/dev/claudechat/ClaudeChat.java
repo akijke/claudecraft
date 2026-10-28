@@ -90,6 +90,7 @@ public final class ClaudeChat implements ClientModInitializer {
     final Map<String, JsonArray> keyFields = new HashMap<>();
     volatile String notice = "";
     private KeyMapping openKey;
+    private final Map<String, KeyMapping> extraKeys = new LinkedHashMap<>();
 
     private static ClaudeChat instance;
 
@@ -105,6 +106,11 @@ public final class ClaudeChat implements ClientModInitializer {
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("claude_chat", "main"));
         openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.claude_chat.open",
             InputConstants.KEY_K, category));
+        // More windows, unbound by default: set them in Options → Controls → Key Binds → Claudecraft
+        String[] names = {"files", "terminal", "ide", "palette", "goto", "screenshot", "settings"};
+        for (String name : names)
+            extraKeys.put(name, KeyMappingHelper.registerKeyMapping(new KeyMapping("key.claude_chat." + name,
+                InputConstants.UNKNOWN.getValue(), category)));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
             for (String mode : new String[]{"c", "cc"}) {
                 dispatcher.register(literal(mode)
@@ -163,6 +169,20 @@ public final class ClaudeChat implements ClientModInitializer {
             if (palette && !paletteHeld) open(() -> new PaletteScreen(this, null, false));
             paletteHeld = palette;
             while (openKey.consumeClick()) open(() -> new ConversationScreen(this));
+            for (var entry : extraKeys.entrySet()) {
+                while (entry.getValue().consumeClick()) {
+                    switch (entry.getKey()) {
+                        case "files" -> open(() -> new FileScreen(this, null));
+                        case "terminal" -> open(() -> TerminalScreen.reopen(this, null));
+                        case "ide" -> open(() -> new IdeScreen(this, null));
+                        case "palette" -> { refreshCommands("cc"); open(() -> new PaletteScreen(this, null, false)); }
+                        case "goto" -> open(() -> new PaletteScreen(this, null, true));
+                        case "screenshot" -> screenshot("cc", "");
+                        case "settings" -> open(() -> new SettingsScreen(this, null));
+                        default -> { }
+                    }
+                }
+            }
             Supplier<Screen> next = openNext;
             if (next != null) {
                 // Deferred: the chat screen closes right after a command runs.

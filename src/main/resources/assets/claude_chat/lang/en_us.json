@@ -1,4 +1,11 @@
 {
   "key.claude_chat.open": "Claude conversation window",
-  "key.category.claude_chat.main": "Claudecraft"
+  "key.category.claude_chat.main": "Claudecraft",
+  "key.claude_chat.files": "File window",
+  "key.claude_chat.terminal": "Terminal",
+  "key.claude_chat.ide": "IDE layout (chat | editor | terminal)",
+  "key.claude_chat.palette": "Command palette",
+  "key.claude_chat.goto": "Go to file",
+  "key.claude_chat.screenshot": "Game screenshot → Claude",
+  "key.claude_chat.settings": "Claudecraft settings"
 }

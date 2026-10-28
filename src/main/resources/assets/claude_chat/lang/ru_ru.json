@@ -1,4 +1,11 @@
 {
   "key.claude_chat.open": "Окно переписки Claude",
-  "key.category.claude_chat.main": "Claudecraft"
+  "key.category.claude_chat.main": "Claudecraft",
+  "key.claude_chat.files": "Окно файлов",
+  "key.claude_chat.terminal": "Терминал",
+  "key.claude_chat.ide": "IDE-раскладка (чат | редактор | терминал)",
+  "key.claude_chat.palette": "Палитра команд",
+  "key.claude_chat.goto": "Перейти к файлу",
+  "key.claude_chat.screenshot": "Скриншот игры → Claude",
+  "key.claude_chat.settings": "Настройки Claudecraft"
 }
