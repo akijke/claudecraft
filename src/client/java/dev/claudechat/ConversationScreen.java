@@ -157,9 +157,9 @@ final class ConversationScreen extends Screen {
         boolean compact = width < 380;
         int panel = compact ? 0 : Math.min(150, width / 4);
         mainX = compact ? 6 : left + panel + 8;
-        mainY = 8;
+        mainY = 20;  // a status line above the log
         mainW = width - mainX - 6;
-        mainH = height - 82;  // log ends above the notice line and the input box
+        mainH = height - 94;  // log ends above the notice line and the input box
 
         if (!compact) {
             addRenderableWidget(tab("Claude", "c", left, 22, panel / 2 - 1));
@@ -377,6 +377,30 @@ final class ConversationScreen extends Screen {
     }
 
     // ---- frame -----------------------------------------------------------------
+    /** model · effort · ⇄ branch · ◎ context% · Σ tokens $ · limits · queue — one line, cut to the width. */
+    private net.minecraft.util.FormattedCharSequence statusLine(JsonObject s) {
+        var c = Component.literal("");
+        java.util.function.BiConsumer<String, Integer> part = (text, color) ->
+            c.append(Component.literal(text).withColor(color)).append(Component.literal("  "));
+        part.accept((s.get("running").getAsBoolean() ? "▶ " : "● ") + s.get("model").getAsString()
+            + (s.get("effort").getAsString().equals("default") ? "" : " · " + s.get("effort").getAsString()),
+            s.get("running").getAsBoolean() ? ChatStyle.GREEN : ChatStyle.DIM);
+        if (s.has("branch") && !s.get("branch").isJsonNull()) part.accept("⇄ " + s.get("branch").getAsString(), ChatStyle.AQUA);
+        int ctx = s.get("context").getAsInt();
+        if (ctx > 0) part.accept("◎ " + ctx + "%", ctx >= 80 ? ChatStyle.RED : ctx >= 60 ? ChatStyle.GOLD : ChatStyle.DIM);
+        long tokens = s.get("tokens").getAsLong();
+        if (tokens > 0) part.accept("Σ " + ChatStyle.human(tokens) + String.format(java.util.Locale.ROOT, " $%.2f", s.get("cost").getAsDouble()), ChatStyle.DIM);
+        for (var e : s.getAsJsonObject("limits").entrySet()) {
+            int pct = (int) Math.round(e.getValue().getAsDouble() * 100);
+            part.accept(L.t("лимит ") + pct + "%", pct >= 90 ? ChatStyle.RED : pct >= 70 ? ChatStyle.GOLD : ChatStyle.FAINT);
+        }
+        if (s.get("queue").getAsInt() > 0) part.accept(L.t("очередь ") + s.get("queue").getAsInt(), ChatStyle.GOLD);
+        if (s.get("paused").getAsBoolean()) part.accept(L.t("⏸ пауза"), ChatStyle.RED);
+        if (!s.get("auto").getAsString().equals("off")) part.accept("auto " + s.get("auto").getAsString(), ChatStyle.FAINT);
+        var cut = font.substrByWidth(c, Math.max(40, mainW));
+        return net.minecraft.locale.Language.getInstance().getVisualOrder(cut);
+    }
+
     @Override public void tick() {
         long now = System.currentTimeMillis();
         if (now >= nextState) { nextState = now + 1500; fetchState(); }
@@ -388,6 +412,8 @@ final class ConversationScreen extends Screen {
         g.fill(mainX - 2, mainY - 2, mainX + mainW, mainY + mainH, 0x90000000);
         super.extractRenderState(g, mouseX, mouseY, delta);
         g.text(font, Component.literal("✦ Claudecraft").withColor(ChatStyle.CLAUDE), left, 8, 0xFFFFFFFF);
+        if (state != null && state.has("status") && state.getAsJsonObject("status").has(mode))
+            g.text(font, statusLine(state.getAsJsonObject("status").getAsJsonObject(mode)), mainX, 8, 0xFFFFFFFF);
 
         int visible = mainH / 9, first = firstVisible(), y = mainY + 3;
         for (int i = first; i < Math.min(lines.size(), first + visible); i++) {

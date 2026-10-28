@@ -598,5 +598,8 @@
   "тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода": "theme dark | light | contrast · /claude scale auto|1..4 — scale of the mod's windows",
   " — системные уведомления, когда игра свёрнута": " — system notifications while the game is minimized",
   "Проверка уведомления": "Test notification",
-  "уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл": "Windows notifications and a flashing taskbar button while the game is minimized — on/off"
+  "уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл": "Windows notifications and a flashing taskbar button while the game is minimized — on/off",
+  "лимит ": "limit ",
+  "очередь ": "queue ",
+  "⏸ пауза": "⏸ paused"
 }

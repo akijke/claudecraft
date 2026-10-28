@@ -119,7 +119,8 @@ class Bridge:
         self.runner = runner or self.run_backend
         self.account = Account(self)
         self.rate_limits = {}
-        self.bg_tasks = {}  # Claude's background tasks: id -> info (see background_task)
+        self.bg_tasks = {}
+        self.branch_cache = {}  # folder -> (git branch, time) for the status line  # Claude's background tasks: id -> info (see background_task)
         state = self.directory / 'chats.json'
         if state.exists():
             data = json.loads(state.read_text(encoding='utf-8'))
@@ -360,6 +361,23 @@ class Bridge:
             chat.task = None
             chat.step = ''
             chat.budget_override = False
+
+    async def status_line(self, mode):
+        """Model, effort, git branch, context, tokens, limits and queue of the selected chat (status line)."""
+        from backends.budget import tokens_of
+        chat = self.current_chat(mode)
+        folder = self.chat_cwd(chat)
+        branch, stamp = self.branch_cache.get(folder, (None, 0))
+        if time.monotonic() - stamp > 20:
+            code, out = await self.git.run('rev-parse', '--abbrev-ref', 'HEAD', cwd=folder) if shutil.which('git') else (1, '')
+            branch = out.strip() if code == 0 else None
+            self.branch_cache[folder] = (branch, time.monotonic())
+        limits = {k: v.get('utilization') for k, v in self.rate_limits.items() if v.get('utilization') is not None}
+        return {'model': chat.model or 'default', 'effort': chat.effort or 'default', 'branch': branch,
+                'context': context_percent(chat), 'tokens': tokens_of(chat.usage),
+                'cost': round(chat.usage.get('cost_usd', 0.0), 4), 'day_cost': round(self.budget._today()['usd'], 4),
+                'queue': len(chat.queue), 'running': chat.task is not None, 'auto': chat.auto,
+                'paused': chat.paused, 'limits': limits, 'backend': chat.backend}
 
     def context_check(self, chat):
         """Warns once per crossing of 80 % context fill."""
@@ -1381,6 +1399,7 @@ def create_app(bridge, token):
                   'running': bool(c.task), 'queue': len(c.queue), 'updated': c.updated}
                  for c in bridge.chats.values()]
         return web.json_response({'chats': chats, 'selected': bridge.selected,
+                                  'status': {m: await bridge.status_line(m) for m in ('c', 'cc')},
                                   'project': bridge.projects.current,
                                   'project_path': bridge.projects.path_of_current(),
                                   'projects': bridge.projects.rows(bridge.chats)})

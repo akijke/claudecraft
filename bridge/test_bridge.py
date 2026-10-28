@@ -1121,6 +1121,26 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bridge.runner.await_args.args[1], 'waits')
 
 
+class StatusLineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_status_in_state(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(temp.name, AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        chat = bridge.current_chat('cc')
+        await bridge.command({'mode': 'cc', 'action': 'model', 'text': 'opus'})
+        chat.context = 100000
+        bridge.add_usage(chat, {'input_tokens': 1200, 'output_tokens': 300}, 0.05)
+        bridge.rate_limits['five_hour'] = {'status': 'allowed', 'utilization': 0.42, 'resets_at': None}
+        app = create_app(bridge, 't')
+        request = make_mocked_request('GET', '/state', headers={'Authorization': 'Bearer t'})
+        route = await app.router.resolve(request)
+        status = json.loads((await app.middlewares[0](request, route.handler)).text)['status']['cc']
+        self.assertEqual((status['model'], status['context'], status['tokens'], status['cost']), ('opus', 50, 1500, 0.05))
+        self.assertEqual(status['limits'], {'five_hour': 0.42})
+        self.assertFalse(status['running'])
+
+
 class DoctorTests(unittest.IsolatedAsyncioTestCase):
     async def test_report_rows_and_english(self):
         temp = tempfile.TemporaryDirectory()
