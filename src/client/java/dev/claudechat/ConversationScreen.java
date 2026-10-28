@@ -153,55 +153,59 @@ final class ConversationScreen extends Screen {
     @Override protected void init() {
         if (input != null) draft = input.getValue();
         left = 6;
-        int panel = Math.min(150, width / 4);
-        mainX = left + panel + 8;
+        // narrow (e.g. the chat pane of /ide): no side column, the conversation takes the width
+        boolean compact = width < 380;
+        int panel = compact ? 0 : Math.min(150, width / 4);
+        mainX = compact ? 6 : left + panel + 8;
         mainY = 8;
         mainW = width - mainX - 6;
         mainH = height - 82;  // log ends above the notice line and the input box
 
-        addRenderableWidget(tab("Claude", "c", left, 22, panel / 2 - 1));
-        addRenderableWidget(tab("Code", "cc", left + panel / 2 + 1, 22, panel / 2 - 1));
-        int y = 46;
-        if (mode.equals("cc") && state != null) {
-            String project = state.get("project").getAsString();
-            addRenderableWidget(Button.builder(Component.literal("✦ " + project).withColor(ChatStyle.CODE_MODE),
-                    b -> mod.runLine(mode, "/cc project"))
-                .bounds(left, y, panel - 24, 20)
-                .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + L.t("\nСменить проект")))).build());
-            addRenderableWidget(Button.builder(Component.literal("+"), b -> FolderPicker.pick(mod))
-                .bounds(left + panel - 22, y, 22, 20)
-                .tooltip(Tooltip.create(Component.literal(L.t("Открыть папку на ПК как проект")))).build());
-            y += 24;
-        }
-        String selected = selectedChat();
-        int maxChats = Math.max(1, (height - y - 100) / 22);
-        List<JsonObject> chats = chatsOfMode();
-        for (JsonObject c : chats.subList(0, Math.min(chats.size(), maxChats))) {
-            String id = c.get("id").getAsString();
-            boolean running = c.get("running").getAsBoolean();
-            String label = (running ? "▶ " : "") + font.plainSubstrByWidth(c.get("title").getAsString(), panel - 18);
-            Button b = Button.builder(Component.literal(label).withColor(id.equals(selected) ? 0x6BD08B : 0xE8E8E8), btn -> {
-                mod.send(mode, mod.command(mode, "select", id));
-                scroll = 0;
-                nextState = 0;
-            }).bounds(left, y, panel, 20).build();
-            b.active = !id.equals(selected);
-            addRenderableWidget(b);
-            y += 22;
-        }
-        addRenderableWidget(Button.builder(Component.literal(L.t("+ Новый чат")), b -> { mod.dispatch(mode, "new"); nextState = 0; })
-            .bounds(left, y, panel, 20).build());
+        if (!compact) {
+            addRenderableWidget(tab("Claude", "c", left, 22, panel / 2 - 1));
+            addRenderableWidget(tab("Code", "cc", left + panel / 2 + 1, 22, panel / 2 - 1));
+            int y = 46;
+            if (mode.equals("cc") && state != null) {
+                String project = state.get("project").getAsString();
+                addRenderableWidget(Button.builder(Component.literal("✦ " + project).withColor(ChatStyle.CODE_MODE),
+                        b -> mod.runLine(mode, "/cc project"))
+                    .bounds(left, y, panel - 24, 20)
+                    .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + L.t("\nСменить проект")))).build());
+                addRenderableWidget(Button.builder(Component.literal("+"), b -> FolderPicker.pick(mod))
+                    .bounds(left + panel - 22, y, 22, 20)
+                    .tooltip(Tooltip.create(Component.literal(L.t("Открыть папку на ПК как проект")))).build());
+                y += 24;
+            }
+            String selected = selectedChat();
+            int maxChats = Math.max(1, (height - y - 100) / 22);
+            List<JsonObject> chats = chatsOfMode();
+            for (JsonObject c : chats.subList(0, Math.min(chats.size(), maxChats))) {
+                String id = c.get("id").getAsString();
+                boolean running = c.get("running").getAsBoolean();
+                String label = (running ? "▶ " : "") + font.plainSubstrByWidth(c.get("title").getAsString(), panel - 18);
+                Button b = Button.builder(Component.literal(label).withColor(id.equals(selected) ? 0x6BD08B : 0xE8E8E8), btn -> {
+                    mod.send(mode, mod.command(mode, "select", id));
+                    scroll = 0;
+                    nextState = 0;
+                }).bounds(left, y, panel, 20).build();
+                b.active = !id.equals(selected);
+                addRenderableWidget(b);
+                y += 22;
+            }
+            addRenderableWidget(Button.builder(Component.literal(L.t("+ Новый чат")), b -> { mod.dispatch(mode, "new"); nextState = 0; })
+                .bounds(left, y, panel, 20).build());
 
-        int bw = (panel - 2) / 2;  // two per row so labels are not cut
-        addRenderableWidget(Button.builder(Component.literal(L.t("Файлы")), b -> minecraft.setScreenAndShow(new FileScreen(mod, this)))
-            .bounds(left, height - 70, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Файловый менеджер")))).build());
-        addRenderableWidget(small(L.t("Агенты"), "/cc agents", L.t("Агенты-помощники"), left + bw + 2, height - 70, bw));
-        addRenderableWidget(small(L.t("Задачи"), "/cc tasks", L.t("Все работающие задачи и агенты"), left, height - 48, bw));
-        addRenderableWidget(small("Git", "/cc git", L.t("Git текущего проекта"), left + bw + 2, height - 48, bw));
-        addRenderableWidget(small("MCP", "/cc connectors", L.t("Коннекторы"), left, height - 26, bw));
-        addRenderableWidget(Button.builder(Component.literal("⚙"), b -> mod.runLine(mode, "/claude"))
-            .bounds(left + bw + 2, height - 26, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Настройки")))).build());
+            int bw = (panel - 2) / 2;  // two per row so labels are not cut
+            addRenderableWidget(Button.builder(Component.literal(L.t("Файлы")), b -> minecraft.setScreenAndShow(new FileScreen(mod, this)))
+                .bounds(left, height - 70, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Файловый менеджер")))).build());
+            addRenderableWidget(small(L.t("Агенты"), "/cc agents", L.t("Агенты-помощники"), left + bw + 2, height - 70, bw));
+            addRenderableWidget(small(L.t("Задачи"), "/cc tasks", L.t("Все работающие задачи и агенты"), left, height - 48, bw));
+            addRenderableWidget(small("Git", "/cc git", L.t("Git текущего проекта"), left + bw + 2, height - 48, bw));
+            addRenderableWidget(small("MCP", "/cc connectors", L.t("Коннекторы"), left, height - 26, bw));
+            addRenderableWidget(Button.builder(Component.literal("⚙"), b -> mod.runLine(mode, "/claude"))
+                .bounds(left + bw + 2, height - 26, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Настройки")))).build());
 
+        }
         int inputW = mainW - 92;
         input = new MultiLineEditBox.Builder()
             .setPlaceholder(Component.literal(mode.equals("cc") ? L.t("Задача для Claude Code… (Ctrl+Enter — отправить, /cc … — команда)")

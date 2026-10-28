@@ -236,6 +236,11 @@ final class LiveTest {
                     .resolve("claude-chat/workspace/livetest-lines.txt")).contains("last line");
             } catch (IOException e) { return false; }
         }, 20);
+        step("/ide shows chat, editor and terminal together", () -> mod.runLine("cc", "/ide livetest-lines.txt"), () -> {
+            if (!(screen() instanceof IdeScreen ide)) return false;
+            if (waited == 40) ide.typeForTest("echo ide-ok\r");
+            return waited > 90;
+        }, 15);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);
     }

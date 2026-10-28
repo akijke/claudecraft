@@ -33,6 +33,9 @@ final class PaletteScreen extends Screen {
     private int selected, scroll;
     private String root = "";
     private String status = "";
+    private java.util.function.Consumer<String> onFile;  // the IDE layout opens files in its editor pane
+
+    void onFile(java.util.function.Consumer<String> target) { onFile = target; }
 
     PaletteScreen(ClaudeChat mod, Screen parent, boolean files) {
         super(Component.literal("Palette"));
@@ -53,7 +56,7 @@ final class PaletteScreen extends Screen {
     private static List<Entry> commands() {
         List<Entry> e = new ArrayList<>();
         String[][] table = {
-            {L.t("Окно переписки"), "/cc ui", "K"}, {L.t("Файлы"), "/files", ""}, {L.t("Терминал"), "/pty", ""},
+            {L.t("Окно переписки"), "/cc ui", "K"}, {L.t("IDE: чат | редактор | терминал"), "/ide", ""}, {L.t("Файлы"), "/files", ""}, {L.t("Терминал"), "/pty", ""},
             {L.t("Новый терминал"), "/pty new", ""}, {L.t("Настройки"), "/claude", ""},
             {L.t("Перейти к файлу…"), "@files", "Ctrl+P"},
             {L.t("Новый чат Claude Code"), "/cc new", ""}, {L.t("Чаты"), "/cc c", ""}, {L.t("Задачи"), "/cc tasks", ""},
@@ -134,6 +137,7 @@ final class PaletteScreen extends Screen {
     private void run(Entry e) {
         if (files) {
             String path = root.isEmpty() ? e.label() : root + java.io.File.separator + e.label();
+            if (onFile != null) { minecraft.setScreenAndShow(parent); onFile.accept(path); return; }
             minecraft.setScreenAndShow(new EditorScreen(mod, parent, path));
             return;
         }

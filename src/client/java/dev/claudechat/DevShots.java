@@ -76,7 +76,9 @@ final class DevShots {
             case 557 -> Screenshot.grab(client, true);
             case 568 -> client.setScreenAndShow(new ChatPreview(REWIND));
             case 572 -> Screenshot.grab(client, true);
-            case 575 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 576 -> client.setScreenAndShow(new IdeScreen(mod, "src/main/java/dev/demo/Hello.java"));
+            case 600 -> Screenshot.grab(client, true);
+            case 610 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
             case 720 -> client.stop();

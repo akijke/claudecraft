@@ -576,5 +576,7 @@
   "[номер] — новый чат-ветка с этого места разговора (исходный не меняется)": "[number] — a new branch chat from this point of the conversation (the original stays)",
   "   ⟳ — откатить разговор и файлы к моменту перед запросом · «ветка» — новый чат после ответа": "   ⟳ — roll back the conversation and files to before the request · “branch” — a new chat after the answer",
   "ветка": "branch",
-  "Нет файлов для @": "No files for @"
+  "Нет файлов для @": "No files for @",
+  "IDE: чат | редактор | терминал": "IDE: chat | editor | terminal",
+  "[файл] — чат | редактор | терминал в одном окне (Ctrl+1/2/3, Ctrl+P — файл, разделители тянутся)": "[file] — chat | editor | terminal in one window (Ctrl+1/2/3, Ctrl+P — file, drag the splitters)"
 }
