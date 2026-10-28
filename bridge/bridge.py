@@ -57,6 +57,10 @@ class Chat:
     worktree: str | None = None      # /cc spawn in a git project: the task's own checkout
     wt_branch: str | None = None
     wt_repo: str | None = None
+    paused: bool = False             # budget reached: the queue waits for /cc budget resume (not saved)
+    budget_override: bool = False    # "continue anyway" for the current request
+    budget_hit: tuple | None = None  # the limit that interrupted the running request
+    live_tokens: int = 0             # tokens of the running request, counted per model call
     cwd: str | None = None           # legacy field (old `cd`), ignored
     run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     step: str = ''                   # last progress line, for the task manager
@@ -98,6 +102,8 @@ class Bridge:
         self.checkpoints = Checkpoints(self.directory / 'undo')
         from backends.worktrees import Worktrees
         self.worktrees = Worktrees(self)
+        from backends.budget import Budget
+        self.budget = Budget(self)
         self.terminals = Terminals(self)
         self.oauth = OAuth(self)
         self.port = 18741  # set by main(); used for the OAuth redirect
@@ -311,9 +317,17 @@ class Bridge:
     async def pump(self, chat):
         try:
             while chat.queue:
+                if chat.paused:
+                    break
+                hit = self.budget.exceeded(chat, scopes=('chat', 'day'))
+                if hit:
+                    self.pause_for_budget(chat, hit)
+                    break
                 question = chat.queue.popleft()
                 self.emit(chat, 'Думаю…', kind='thinking', queued=len(chat.queue))
                 chat.run_usage = {}
+                chat.live_tokens = 0
+                chat.budget_hit = None
                 chat.started = started = time.monotonic()
                 chat.step = 'думает…'
                 try:
@@ -333,6 +347,8 @@ class Bridge:
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
+                    if chat.budget_hit:
+                        continue  # interrupted by the budget: the card is already shown
                     message = 'Ошибка: ' + str(e)[:1500]
                     if re.search(r'auth|login|credential|401|api key', str(e), re.I):
                         message += '\nПроверь вход в аккаунт Claude: /c settings'
@@ -342,6 +358,7 @@ class Bridge:
         finally:
             chat.task = None
             chat.step = ''
+            chat.budget_override = False
 
     def context_check(self, chat):
         """Warns once per crossing of 80 % context fill."""
@@ -360,6 +377,30 @@ class Bridge:
                 bucket[key] = bucket.get(key, 0) + int((usage or {}).get(key) or 0)
             bucket['cost_usd'] = bucket.get('cost_usd', 0.0) + float(cost or 0.0)
         chat.usage['turns'] = chat.usage.get('turns', 0) + 1
+        from backends.budget import tokens_of
+        self.budget.add(cost, tokens_of(usage or {}))
+        self.budget_check(chat)
+
+    def budget_check(self, chat, live_tokens=0):
+        """Interrupts the running request when a limit is reached (called per turn and per model call)."""
+        if chat.budget_hit:
+            return
+        hit = self.budget.exceeded(chat, live_tokens)
+        if not hit:
+            return
+        chat.budget_hit = hit
+        live = chat.live
+        if live is not None and live.client is not None:
+            asyncio.get_running_loop().create_task(live.client.interrupt())
+        self.pause_for_budget(chat, hit)
+
+    def pause_for_budget(self, chat, hit):
+        scope, kind, spent, limit = hit
+        chat.paused = True
+        shown = (lambda v: f'${v:.2f}') if kind == 'usd' else (lambda v: f'{v:,}'.replace(',', ' '))
+        names = {'task': 'запрос', 'chat': 'чат', 'day': 'день'}
+        self.emit(chat, f'Лимит «{names[scope]}» достигнут: {shown(spent)} из {shown(limit)} — работа на паузе',
+                  kind='budget_hit', scope=scope, limit_kind=kind, spent=spent, limit=limit, queued=len(chat.queue))
 
     def replace(self, mode, chat, text):
         """/cc replace [-r] [-c] [--in <glob>] [--here] <old> -> <new>  (preview) · replace apply <token>"""
@@ -444,6 +485,10 @@ class Bridge:
     def start(self, chat, text, first=False):
         if len(chat.queue) >= 20:
             raise ValueError('Queue is full (20)')
+        if chat.paused and chat.task is None:
+            chat.queue.appendleft(text) if first else chat.queue.append(text)
+            self.emit(chat, 'Чат на паузе из-за лимита — /cc budget resume', kind='status')
+            return False
         if first:
             chat.queue.appendleft(text)
         else:
@@ -736,6 +781,18 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'budget':
+            sub, _, rest = text.strip().partition(' ')
+            if sub == 'resume':
+                chat.paused = False
+                chat.budget_override = True  # the next request may go past the limit once
+                if chat.queue and chat.task is None:
+                    chat.task = asyncio.create_task(self.pump(chat))
+                self.emit(chat, 'Пауза снята — продолжаю (лимит пропускается для одного запроса).', kind='status')
+            elif sub:
+                self.budget.set(sub, rest)
+            if sub != 'resume':
+                self.emit(chat, 'Бюджет', kind='budget', **self.budget.report(chat))
         elif action == 'replace':
             self.replace(mode, chat, text)
         elif action == 'plan':

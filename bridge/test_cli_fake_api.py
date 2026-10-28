@@ -258,6 +258,27 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertIn('plan mode', sent.lower())              # the CLI really ran in plan mode
         self.assertEqual(chat.title, '[plan] fix the bug')
 
+    async def test_budget_interrupts_pauses_and_resumes(self):
+        heavy = tool('Read', {'file_path': 'x'}, delay=2.0)
+        heavy['usage'] = {'input_tokens': 5000, 'output_tokens': 1}
+        await self.start([heavy, text('second request done')])
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'budget', 'text': 'task 1k'})
+        await self.bridge.enqueue(chat, 'expensive')
+        await self.bridge.enqueue(chat, 'cheap one')
+        await self.until(lambda: chat.task is None)
+        hits = [e for e in self.bridge.events if e['kind'] == 'budget_hit']
+        self.assertEqual((hits[0]['scope'], hits[0]['limit_kind'], hits[0]['limit']), ('task', 'tokens', 1000))
+        self.assertTrue(chat.paused)
+        self.assertEqual(self.runs, ['expensive'])            # the queue waits
+        self.assertEqual(list(chat.queue), ['cheap one'])
+        self.assertEqual(self.errors(), [])                     # no scary error, just the card
+        await self.bridge.command({'mode': 'cc', 'action': 'budget', 'text': 'task off'})
+        await self.bridge.command({'mode': 'cc', 'action': 'budget', 'text': 'resume'})
+        await self.until(lambda: chat.task is None and not chat.queue)
+        self.assertEqual(self.runs, ['expensive', 'cheap one'])
+        self.assertIn('second request done', self.texts())
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

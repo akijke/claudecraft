@@ -9,6 +9,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 
@@ -181,6 +182,35 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "budget_hit" -> {
+                out.add(line(mode, lit("⏸ " + s(e, "text"), GOLD).withStyle(st -> st.withBold(true))));
+                out.add(line(mode, Component.literal("  ")
+                    .append(button("▶ " + L.t("продолжить"), cmd + "budget resume", false, GREEN,
+                        L.t("Один запрос пройдёт сверх лимита")))
+                    .append(sp()).append(button("+ " + L.t("лимит"), cmd + "budget " + s(e, "scope") + " ", true, AQUA,
+                        L.t("Новый лимит: $1, 500k, 2M или off")))
+                    .append(sp()).append(button(L.t("бюджет"), cmd + "budget", false, AQUA, null))
+                    .append(lit(n(e, "queued") > 0 ? L.t("  в очереди: ") + n(e, "queued") : "", FAINT))));
+            }
+            case "budget" -> {
+                out.add(line(mode, lit("$ " + L.t("Бюджет"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(b(e, "paused") ? L.t("  на паузе") : "", RED))));
+                JsonObject limits = e.getAsJsonObject("limits"), spent = e.getAsJsonObject("spent");
+                for (String scope : new String[]{"task", "chat", "day"}) {
+                    String label = scope.equals("task") ? L.t("запрос") : scope.equals("chat") ? L.t("чат") : L.t("день");
+                    JsonObject lim = limits.has(scope) ? limits.getAsJsonObject(scope) : new JsonObject();
+                    JsonObject sp = spent.getAsJsonObject(scope);
+                    String limitText = lim.isEmpty() ? L.t("без лимита")
+                        : (lim.has("usd") ? String.format(Locale.ROOT, "$%.2f", lim.get("usd").getAsDouble()) : "")
+                        + (lim.has("usd") && lim.has("tokens") ? " · " : "")
+                        + (lim.has("tokens") ? human(lim.get("tokens").getAsLong()) + L.t(" ток.") : "");
+                    out.add(line(mode, lit(String.format("  %-8s", label), TEXT)
+                        .append(lit(String.format(Locale.ROOT, "$%.3f · %s", sp.get("usd").getAsDouble(), human(sp.get("tokens").getAsLong())), DIM))
+                        .append(lit("  / " + limitText + "  ", lim.isEmpty() ? FAINT : GOLD))
+                        .append(button(L.t("изменить"), cmd + "budget " + scope + " ", true, AQUA, "$0.50 · 200k · 2M · off"))));
+                }
+                out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
+            }
             case "git_hunks" -> {
                 out.add(line(mode, lit("± " + L.t("Куски изменений"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit("  " + s(e, "text") + "  ", DIM)).append(button("⟳", "/cc git hunks " + s(e, "path"), false, AQUA, null))

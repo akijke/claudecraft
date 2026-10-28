@@ -1089,6 +1089,38 @@ class SlashCommandTests(unittest.IsolatedAsyncioTestCase):
             await self.bridge.command({'mode': 'cc', 'action': 'slash', 'text': 'nope'})
 
 
+class BudgetTests(unittest.IsolatedAsyncioTestCase):
+    async def test_parse_limits_day_rollover_and_chat_pause(self):
+        from backends.budget import parse_amount
+        self.assertEqual(parse_amount('$0.50'), ('usd', 0.5))
+        self.assertEqual(parse_amount('2.5$'), ('usd', 2.5))
+        self.assertEqual(parse_amount('200k'), ('tokens', 200000))
+        self.assertEqual(parse_amount('2M'), ('tokens', 2000000))
+        self.assertEqual(parse_amount('off'), (None, None))
+        with self.assertRaises(ValueError):
+            parse_amount('lots')
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(temp.name, AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        chat = bridge.current_chat('cc')
+        await bridge.command({'mode': 'cc', 'action': 'budget', 'text': 'chat $1'})
+        bridge.add_usage(chat, {'input_tokens': 10}, 1.2)          # over the chat limit
+        self.assertTrue(chat.paused)
+        await bridge.enqueue(chat, 'waits')
+        self.assertIsNone(chat.task)
+        self.assertEqual(list(chat.queue), ['waits'])
+        self.assertEqual(bridge.budget.day['usd'], 1.2)
+        bridge.budget.day['date'] = '2000-01-01'                    # a new day starts from zero
+        self.assertEqual(bridge.budget.spent(chat)['day']['usd'], 0.0)
+        await bridge.command({'mode': 'cc', 'action': 'budget', 'text': 'resume'})
+        for _ in range(50):
+            if bridge.runner.await_count:
+                break
+            await asyncio.sleep(0.02)
+        self.assertEqual(bridge.runner.await_args.args[1], 'waits')
+
+
 class DoctorTests(unittest.IsolatedAsyncioTestCase):
     async def test_report_rows_and_english(self):
         temp = tempfile.TemporaryDirectory()

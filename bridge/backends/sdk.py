@@ -160,6 +160,8 @@ class SdkTurn:
                                                      'cache_creation_input_tokens'))
             if used:
                 self.chat.context = used
+                self.chat.live_tokens += used
+                self.bridge.budget_check(self.chat, self.chat.live_tokens)
             return
         if kind == 'content_block_delta' and event.get('delta', {}).get('type') == 'text_delta':
             self.stream += event['delta'].get('text', '')

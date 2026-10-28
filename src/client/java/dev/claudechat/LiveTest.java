@@ -122,6 +122,7 @@ final class LiveTest {
             () -> event("perms"), 20);
         step("/cc worktree lists worktrees", () -> { markEvents(); mod.runLine("cc", "/cc worktree"); },
             () -> event("worktrees"), 20);
+        step("/cc budget shows limits", () -> { markEvents(); mod.runLine("cc", "/cc budget"); }, () -> event("budget"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

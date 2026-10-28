@@ -60,7 +60,10 @@ class FakeAnthropic:
         await response.prepare(request)
 
         async def send(event, data):
-            await response.write(f'event: {event}\ndata: {json.dumps(data)}\n\n'.encode())
+            try:
+                await response.write(f'event: {event}\ndata: {json.dumps(data)}\n\n'.encode())
+            except ConnectionError:
+                pass  # the CLI hung up (interrupt/cancel): nothing to tell it any more
 
         await send('message_start', {'type': 'message_start', 'message': {
             'id': f'msg_{len(self.requests)}', 'type': 'message', 'role': 'assistant',

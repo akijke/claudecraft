@@ -50,7 +50,7 @@ final class Notify {
             }
             case "tool" -> { Task t = TASKS.get(chat); if (t != null) { t.step = str(e, "text"); t.waiting = false; } }
             case "text_part", "text" -> { Task t = TASKS.get(chat); if (t != null) t.waiting = false; }
-            case "permission", "question", "plan" -> {
+            case "permission", "question", "plan", "budget_hit" -> {
                 Task t = TASKS.get(chat);
                 if (t != null) t.waiting = true;
                 if (!viewing(chat)) alert(L.t("Claude ждёт твоего ответа"), title, true);

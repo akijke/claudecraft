@@ -463,5 +463,19 @@
   "открыть чат": "open chat",
   "Удалить worktree и ветку без слияния": "Remove the worktree and branch without merging",
   "  нет — /cc spawn <задача> создаёт worktree в git-проекте": "  none — /cc spawn <task> creates one in a git project",
-  "worktrees параллельных задач: merge · diff · drop (spawn --here — без worktree)": "worktrees of parallel tasks: merge · diff · drop (spawn --here — no worktree)"
+  "worktrees параллельных задач: merge · diff · drop (spawn --here — без worktree)": "worktrees of parallel tasks: merge · diff · drop (spawn --here — no worktree)",
+  "продолжить": "continue",
+  "Один запрос пройдёт сверх лимита": "One request may go past the limit",
+  "лимит": "limit",
+  "Новый лимит: $1, 500k, 2M или off": "New limit: $1, 500k, 2M or off",
+  "бюджет": "budget",
+  "  в очереди: ": "  queued: ",
+  "Бюджет": "Budget",
+  "  на паузе": "  paused",
+  "запрос": "request",
+  "день": "day",
+  "без лимита": "no limit",
+  " ток.": " tok.",
+  "  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume": "  at the limit the request is interrupted and the queue waits for /cc budget resume",
+  "лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume": "$ / token limits: budget task $0.50 · chat 2M · day $5 · resume"
 }
