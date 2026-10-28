@@ -153,6 +153,26 @@ final class WorkStyle {
                 out.add(line("cc", lit("  " + L.t("Та же сессия: в игре и на ПК видно одно и то же. Не пиши в неё в двух местах одновременно."),
                     b(e, "busy") ? GOLD : FAINT)));
             }
+            case "model" -> {
+                String model = s(e, "model"), effort = s(e, "effort");
+                MutableComponent row = lit("◆ " + L.t("Модель") + ": ", GOLD);
+                for (String m : new String[]{"default", "opus", "sonnet", "haiku"}) {
+                    boolean on = m.equals(model.isEmpty() ? "default" : model);
+                    row.append(button((on ? "● " : "") + m, cmd + "model " + m, false, on ? GREEN : AQUA,
+                        m.equals("default") ? L.t("Модель по умолчанию из Claude Code") : null)).append(sp());
+                }
+                if (!model.isEmpty() && !java.util.List.of("opus", "sonnet", "haiku").contains(model))
+                    row.append(lit("● " + model, GREEN));
+                out.add(line(mode, row));
+                MutableComponent eff = lit("  " + L.t("Усилие") + ": ", DIM);
+                for (String level : new String[]{"default", "low", "medium", "high", "xhigh", "max"}) {
+                    boolean on = level.equals(effort.isEmpty() ? "default" : effort);
+                    eff.append(button((on ? "● " : "") + level, cmd + "effort " + level, false, on ? GREEN : AQUA,
+                        level.equals("max") ? L.t("Дольше думает, тратит больше лимита") : null)).append(sp());
+                }
+                out.add(line(mode, eff));
+                out.add(line(mode, lit("  " + L.t("Для этого чата, со следующего запроса. Можно и полный id: model claude-…"), FAINT)));
+            }
             case "chats" -> { return false; }
             default -> { return false; }
         }

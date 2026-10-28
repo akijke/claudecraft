@@ -10,7 +10,7 @@ async def run(bridge, chat, text):
     async with ClientSession(timeout=ClientTimeout(total=300)) as session:
         async with session.post('https://api.anthropic.com/v1/messages',
             headers={'x-api-key': key, 'anthropic-version': '2023-06-01'},
-            json={'model': bridge.config['api_model'], 'max_tokens': 4096,
+            json={'model': chat.model if (chat.model or '').startswith('claude-') else bridge.config['api_model'], 'max_tokens': 4096,
                   'system': 'Answer in the user language. Plain text, concise.',
                   'messages': messages}) as response:
             data = await response.json()

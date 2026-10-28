@@ -44,6 +44,8 @@ class Chat:
     usage: dict = field(default_factory=dict)    # token/cost totals for /c tokens
     updated: float = 0.0
     origin: str = ''                 # 'pc' = session found in Claude Code on the PC
+    model: str | None = None         # None = Claude Code default; alias (opus/sonnet/haiku) or full id
+    effort: str | None = None        # None = default; low | medium | high | xhigh | max
     cwd: str | None = None           # legacy field (old `cd`), ignored
     run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     step: str = ''                   # last progress line, for the task manager
@@ -56,7 +58,7 @@ class Chat:
 
 
 SAVED = ('id', 'mode', 'backend', 'title', 'sdk_id', 'messages', 'project', 'session_cwd', 'auto',
-         'allowed', 'usage', 'updated', 'origin')
+         'allowed', 'usage', 'updated', 'origin', 'model', 'effort')
 
 
 class Bridge:
@@ -608,6 +610,20 @@ class Bridge:
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
         elif action == 'tokens':
             self.tokens_report(chat)
+        elif action in ('model', 'effort'):
+            value = text.strip()
+            if value:
+                if action == 'model':
+                    if value != 'default' and value not in MODELS and not re.fullmatch(r'claude-[a-z0-9.\-]{2,60}', value):
+                        raise ValueError('model: opus | sonnet | haiku | default | claude-…')
+                    chat.model = None if value == 'default' else value
+                else:
+                    if value != 'default' and value not in EFFORTS:
+                        raise ValueError('effort: low | medium | high | xhigh | max | default')
+                    chat.effort = None if value == 'default' else value
+                self.persist()
+            self.emit(chat, 'Модель', kind='model', model=chat.model, effort=chat.effort,
+                      models=list(MODELS), efforts=list(EFFORTS), backend=chat.backend)
         elif action == 'auto':
             value = text.strip().lower()
             if value:
@@ -836,6 +852,8 @@ ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls'
            'ps': 'tasks', 'jobs': 'tasks', 'mcp': 'connectors', 'unconnect': 'disconnect_connector',
            'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn',
            'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh'}
+MODELS = ('opus', 'sonnet', 'haiku')
+EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
 USAGE_KEYS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
 AUTO_MODES = {
     'off': 'Авторазрешение выключено: каждое действие спрашивает подтверждение.',

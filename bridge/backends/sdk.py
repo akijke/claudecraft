@@ -366,6 +366,7 @@ async def run(bridge, chat, text):
         permission_mode='default', setting_sources=[],
         # Lines of the answer are shown while they are generated.
         include_partial_messages=True,
+        model=chat.model, effort=chat.effort,
         agents=bridge.agents.definitions(effective) if chat.mode == 'cc' else None,
         # Echo accepted prompts so `f` messages can be matched against ResultMessage.
         extra_args={'replay-user-messages': None},

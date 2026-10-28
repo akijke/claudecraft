@@ -117,6 +117,16 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertIn('second question', second)
         self.assertTrue(chat.sdk_id)
 
+    async def test_model_choice_reaches_the_api(self):
+        await self.start([text('hi from haiku')])
+        chat = self.bridge.chats[self.bridge.selected['c']]
+        await self.bridge.command({'mode': 'c', 'action': 'model', 'text': 'haiku'})
+        await self.bridge.command({'mode': 'c', 'action': 'effort', 'text': 'low'})
+        await self.bridge.enqueue(chat, 'hello')
+        await self.until(lambda: chat.task is None)
+        self.assertEqual(self.errors(), [])
+        self.assertIn('haiku', self.fake.requests[0]['model'])
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

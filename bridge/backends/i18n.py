@@ -152,6 +152,7 @@ EN = {
     'Платежи, клиенты, подписки': 'Payments, customers, subscriptions', 'Страницы и базы Notion': 'Notion pages and databases',
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
+    'Модель': 'Model',
     # --- shell & GitHub --------------------------------------------------------
     'Формат: /sh <команда>  (а также /ps, /cmd, /bash)': 'Usage: /sh <command>  (also /ps, /cmd, /bash)',
     'cmd есть только в Windows — используй /sh или /bash': 'cmd exists only on Windows — use /sh or /bash',

@@ -681,6 +681,34 @@ class FileWindowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('No such folder', data['error'])
 
 
+class ModelTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def test_model_and_effort_per_chat(self):
+        cmd = lambda a, t: self.bridge.command({'mode': 'cc', 'action': a, 'text': t})
+        await cmd('model', 'opus')
+        await cmd('effort', 'max')
+        chat = self.bridge.current_chat('cc')
+        self.assertEqual((chat.model, chat.effort), ('opus', 'max'))
+        self.assertEqual(self.bridge.events[-1]['kind'], 'model')
+        await cmd('model', 'claude-sonnet-5-5')
+        self.assertEqual(chat.model, 'claude-sonnet-5-5')
+        with self.assertRaises(ValueError):
+            await cmd('model', 'gpt-4')
+        with self.assertRaises(ValueError):
+            await cmd('effort', 'insane')
+        await cmd('model', 'default')
+        restored = Bridge(self.temp.name)
+        self.assertEqual((restored.chats[chat.id].model, restored.chats[chat.id].effort), (None, 'max'))
+        await restored.close()
+
+
 class ProtectedPathTests(unittest.TestCase):
     def test_top_level_folders_can_be_deleted_but_system_ones_cannot(self):
         from backends.files import _protected

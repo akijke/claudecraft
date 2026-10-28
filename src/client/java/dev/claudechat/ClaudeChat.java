@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto",
+        "tokens", "usage", "auto", "model", "effort",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -327,6 +327,7 @@ public final class ClaudeChat implements ClientModInitializer {
         String[][] rows = {
             {c + L.t("<запрос>"), L.t("в очередь (q, queue) · f/force — дописать в работу · cq — очистить очередь")},
             {c + "c", L.t("чаты · new · rename · status · cancel · restart · tokens · auto")},
+            {c + "model", L.t("модель и усилие для этого чата (opus, sonnet, haiku · low…max)")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},
             {c + "ls", L.t("файлы: cd · pwd · cat · tree · find · mkdir · mv · cp · rm · open · code")},
             {"/cc git", L.t("статус · diff · commit · push · pull · branch · log · clone · github")},

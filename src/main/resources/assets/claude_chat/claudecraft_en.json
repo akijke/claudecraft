@@ -313,5 +313,11 @@
   "↑↓ выбор · Enter открыть · Backspace вверх · F2 имя · Delete удалить": "↑↓ select · Enter open · Backspace up · F2 rename · Delete delete",
   "Терминал": "Terminal",
   "Очистить поиск": "Clear search",
-  "Claude Code работает в: ": "Claude Code works in: "
+  "Claude Code работает в: ": "Claude Code works in: ",
+  "Модель": "Model",
+  "Модель по умолчанию из Claude Code": "Claude Code's default model",
+  "Усилие": "Effort",
+  "Дольше думает, тратит больше лимита": "Thinks longer, uses more of the limit",
+  "Для этого чата, со следующего запроса. Можно и полный id: model claude-…": "For this chat, from the next request. A full id works too: model claude-…",
+  "модель и усилие для этого чата (opus, sonnet, haiku · low…max)": "model and effort for this chat (opus, sonnet, haiku · low…max)"
 }

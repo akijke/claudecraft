@@ -82,7 +82,6 @@ tasks.register('generateShared') {
                         'help(parts[0].equals("gpt") ? "c" : "cc"); else dispatch(parts[0].equals("gpt") ? "c" : "cc", rest);')
                     .replace('case "claude" ->', 'case "codexcraft" ->')
                     .replace('InputConstants.KEY_K', 'InputConstants.KEY_J')
-                    .replace('"tokens", "usage", "auto",', '"tokens", "usage", "auto", "model",')
                     .replace('{"/codex agents", L.t("агенты · agent <имя> <задача> · spawn — параллельно · tasks")}',
                         '{"/codex spawn", L.t("параллельная задача · tasks — список задач")}')
                     .replace('настройки, вход в аккаунт, API-ключ', 'настройки и вход через ChatGPT')
