@@ -228,7 +228,7 @@ class FileManager:
         path = self.resolve(mode, arg[6:] if confirmed else arg)
         if not path.exists():
             raise ValueError(f'Нет такого пути: {path}')
-        if path in (Path(path.anchor), Path.home(), self.bridge.workspace) or len(path.parts) <= 2:
+        if _protected(path, self.bridge.workspace):
             raise ValueError(f'Слишком опасно удалять {path}')
         if not confirmed:
             count = sum(1 for _ in path.rglob('*')) if path.is_dir() else 1
@@ -260,6 +260,22 @@ class FileManager:
         else:
             subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(path)])
         self.emit(mode, f'Открыто: {path}', kind='status')
+
+
+def _protected(path, workspace):
+    """Folders rm refuses: disk roots, home and its parent, the OS and program folders, the workspace.
+    Ordinary folders anywhere (also right under C:\\) can be deleted."""
+    path = Path(path).resolve()
+    home = Path.home().resolve()
+    danger = {Path(path.anchor), home, home.parent, Path(workspace).resolve()}
+    for var in ('SystemRoot', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramData', 'APPDATA', 'LOCALAPPDATA'):
+        if os.environ.get(var):
+            danger.add(Path(os.environ[var]).resolve())
+    if os.name != 'nt':
+        danger |= {Path(p) for p in ('/bin', '/boot', '/dev', '/etc', '/home', '/lib', '/lib64', '/opt',
+                                     '/proc', '/root', '/sbin', '/sys', '/usr', '/var', '/Users', '/System',
+                                     '/Applications', '/Library')}
+    return path in danger
 
 
 def _drives():

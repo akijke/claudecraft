@@ -134,7 +134,9 @@ final class FileScreen extends Screen {
         }
     }
 
-    private void say(String text, int color) { message = text; messageColor = color; }
+    private long messageAt;
+
+    private void say(String text, int color) { message = text; messageColor = color; messageAt = System.currentTimeMillis(); }
 
     // ---- layout ---------------------------------------------------------------
     @Override protected void init() {
@@ -143,7 +145,7 @@ final class FileScreen extends Screen {
         listX = 6;
         listY = 72;
         listW = Math.max(150, (int) (width * 0.42));
-        listH = height - listY - 54;
+        listH = height - listY - 66;  // leaves a status line between the panes and the buttons
         viewX = listX + listW + 8;
         viewW = width - viewX - 6;
 
@@ -370,7 +372,11 @@ final class FileScreen extends Screen {
         }
         drawList(g, mouseX, mouseY);
         drawPreview(g);
-        if (!message.isEmpty()) g.text(font, font.plainSubstrByWidth(message, width - 12), 6, listY + listH + 4, messageColor);
+        if (!message.isEmpty() && System.currentTimeMillis() - messageAt < 8000) {
+            String shown = font.plainSubstrByWidth(message, width - 16);
+            g.fill(4, listY + listH + 2, 8 + font.width(shown), listY + listH + 13, 0xC0000000);
+            g.text(font, shown, 6, listY + listH + 4, messageColor);
+        }
     }
 
     private void drawCrumbs(GuiGraphicsExtractor g, int mouseX, int mouseY) {

@@ -681,6 +681,21 @@ class FileWindowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('No such folder', data['error'])
 
 
+class ProtectedPathTests(unittest.TestCase):
+    def test_top_level_folders_can_be_deleted_but_system_ones_cannot(self):
+        from backends.files import _protected
+        ws = Path(tempfile.gettempdir()) / 'ws'
+        root = Path(Path.home().anchor)
+        self.assertTrue(_protected(root, ws))
+        self.assertTrue(_protected(Path.home(), ws))
+        self.assertTrue(_protected(Path.home().parent, ws))
+        self.assertTrue(_protected(ws, ws))
+        self.assertFalse(_protected(root / 'sdds', ws))  # e.g. C:\sdds is an ordinary folder
+        self.assertFalse(_protected(Path.home() / 'Desktop' / 'old-project', ws))
+        if os.name == 'nt' and os.environ.get('SystemRoot'):
+            self.assertTrue(_protected(Path(os.environ['SystemRoot']), ws))
+
+
 class AccountTests(unittest.IsolatedAsyncioTestCase):
     """In-game account flow against a fake `claude auth` CLI."""
     async def asyncSetUp(self):
