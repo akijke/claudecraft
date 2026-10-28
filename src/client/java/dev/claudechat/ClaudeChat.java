@@ -58,6 +58,7 @@ public final class ClaudeChat implements ClientModInitializer {
         SHORTCUTS.put("bash", "sh bash");
         SHORTCUTS.put("kill", "sh kill");
         SHORTCUTS.put("project", "project");
+        SHORTCUTS.put("files", "files");
     }
     private final Set<String> needsText = Set.of("q", "queue", "f", "force", "spawn", "run", "cat", "type",
         "find", "mkdir", "touch", "mv", "cp", "rm", "connect", "stop", "disconnect", "detach");
@@ -206,6 +207,7 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("help")) { help(mode); return; }
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
+        if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
         if (Set.of("project", "projects", "p").contains(action) && text.strip().equals("pick")) {
             FolderPicker.pick(this);  // system folder dialog; the bridge gets the chosen path
             return;

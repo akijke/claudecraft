@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from urllib.parse import quote
 from aiohttp.test_utils import make_mocked_request
 from unittest.mock import AsyncMock
 from bridge import Bridge, create_app
@@ -638,6 +639,46 @@ class ShellTests(unittest.IsolatedAsyncioTestCase):
         end = await self.finished()
         self.assertTrue(end.get('killed'))
         self.assertFalse(self.bridge.shell.running())
+
+
+class FileWindowTests(unittest.IsolatedAsyncioTestCase):
+    """HTTP data for the file manager window."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        ws = self.bridge.workspace
+        (ws / 'src').mkdir()
+        (ws / 'src' / 'A.java').write_text('line1\nline2\nline3\n', encoding='utf-8')
+        (ws / 'b.bin').write_bytes(b'\0\1')
+        self.app = create_app(self.bridge, 't')
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def get(self, path):
+        request = make_mocked_request('GET', path, headers={'Authorization': 'Bearer t'})
+        route = await self.app.router.resolve(request)
+        response = await self.app.middlewares[0](request, route.handler)
+        return response.status, json.loads(response.text)
+
+    async def test_listing_preview_and_errors(self):
+        status, data = await self.get('/files?mode=cc')
+        self.assertEqual(status, 200)
+        self.assertEqual(data['rows'][0]['name'], 'extensions')  # folders first
+        self.assertIn('src', [r['name'] for r in data['rows'] if r['dir']])
+        self.assertTrue(data['roots'])
+        src = str(self.bridge.workspace / 'src')
+        status, data = await self.get('/files?mode=cc&path=' + quote(src))
+        self.assertEqual([r['name'] for r in data['rows']], ['A.java'])
+        self.assertEqual(Path(self.bridge.files.here('cc')), Path(src))  # window folder = browsing folder
+        status, data = await self.get('/file?mode=cc&path=' + quote(src + '/A.java') + '&start=2')
+        self.assertEqual((data['lines'], data['total'], data['start']), (['line2', 'line3'], 3, 2))
+        status, data = await self.get('/file?mode=cc&path=' + quote(str(self.bridge.workspace / 'b.bin')))
+        self.assertTrue(data['binary'])
+        status, data = await self.get('/files?mode=cc&path=' + quote(src + '/missing'))
+        self.assertEqual(status, 400)
+        self.assertIn('No such folder', data['error'])
 
 
 class AccountTests(unittest.IsolatedAsyncioTestCase):

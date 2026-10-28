@@ -277,6 +277,7 @@ final class ChatStyle {
         out.add(line(mode, head));
         MutableComponent tools = Component.literal("  ");
         if (!str(e, "parent").isEmpty()) tools.append(button("..", cmd + "cd ..", false, AQUA, L.t("Вверх"))).append(" ");
+        tools.append(button("▣ " + L.t("окно"), cmd + "files", false, GOLD, L.t("Открыть окно файлового менеджера"))).append(" ");
         tools.append(button("≡ tree", cmd + "tree", false, AQUA, L.t("Дерево папок"))).append(" ");
         if (str(e, "project").isEmpty())
             tools.append(button(L.t("✦ Сделать проектом"), "/cc project here", false, CODE_MODE,

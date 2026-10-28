@@ -887,6 +887,18 @@ def create_app(bridge, token):
     app.router.add_post('/command', command)
     app.router.add_get('/events', events)
     app.router.add_get('/state', state)
+    async def files(request):
+        """File manager window: listing of a folder (path empty = current browsing folder)."""
+        mode = request.query.get('mode', 'cc')
+        return web.json_response(bridge.files.snapshot(mode if mode in ('c', 'cc') else 'cc',
+                                                       request.query.get('path', '')))
+    async def file(request):
+        mode = request.query.get('mode', 'cc')
+        return web.json_response(bridge.files.read(mode if mode in ('c', 'cc') else 'cc',
+                                                   request.query.get('path', ''),
+                                                   int(request.query.get('start', '1') or 1)))
+    app.router.add_get('/files', files)
+    app.router.add_get('/file', file)
     async def account(request):
         status = await bridge.account.status()
         status['github'] = await bridge.github.status()

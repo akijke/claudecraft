@@ -58,6 +58,9 @@ final class ConversationScreen extends Screen {
     }
 
     static boolean isOpen() { return open; }
+
+    /** Opens the next conversation window on `m` with `text` already in the input box. */
+    static void prefill(String m, String text) { mode = m; draft = text; }
     static void changed() { dirty = true; }
 
     @Override public void added() { open = true; dirty = true; }
@@ -177,7 +180,8 @@ final class ConversationScreen extends Screen {
             .bounds(left, y, panel, 20).build());
 
         int bw = (panel - 2) / 2;  // two per row so labels are not cut
-        addRenderableWidget(small(L.t("Файлы"), "/" + mode + " ls", L.t("Файловый менеджер"), left, height - 70, bw));
+        addRenderableWidget(Button.builder(Component.literal(L.t("Файлы")), b -> minecraft.setScreenAndShow(new FileScreen(mod, this)))
+            .bounds(left, height - 70, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Файловый менеджер")))).build());
         addRenderableWidget(small(L.t("Агенты"), "/cc agents", L.t("Агенты-помощники"), left + bw + 2, height - 70, bw));
         addRenderableWidget(small(L.t("Задачи"), "/cc tasks", L.t("Все работающие задачи и агенты"), left, height - 48, bw));
         addRenderableWidget(small("Git", "/cc git", L.t("Git текущего проекта"), left + bw + 2, height - 48, bw));

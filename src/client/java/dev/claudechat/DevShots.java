@@ -38,6 +38,8 @@ final class DevShots {
                 client.setScreenAndShow(new ConversationScreen(mod, parse(STATE)));
             }
             case 300 -> Screenshot.grab(client, true);
+            case 310 -> client.setScreenAndShow(new FileScreen(mod, null, parse(FILES)));
+            case 318 -> Screenshot.grab(client, true);
             case 320 -> client.setScreenAndShow(new ChatPreview(PROJECT));
             case 360 -> Screenshot.grab(client, true);
             case 380 -> client.setScreenAndShow(new ChatPreview(TOOLS));
@@ -65,6 +67,16 @@ final class DevShots {
         + "{\"id\":\"demo\",\"mode\":\"cc\",\"title\":\"Почини сборку\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":3},"
         + "{\"id\":\"demo2\",\"mode\":\"cc\",\"title\":\"test-writer: тесты utils\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":2},"
         + "{\"id\":\"demo3\",\"mode\":\"cc\",\"title\":\"README\",\"project\":\"my-mod\",\"running\":false,\"queue\":0,\"updated\":1}]}";
+
+    private static final String FILES = "{\"path\":\"C:\\\\dev\\\\my-mod\\\\src\",\"parent\":\"C:\\\\dev\\\\my-mod\",\"more\":0,"
+        + "\"project\":null,\"git\":false,\"claude\":\"C:\\\\dev\\\\my-mod\",\"current_project\":\"my-mod\","
+        + "\"workspace\":\"C:\\\\mc\\\\workspace\",\"home\":\"C:\\\\Users\\\\me\",\"roots\":[\"C:\\\\\",\"D:\\\\\"],\"rows\":["
+        + "{\"name\":\"client\",\"dir\":true,\"size\":0,\"mtime\":1790000000,\"hidden\":false},"
+        + "{\"name\":\"main\",\"dir\":true,\"size\":0,\"mtime\":1790000000,\"hidden\":false},"
+        + "{\"name\":\".cache\",\"dir\":true,\"size\":0,\"mtime\":1790000000,\"hidden\":true},"
+        + "{\"name\":\"Main.java\",\"dir\":false,\"size\":4210,\"mtime\":1790000000,\"hidden\":false},"
+        + "{\"name\":\"Util.java\",\"dir\":false,\"size\":980,\"mtime\":1790000000,\"hidden\":false},"
+        + "{\"name\":\"notes.md\",\"dir\":false,\"size\":120400,\"mtime\":1790000000,\"hidden\":false}]}";
 
     private static final String[] WORK = {
         "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Почини сборку\",\"text\":\"Думаю…\",\"queued\":0}",

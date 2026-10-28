@@ -41,6 +41,48 @@ class FileManager:
     def emit(self, mode, text, **extra):
         self.bridge.emit(self.bridge.current_chat(mode), text, **extra)
 
+    # ---- data for the file window (no chat output) ---------------------------
+    def snapshot(self, mode, arg=''):
+        """Folder listing for the file manager window; also becomes the browsing folder."""
+        folder = self.resolve(mode, arg)
+        if not folder.is_dir():
+            raise ValueError(f'Нет такой папки: {folder}')
+        try:
+            entries = sorted(folder.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except PermissionError:
+            raise ValueError(f'Нет доступа: {folder}') from None
+        rows = []
+        for entry in entries[:2000]:
+            try:
+                is_dir = entry.is_dir()
+                stat = entry.stat()
+            except OSError:
+                continue
+            rows.append({'name': entry.name, 'dir': is_dir, 'size': 0 if is_dir else stat.st_size,
+                         'mtime': int(stat.st_mtime), 'hidden': entry.name.startswith('.')})
+        self.cwd[mode] = str(folder)
+        roots = [str(Path(d)) for d in _drives()]
+        return {'path': str(folder), 'parent': str(folder.parent) if folder.parent != folder else None,
+                'rows': rows, 'more': max(0, len(entries) - 2000),
+                'project': self.bridge.projects.find_by_path(folder), 'git': (folder / '.git').exists(),
+                'claude': self.bridge.projects.path_of_current(), 'current_project': self.bridge.projects.current,
+                'workspace': str(self.bridge.workspace), 'home': str(Path.home()), 'roots': roots}
+
+    def read(self, mode, arg, start=1, count=400):
+        """Text of a file for the preview pane."""
+        path = self.resolve(mode, arg)
+        if not path.is_file():
+            raise ValueError(f'Нет такого файла: {path}')
+        size = path.stat().st_size
+        with path.open('rb') as f:
+            raw = f.read(4_000_000)
+        if b'\0' in raw[:8000]:
+            return {'path': str(path), 'binary': True, 'size': size, 'lines': [], 'total': 0, 'start': 1}
+        lines = raw.decode('utf-8', 'replace').splitlines()
+        start = max(1, start)
+        return {'path': str(path), 'binary': False, 'size': size, 'start': start, 'total': len(lines),
+                'lines': [line[:400] for line in lines[start - 1:start - 1 + min(count, 2000)]]}
+
     # ---- browsing ------------------------------------------------------
     def ls(self, mode, arg=''):
         folder = self.resolve(mode, arg)
@@ -218,6 +260,14 @@ class FileManager:
         else:
             subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(path)])
         self.emit(mode, f'Открыто: {path}', kind='status')
+
+
+def _drives():
+    """Disk roots for quick jumps (C:\\, D:\\ … on Windows; / elsewhere)."""
+    if os.name != 'nt':
+        return ['/']
+    import string
+    return [f'{letter}:\\' for letter in string.ascii_uppercase if os.path.exists(f'{letter}:\\')]
 
 
 def split_two(arg):
