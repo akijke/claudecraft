@@ -535,5 +535,17 @@
   "   ⟳ — откатить разговор и файлы к моменту перед запросом": "   ⟳ — roll the conversation and files back to before the request",
   "Вернуться к моменту перед этим запросом": "Go back to just before this request",
   "изменить и отправить заново": "edit and send again",
-  "[номер] — откатить разговор и файлы к любому прошлому запросу": "[number] — roll the conversation and files back to any earlier request"
+  "[номер] — откатить разговор и файлы к любому прошлому запросу": "[number] — roll the conversation and files back to any earlier request",
+  "Память Claude": "Claude's memory",
+  "  Claude читает эти файлы  ": "  Claude reads these files  ",
+  "  выключено — Claude их не видит  ": "  off — Claude does not see them  ",
+  "Вместе с CLAUDE.md грузятся правила и хуки из settings.json": "Rules and hooks from settings.json are loaded together with CLAUDE.md",
+  "локально (не в git)": "local (not in git)",
+  " строк  ": " lines  ",
+  "нет файла  ": "no file  ",
+  "править": "edit",
+  "создать": "create",
+  "быстрая заметка": "quick note",
+  "Допишет строку в раздел ## Notes файла CLAUDE.md проекта": "Appends a line to ## Notes of the project's CLAUDE.md",
+  "CLAUDE.md проекта и пользователя: открыть, вкл/выкл · /cc # <заметка> — дописать в CLAUDE.md": "project and user CLAUDE.md: open, on/off · /cc # <note> — append to CLAUDE.md"
 }

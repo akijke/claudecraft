@@ -214,7 +214,9 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         await self.until(lambda: chat.task is None)
         results = json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False)
         self.assertIn('rule-ok', results)
-        self.assertIn('Denied by the permission rule Bash(git push:*)', results)
+        # Denied either by the CLI itself (it reads .claude/settings.json) or by the bridge's rules
+        self.assertTrue('Permission to use Bash with command git push --force has been denied' in results
+                        or 'Denied by the permission rule Bash(git push:*)' in results, results[-600:])
 
     async def answer_plans(self, answers):
         """Answers plan cards in order, like the Minecraft buttons."""
@@ -309,6 +311,37 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('PROMPT-TWO', sent)
         self.assertNotIn('PROMPT-THREE', sent)
         self.assertIn('after rewind', self.texts())
+
+    async def test_claude_md_memory_and_undo_when_settings_allow(self):
+        await self.start([])
+        ws = self.bridge.workspace
+        target = os.path.join(ws, 'kept.txt')
+        with open(target, 'w', encoding='utf-8') as f:
+            f.write('original')
+        self.fake.script = [tool('Write', {'file_path': target, 'content': 'changed'}), text('ok')]
+        await self.bridge.command({'mode': 'cc', 'action': 'remember', 'text': 'MEMORY-TOKEN-42 use tabs'})
+        os.makedirs(os.path.join(ws, '.claude'), exist_ok=True)
+        with open(os.path.join(ws, '.claude', 'settings.json'), 'w', encoding='utf-8') as f:
+            json.dump({'permissions': {'allow': ['Write']}}, f)   # the CLI allows it without asking us
+        config = os.environ['CLAUDE_CONFIG_DIR']
+        os.makedirs(config, exist_ok=True)
+        with open(os.path.join(config, '.claude.json'), 'w', encoding='utf-8') as f:   # trusted folder
+            json.dump({'projects': {str(ws).replace('\\', '/'): {'hasTrustDialogAccepted': True}}}, f)
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        import backends.permrules as rules
+        asked = []
+        original = rules.decide
+        with mock.patch.object(rules, 'decide', lambda *a: asked.append(a) or original(*a)):
+            await self.bridge.enqueue(chat, 'change the file')
+            await self.until(lambda: chat.task is None)
+        self.assertEqual(asked, [])   # the bridge's permission callback never ran: only the hook saw the edit
+        self.assertEqual(self.errors(), [])
+        self.assertIn('MEMORY-TOKEN-42', json.dumps(self.fake.requests[0], ensure_ascii=False))
+        with open(target, encoding='utf-8') as f:
+            self.assertEqual(f.read(), 'changed')
+        await self.bridge.command({'mode': 'cc', 'action': 'undo'})
+        with open(target, encoding='utf-8') as f:
+            self.assertEqual(f.read(), 'original')
 
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])

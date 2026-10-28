@@ -182,6 +182,24 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "memory" -> {
+                boolean loaded = b(e, "loaded");
+                out.add(line(mode, lit("☰ " + L.t("Память Claude"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(loaded ? L.t("  Claude читает эти файлы  ") : L.t("  выключено — Claude их не видит  "), loaded ? GREEN : RED))
+                    .append(button(loaded ? L.t("выключить") : L.t("включить"), cmd + "memory " + (loaded ? "off" : "on"), false, AQUA,
+                        L.t("Вместе с CLAUDE.md грузятся правила и хуки из settings.json")))));
+                for (JsonElement item : e.getAsJsonArray("files")) {
+                    JsonObject f = item.getAsJsonObject();
+                    String scope = s(f, "scope");
+                    String label = scope.equals("project") ? L.t("проект") : scope.equals("local") ? L.t("локально (не в git)") : L.t("пользователь");
+                    out.add(line(mode, lit("  " + label + "  ", TEXT)
+                        .append(lit(b(f, "exists") ? n(f, "lines") + L.t(" строк  ") : L.t("нет файла  "), DIM))
+                        .append(button("✎ " + (b(f, "exists") ? L.t("править") : L.t("создать")), cmd + "memory edit " + s(f, "path"), false, AQUA, s(f, "path")))));
+                    for (JsonElement p : f.getAsJsonArray("preview")) out.add(line(mode, lit("      " + p.getAsString(), FAINT)));
+                }
+                out.add(line(mode, Component.literal("  ").append(button("# " + L.t("быстрая заметка"), cmd + "# ", true, GREEN,
+                    L.t("Допишет строку в раздел ## Notes файла CLAUDE.md проекта")))));
+            }
             case "rewind_list" -> {
                 out.add(line(mode, lit("⟳ " + L.t("История запросов"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit(L.t("   ⟳ — откатить разговор и файлы к моменту перед запросом"), FAINT))));

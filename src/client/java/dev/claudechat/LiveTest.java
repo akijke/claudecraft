@@ -129,6 +129,11 @@ final class LiveTest {
         }, () -> waited > 10 && Sounds.sound("done").equals("minecraft:block.note_block.bell"), 10);
         quiet("restore the default sound", () -> mod.runLine("c", "/claude sound done default"),
             () -> Sounds.sound("done").equals(Sounds.DEFAULTS.get("done")), 5);
+        step("/cc # remembers, /cc memory shows CLAUDE.md", () -> {
+            markEvents();
+            mod.runLine("cc", "/cc # livetest note");
+            mod.runLine("cc", "/cc memory");
+        }, () -> event("memory"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

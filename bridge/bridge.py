@@ -820,6 +820,24 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action in ('memory', 'mem'):
+            from backends import memory
+            sub, _, rest = text.strip().partition(' ')
+            if sub == 'edit':
+                self.emit(chat, 'Память', kind='open_editor', path=memory.ensure(rest.strip()))
+            elif sub in ('on', 'off'):
+                from backends.util import save_json
+                self.config['load_claude_settings'] = sub == 'on'
+                save_json(self.directory / 'bridge-config.json', self.config)
+            elif sub:
+                raise ValueError('memory [edit <файл> | on | off]')
+            if sub != 'edit':
+                self.emit(chat, 'Память Claude', kind='memory', files=memory.files(self.chat_cwd(chat)),
+                          loaded=self.config.get('load_claude_settings', True))
+        elif action == 'remember':
+            from backends import memory
+            path = memory.remember(self.chat_cwd(chat), text)
+            self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
         elif action == 'budget':
@@ -1153,7 +1171,7 @@ ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls'
            'ps': 'tasks', 'jobs': 'tasks', 'mcp': 'connectors', 'unconnect': 'disconnect_connector',
            'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn',
            'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh',
-           'image': 'img', 'picture': 'img'}
+           'image': 'img', 'picture': 'img', '#': 'remember'}
 MODELS = ('opus', 'sonnet', 'haiku')
 
 

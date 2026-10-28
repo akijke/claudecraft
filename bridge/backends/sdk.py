@@ -316,7 +316,7 @@ async def run(bridge, chat, text):
         text = text[len(PLAN_MARK):]
     plan_file = [None]  # set when Claude writes its plan (plan mode)
     from claude_agent_sdk import (ClaudeAgentOptions, ClaudeSDKClient, PermissionResultAllow,
-        PermissionResultDeny, tool, create_sdk_mcp_server)
+        PermissionResultDeny, tool, create_sdk_mcp_server, HookMatcher)
 
     async def permission(name, data, context):
         try:
@@ -413,6 +413,17 @@ async def run(bridge, chat, text):
         return {'content': [{'type': 'text', 'text': read_game_logs(bridge.game_dir, args.get('kind', 'latest'),
                                                                      int(args.get('lines') or 300))}]}
 
+    async def snapshot_hook(data, tool_use_id, context):
+        # Runs for every file tool, also when settings.json rules allow it without asking us,
+        # so /cc undo always has the file as it was. Never blocks the tool.
+        try:
+            path = undo_files.target(data.get('tool_name', ''), data.get('tool_input') or {}, effective)
+            if path:
+                bridge.checkpoints.remember(chat.id, path)
+        except Exception:
+            log.exception('snapshot hook')
+        return {}
+
     tools = (['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'Task',
               'NotebookEdit', 'AskUserQuestion'] if chat.mode == 'cc' else ['AskUserQuestion'])
     mcp = dict(bridge.extensions) if chat.mode == 'cc' else {}
@@ -444,9 +455,13 @@ async def run(bridge, chat, text):
         tools = tools + ['ExitPlanMode'] if 'ExitPlanMode' not in tools else tools
     options = ClaudeAgentOptions(cwd=session_dir, resume=chat.sdk_id, add_dirs=extra_dirs,
         tools=tools, mcp_servers=mcp, can_use_tool=permission,
-        permission_mode='plan' if plan_mode else 'default', setting_sources=[],
+        permission_mode='plan' if plan_mode else 'default',
+        # CLAUDE.md memory, permission rules and hooks from disk, like Claude Code (off: load_claude_settings=false)
+        setting_sources=['user', 'project', 'local'] if bridge.config.get('load_claude_settings', True) else [],
         # Lines of the answer are shown while they are generated.
         include_partial_messages=True,
+        hooks={'PreToolUse': [HookMatcher(matcher='Write|Edit|MultiEdit|NotebookEdit', hooks=[snapshot_hook])]}
+        if chat.mode == 'cc' else None,
         model=chat.model, effort=chat.effort,
         agents=bridge.agents.definitions(effective) if chat.mode == 'cc' else None,
         # Echo accepted prompts so `f` messages can be matched against ResultMessage.

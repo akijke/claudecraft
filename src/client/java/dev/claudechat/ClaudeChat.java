@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "memory", "mem", "#", "remember", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -455,6 +455,11 @@ public final class ClaudeChat implements ClientModInitializer {
 
     private void render(JsonObject event) {
         String kind = event.has("kind") ? event.get("kind").getAsString() : "";
+        if (kind.equals("open_editor") && event.has("path")) {  // the bridge asks to open a file in the editor
+            String path = event.get("path").getAsString();
+            open(() -> new EditorScreen(this, null, path));
+            return;
+        }
         String chat = event.has("chat") ? event.get("chat").getAsString() : "";
         if (kind.equals("need_key") && event.has("connector"))
             keyFields.put(event.get("connector").getAsString(), event.getAsJsonArray("fields"));
@@ -514,6 +519,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "budget", L.t("лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume")},
             {"/palette", L.t("все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)")},
             {c + "rewind", L.t("[номер] — откатить разговор и файлы к любому прошлому запросу")},
+            {c + "memory", L.t("CLAUDE.md проекта и пользователя: открыть, вкл/выкл · /cc # <заметка> — дописать в CLAUDE.md")},
             {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
