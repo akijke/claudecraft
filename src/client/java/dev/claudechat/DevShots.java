@@ -115,7 +115,8 @@ final class DevShots {
         "{\"seq\":11,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"import static ...ClientCommands.*;\"}",
         "{\"seq\":12,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```\"}",
         "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- the build passes, `gradlew build` ✔\"}",
-        "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Done\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092}",
+        "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Done\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092,\"context\":162000,\"window\":200000}",
+        "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"context_warn\",\"text\":\"Context is 81% full — compress the history: /cc compact [what to focus on]\",\"percent\":81}",
         "{\"seq\":15,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r1\",\"text\":\"Bash\\n{}\",\"summary\":\"$ git push\",\"choices\":[\"Allow\",\"Deny\",\"Always allow Bash\"]}",
     };
 

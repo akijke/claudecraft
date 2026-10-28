@@ -157,6 +157,12 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Контекст заполнен на {}% — сожми историю: /cc compact [на чём сосредоточиться]':
+        'Context is {}% full — compress the history: /cc compact [what to focus on]',
+    'compact работает в чатах Claude Code (SDK)': 'compact works in Claude Code (SDK) chats',
+    'Сжимать нечего: в этом чате ещё не было разговора': 'Nothing to compact: this chat has no conversation yet',
+    'История сжата (было {} токенов).': 'History compacted (was {} tokens).',
+    'Контекст': 'Context',
     'Claude Code CLI уже встроен в SDK — ставить нечего': 'Claude Code CLI is bundled with the SDK — nothing to install',
     'Нужен Node.js (npm): установи с nodejs.org, перезапусти мост и нажми ещё раз':
         'Node.js (npm) is needed: install it from nodejs.org, restart the bridge and press again',

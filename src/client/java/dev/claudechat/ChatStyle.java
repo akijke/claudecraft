@@ -108,6 +108,14 @@ final class ChatStyle {
                 if (in + o > 0) c.append(lit("  ↑" + human(in) + " ↓" + human(o), DIM));
                 if (e.has("cost") && e.get("cost").getAsDouble() > 0)
                     c.append(lit(String.format(Locale.ROOT, "  ≈$%.3f", e.get("cost").getAsDouble()), FAINT));
+                contextMeter(e, c, mode);
+                out.add(line(mode, c));
+            }
+            case "context_warn" -> out.add(line(mode, lit("⚠ " + text + "  ", GOLD)
+                .append(button(L.t("сжать"), "/" + mode + " compact ", true, AQUA, L.t("Claude перескажет историю коротко; можно дописать, что сохранить")))));
+            case "context" -> {
+                MutableComponent c = lit(L.t("◎ Контекст"), GOLD);
+                contextMeter(e, c, mode);
                 out.add(line(mode, c));
             }
             case "error" -> {
@@ -315,8 +323,23 @@ final class ChatStyle {
             out.add(line(mode, lit(L.t("  … и ещё ") + e.get("more").getAsInt(), DIM)));
     }
 
+    /** "  ◎ 42% контекста" bar: green < 60 %, gold < 80 %, red above; clicking offers /compact. */
+    static void contextMeter(JsonObject e, MutableComponent c, String mode) {
+        long used = e.has("context") && !e.get("context").isJsonNull() ? e.get("context").getAsLong() : 0;
+        long window = e.has("window") ? e.get("window").getAsLong() : 200_000;
+        if (used <= 0 || window <= 0) return;
+        int pct = (int) Math.min(100, Math.round(100.0 * used / window));
+        int color = pct >= 80 ? RED : pct >= 60 ? GOLD : GREEN;
+        int filled = Math.round(pct / 10f);
+        c.append(lit("  ◎ ", DIM)).append(lit("■".repeat(filled), color)).append(lit("■".repeat(10 - filled), FAINT))
+            .append(button(" " + pct + "%", "/" + mode + " compact ", true, color,
+                human(used) + " / " + human(window) + L.t(" токенов в контексте · клик — /compact")));
+    }
+
     private static void tokens(JsonObject e, String mode, List<Component> out) {
-        out.add(line(mode, lit(L.t("Σ Токены"), GOLD).withStyle(s -> s.withBold(true))));
+        MutableComponent head = lit(L.t("Σ Токены"), GOLD).withStyle(s -> s.withBold(true));
+        contextMeter(e, head, mode);
+        out.add(line(mode, head));
         for (JsonElement item : e.getAsJsonArray("rows")) {
             JsonObject r = item.getAsJsonObject();
             out.add(line(mode, lit("  " + str(r, "label"), TEXT)));

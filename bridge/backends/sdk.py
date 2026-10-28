@@ -151,6 +151,14 @@ class SdkTurn:
     def stream_delta(self, event):
         """Text deltas of the main agent: emit complete lines as they arrive."""
         kind = event.get('type')
+        if kind == 'message_start':
+            # Prompt size of this model call = how full the context is right now.
+            u = (event.get('message') or {}).get('usage') or {}
+            used = sum(int(u.get(k) or 0) for k in ('input_tokens', 'cache_read_input_tokens',
+                                                     'cache_creation_input_tokens'))
+            if used:
+                self.chat.context = used
+            return
         if kind == 'content_block_delta' and event.get('delta', {}).get('type') == 'text_delta':
             self.stream += event['delta'].get('text', '')
             self.streamed = True
@@ -196,6 +204,12 @@ class SdkTurn:
                         self.bridge.emit(self.chat, 'Лимит подписки: ' + ('почти исчерпан' if info.status ==
                                          'allowed_warning' else 'исчерпан'), kind='error' if info.status ==
                                          'rejected' else 'status')
+                    continue
+                if isinstance(message, T.SystemMessage) and message.subtype == 'compact_boundary':
+                    meta = message.data.get('compact_metadata') or {}
+                    self.chat.context = 0
+                    self.bridge.emit(self.chat, f"История сжата (было {meta.get('pre_tokens', '?')} токенов).",
+                                     kind='status')
                     continue
                 if isinstance(message, T.SystemMessage) and message.subtype == 'init':
                     for server in message.data.get('mcp_servers') or []:

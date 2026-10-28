@@ -63,7 +63,7 @@ class FakeAnthropic:
         await send('message_start', {'type': 'message_start', 'message': {
             'id': f'msg_{len(self.requests)}', 'type': 'message', 'role': 'assistant',
             'model': body.get('model', 'm'), 'content': [], 'stop_reason': None,
-            'stop_sequence': None, 'usage': {'input_tokens': 1, 'output_tokens': 1}}})
+            'stop_sequence': None, 'usage': reply.get('usage') or {'input_tokens': 1, 'output_tokens': 1}}})
         stop = 'end_turn'
         for i, block in enumerate(reply['blocks']):
             if block['type'] == 'text':

@@ -395,5 +395,10 @@
   "контрольная сумма Python не совпала — файл удалён": "the Python checksum did not match — file deleted",
   "нет контрольной суммы для ": "no checksum for ",
   "распаковываю Python": "unpacking Python",
-  "скачиваю Python: ": "downloading Python: "
+  "скачиваю Python: ": "downloading Python: ",
+  " токенов в контексте · клик — /compact": " tokens in context · click — /compact",
+  "Claude перескажет историю коротко; можно дописать, что сохранить": "Claude retells the history briefly; you can add what to keep",
+  "[фокус] — сжать историю, когда контекст заполнен · context — сколько занято": "[focus] — compress the history when the context is full · context — how much is used",
+  "сжать": "compact",
+  "◎ Контекст": "◎ Context"
 }

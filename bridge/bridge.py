@@ -51,6 +51,8 @@ class Chat:
     origin: str = ''                 # 'pc' = session found in Claude Code on the PC
     model: str | None = None         # None = Claude Code default; alias (opus/sonnet/haiku) or full id
     effort: str | None = None        # None = default; low | medium | high | xhigh | max
+    context: int = 0                 # tokens in the context at the last model call (0 = unknown)
+    context_warned: bool = False     # the >80 % warning was shown (not saved)
     cwd: str | None = None           # legacy field (old `cd`), ignored
     run_usage: dict = field(default_factory=dict)  # current queue item (not saved)
     step: str = ''                   # last progress line, for the task manager
@@ -63,7 +65,7 @@ class Chat:
 
 
 SAVED = ('id', 'mode', 'backend', 'title', 'sdk_id', 'messages', 'project', 'session_cwd', 'auto',
-         'allowed', 'usage', 'updated', 'origin', 'model', 'effort')
+         'allowed', 'usage', 'updated', 'origin', 'model', 'effort', 'context')
 
 
 class Bridge:
@@ -314,7 +316,9 @@ class Bridge:
                     self.emit(chat, 'Готово', kind='done', seconds=round(time.monotonic() - started, 1),
                               input=u.get('input_tokens', 0) + u.get('cache_read_input_tokens', 0)
                               + u.get('cache_creation_input_tokens', 0),
-                              output=u.get('output_tokens', 0), cost=round(u.get('cost_usd', 0.0), 4))
+                              output=u.get('output_tokens', 0), cost=round(u.get('cost_usd', 0.0), 4),
+                              context=chat.context, window=context_window(chat))
+                    self.context_check(chat)
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -327,6 +331,16 @@ class Bridge:
         finally:
             chat.task = None
             chat.step = ''
+
+    def context_check(self, chat):
+        """Warns once per crossing of 80 % context fill."""
+        pct = context_percent(chat)
+        if pct >= 80 and not getattr(chat, 'context_warned', False):
+            chat.context_warned = True
+            self.emit(chat, f'Контекст заполнен на {pct}% — сожми историю: /cc compact [на чём сосредоточиться]',
+                      kind='context_warn', percent=pct)
+        elif pct < 80:
+            chat.context_warned = False
 
     def add_usage(self, chat, usage, cost=0.0):
         """Add one turn's tokens (and cost delta) to the chat totals and the running item."""
@@ -366,7 +380,8 @@ class Bridge:
         note = ('Стоимость — оценка Claude Code по ценам API; на подписке списывается лимит, '
                 'а не деньги.' if chat.backend == 'local' else 'Токены из ответов Messages API.')
         limits = [{'type': k, **v} for k, v in sorted(self.rate_limits.items())]
-        self.emit(chat, 'Токены', kind='tokens', rows=rows, note=note, limits=limits)
+        self.emit(chat, 'Токены', kind='tokens', rows=rows, note=note, limits=limits,
+                  context=chat.context, window=context_window(chat), percent=context_percent(chat))
 
     @staticmethod
     def check_text(text):
@@ -644,6 +659,15 @@ class Bridge:
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
         elif action == 'tokens':
             self.tokens_report(chat)
+        elif action == 'compact':
+            if chat.backend == 'api':
+                raise ValueError('compact работает в чатах Claude Code (SDK)')
+            if not chat.sdk_id:
+                raise ValueError('Сжимать нечего: в этом чате ещё не было разговора')
+            await self.enqueue(chat, ('/compact ' + text.strip()).strip())
+        elif action == 'context':
+            self.emit(chat, 'Контекст', kind='context', context=chat.context, window=context_window(chat),
+                      percent=context_percent(chat))
         elif action == 'undo':
             self.undo(chat, text.strip())
         elif action in ('model', 'effort'):
@@ -909,6 +933,15 @@ ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls'
            'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh',
            'image': 'img', 'picture': 'img'}
 MODELS = ('opus', 'sonnet', 'haiku')
+
+
+def context_window(chat):
+    """Context size of the chat's model: 1M for "[1m]" model ids, otherwise 200k."""
+    return 1_000_000 if '[1m]' in (chat.model or '') else 200_000
+
+
+def context_percent(chat):
+    return min(100, round(100 * (chat.context or 0) / context_window(chat)))
 EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
 USAGE_KEYS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
 AUTO_MODES = {

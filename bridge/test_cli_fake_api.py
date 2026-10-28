@@ -182,6 +182,25 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
             stored += [Path(root, n).read_text(encoding='utf-8') for n in names if n.endswith('.jsonl')]
         self.assertTrue(any('"type":"image"' in s.replace(' ', '') for s in stored))
 
+    async def test_context_meter_warning_and_compact(self):
+        big = text('long answer')
+        big['usage'] = {'input_tokens': 2000, 'cache_read_input_tokens': 168000, 'output_tokens': 5}
+        await self.start([big, text('Summary of the conversation.'), text('after compact')])
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'remember a lot')
+        await self.until(lambda: chat.task is None)
+        self.assertEqual(self.errors(), [])
+        done = [e for e in self.bridge.events if e['kind'] == 'done'][-1]
+        self.assertEqual((done['context'], done['window']), (170000, 200000))
+        warn = [e for e in self.bridge.events if e['kind'] == 'context_warn']
+        self.assertEqual(warn[-1]['percent'], 85)
+        await self.bridge.command({'mode': 'cc', 'action': 'compact', 'text': 'keep the API decisions'})
+        await self.until(lambda: chat.task is None)
+        self.assertEqual(self.errors(), [])
+        self.assertTrue(any('keep the API decisions' in json.dumps(r['messages']) for r in self.fake.requests[1:]))
+        self.assertTrue(any(e['kind'] == 'status' and 'compacted' in e['text'] or 'сжата' in e['text']
+                            for e in self.bridge.events), [e['text'] for e in self.bridge.events][-8:])
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]
