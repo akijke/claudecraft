@@ -632,5 +632,15 @@
   "    #%d стр. %d  ": "    #%d line %d  ",
   "оба": "both",
   "конфликты": "conflicts",
-  "Разрешить конфликты слияния": "Resolve merge conflicts"
+  "Разрешить конфликты слияния": "Resolve merge conflicts",
+  " открыто  ": " open  ",
+  "новый PR": "new PR",
+  "Claude напишет описание и откроет черновик PR": "Claude writes the description and opens a draft PR",
+  "  открытых PR нет": "  no open PRs",
+  "Подробности, CI и комментарии": "Details, CI and comments",
+  "  черновик": "  draft",
+  "открыть на GitHub": "open on GitHub",
+  "ответить на ревью": "address the review",
+  "Claude исправит по комментариям, запушит и ответит в PR (каждый шаг с подтверждением)": "Claude fixes what the comments ask, pushes and replies on the PR (each step confirmed)",
+  "pull requests: список, CI, ревью · pr create — Claude пишет описание · pr reply <N> — ответ на ревью": "pull requests: list, CI, reviews · pr create — Claude writes the description · pr reply <N> — address a review"
 }

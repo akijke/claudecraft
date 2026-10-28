@@ -108,6 +108,8 @@ class Bridge:
         self.ledger = Ledger(self.directory)
         from backends.lsp import Lsp
         self.lsp = Lsp(self)
+        from backends.pulls import Pulls
+        self.pulls = Pulls(self)
         self.terminals = Terminals(self)
         self.oauth = OAuth(self)
         self.port = 18741  # set by main(); used for the OAuth redirect
@@ -970,6 +972,25 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action in ('pr', 'prs'):
+            from backends import pulls
+            folder = self.chat_cwd(chat)
+            sub, _, rest = text.strip().partition(' ')
+            if sub in ('', 'list', 'ls'):
+                self.emit(chat, 'Pull requests', kind='pr_list', rows=await self.pulls.list_prs(folder))
+            elif sub in ('view', 'show', 'checks') or sub.isdigit():
+                number = int(sub if sub.isdigit() else rest.strip().lstrip('#'))
+                self.emit(chat, f'PR #{number}', kind='pr_view', **await self.pulls.view_pr(folder, number))
+            elif sub == 'create':
+                await self.enqueue(chat, pulls.pr_create_prompt(rest.strip()))
+                self.emit(chat, 'Claude готовит PR (черновик): описание, push, gh pr create — каждую команду подтверждаешь ты',
+                          kind='status')
+            elif sub == 'reply':
+                pr = await self.pulls.view_pr(folder, int(rest.strip().lstrip('#')))
+                await self.enqueue(chat, pulls.pr_reply_prompt(pr))
+                self.emit(chat, f"Claude разбирает ревью PR #{pr['number']}: {len(pr['comments'])} комментариев", kind='status')
+            else:
+                raise ValueError('pr [list | <номер> | create [база] | reply <номер>]')
         elif action in ('search', 'grep-chats'):
             from backends import search
             folder = self.chat_cwd(chat) if mode == 'cc' else str(self.workspace)

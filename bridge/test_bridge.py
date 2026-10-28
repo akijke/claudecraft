@@ -1194,6 +1194,82 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bridge.runner.await_args.args[1], 'waits')
 
 
+class PullRequestTests(unittest.IsolatedAsyncioTestCase):
+    """PRs and issues through a fake `gh` on PATH (no GitHub access)."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        tools = Path(self.temp.name) / 'tools'
+        tools.mkdir()
+        fixtures = {
+            'pr list': [{'number': 7, 'title': 'Add login', 'headRefName': 'login', 'baseRefName': 'main', 'isDraft': True,
+                         'url': 'https://github.com/o/r/pull/7', 'author': {'login': 'alex'}, 'reviewDecision': 'CHANGES_REQUESTED',
+                         'statusCheckRollup': [{'name': 'build', 'conclusion': 'FAILURE'}, {'name': 'lint', 'conclusion': 'SUCCESS'}]}],
+            'pr view': {'number': 7, 'title': 'Add login', 'headRefName': 'login', 'baseRefName': 'main', 'isDraft': True,
+                        'url': 'https://github.com/o/r/pull/7', 'state': 'OPEN', 'body': 'Adds /login',
+                        'statusCheckRollup': [{'name': 'build', 'status': 'IN_PROGRESS'}],
+                        'comments': [{'author': {'login': 'sam'}, 'body': 'Please add a test'}],
+                        'reviews': [{'author': {'login': 'kim'}, 'body': 'Rename the flag', 'state': 'CHANGES_REQUESTED'}]},
+            'api': [{'user': {'login': 'kim'}, 'body': 'typo here', 'path': 'src/Login.java', 'line': 12}],
+            'issue list': [{'number': 3, 'title': 'Crash on start', 'labels': [{'name': 'bug'}], 'url': 'https://github.com/o/r/issues/3'}],
+            'issue view': {'number': 3, 'title': 'Crash on start', 'body': 'NPE in Main', 'url': 'u', 'labels': [],
+                           'comments': [{'author': {'login': 'sam'}, 'body': 'stack trace attached'}]},
+        }
+        (tools / 'fixtures.json').write_text(json.dumps(fixtures), encoding='utf-8')
+        script = tools / 'fake_gh.py'
+        script.write_text('import json, sys, pathlib\n'
+                          'f = json.loads((pathlib.Path(__file__).parent / "fixtures.json").read_text())\n'
+                          'a = sys.argv[1:]\nkey = a[0] if a[0] == "api" else a[0] + " " + a[1]\n'
+                          'print(json.dumps(f[key]))\n', encoding='utf-8')
+        if os.name == 'nt':
+            (tools / 'gh.cmd').write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding='utf-8')
+        else:
+            (tools / 'gh').write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding='utf-8')
+            (tools / 'gh').chmod(0o755)
+        self.env = mock.patch.dict(os.environ, {'PATH': str(tools) + os.pathsep + os.environ.get('PATH', '')})
+        self.env.start()
+        self.bridge = Bridge(Path(self.temp.name) / 'b', AsyncMock())
+
+    async def asyncTearDown(self):
+        self.env.stop()
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def test_pr_list_view_and_claude_tasks(self):
+        await self.bridge.command({'mode': 'cc', 'action': 'pr', 'text': ''})
+        row = [e for e in self.bridge.events if e['kind'] == 'pr_list'][-1]['rows'][0]
+        self.assertEqual((row['number'], row['draft'], row['checks']['state'], row['checks']['failed']), (7, True, 'failing', ['build']))
+        await self.bridge.command({'mode': 'cc', 'action': 'pr', 'text': '7'})
+        view = [e for e in self.bridge.events if e['kind'] == 'pr_view'][-1]
+        self.assertEqual(view['checks']['state'], 'pending')
+        self.assertEqual([(c['author'], c['where']) for c in view['comments']],
+                         [('sam', ''), ('kim', 'CHANGES_REQUESTED'), ('kim', 'src/Login.java:12')])
+        await self.bridge.command({'mode': 'cc', 'action': 'pr', 'text': 'reply 7'})
+        await self.bridge.command({'mode': 'cc', 'action': 'pr', 'text': 'create main'})
+        for _ in range(100):
+            if self.bridge.runner.await_count >= 2:
+                break
+            await asyncio.sleep(0.02)
+        prompts = [c.args[1] for c in self.bridge.runner.await_args_list]
+        self.assertIn('typo here', prompts[0])
+        self.assertIn('gh pr comment', prompts[0])
+        self.assertIn('gh pr create --draft', prompts[1])
+
+    @unittest.skip("#56")
+    async def test_issue_list_and_do(self):
+        await self.bridge.command({'mode': 'cc', 'action': 'issues', 'text': ''})
+        rows = [e for e in self.bridge.events if e['kind'] == 'issue_list'][-1]['rows']
+        self.assertEqual((rows[0]['number'], rows[0]['labels']), (3, ['bug']))
+        await self.bridge.command({'mode': 'cc', 'action': 'issue', 'text': 'do 3'})
+        for _ in range(100):
+            if self.bridge.runner.await_count:
+                break
+            await asyncio.sleep(0.02)
+        prompt = self.bridge.runner.await_args.args[1]
+        self.assertIn('NPE in Main', prompt)
+        self.assertIn('issue-3-', prompt)
+        self.assertIn('Closes #3', prompt)
+
+
 class LspTests(unittest.IsolatedAsyncioTestCase):
     async def test_diagnostics_definition_completion_with_a_real_protocol_server(self):
         temp = tempfile.TemporaryDirectory()

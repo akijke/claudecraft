@@ -341,6 +341,36 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "pr_list" -> {
+                JsonArray rows = e.getAsJsonArray("rows");
+                out.add(line(mode, lit("⇄ Pull requests", GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + rows.size() + L.t(" открыто  "), FAINT))
+                    .append(button("+ " + L.t("новый PR"), cmd + "pr create", false, GREEN, L.t("Claude напишет описание и откроет черновик PR")))));
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  открытых PR нет"), FAINT)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    out.add(line(mode, Component.literal("  ").append(button("#" + n(r, "number"), cmd + "pr " + n(r, "number"), false, AQUA, L.t("Подробности, CI и комментарии")))
+                        .append(lit(" " + s(r, "title"), TEXT)).append(lit(b(r, "draft") ? L.t("  черновик") : "", FAINT))
+                        .append(checksBadge(r.getAsJsonObject("checks")))
+                        .append(lit("  " + s(r, "branch") + " → " + s(r, "base"), FAINT))));
+                }
+            }
+            case "pr_view" -> {
+                out.add(line(mode, lit("⇄ #" + n(e, "number") + " " + s(e, "title"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(checksBadge(e.getAsJsonObject("checks")))
+                    .append(lit(s(e, "review").isEmpty() ? "" : "  " + s(e, "review").toLowerCase(Locale.ROOT).replace('_', ' '), DIM))));
+                out.add(line(mode, Component.literal("  ").append(button(L.t("открыть на GitHub"), s(e, "url"), false, AQUA, s(e, "url"))
+                        .withStyle(st -> st.withClickEvent(new ClickEvent.OpenUrl(URI.create(s(e, "url").isEmpty() ? "https://github.com" : s(e, "url"))))))
+                    .append(sp()).append(button("✦ " + L.t("ответить на ревью"), cmd + "pr reply " + n(e, "number"), false, CODE_MODE,
+                        L.t("Claude исправит по комментариям, запушит и ответит в PR (каждый шаг с подтверждением)")))));
+                JsonArray failed = e.getAsJsonObject("checks").getAsJsonArray("failed");
+                for (JsonElement f : failed) out.add(line(mode, lit("  ✖ CI: " + f.getAsString(), RED)));
+                for (JsonElement ce : e.getAsJsonArray("comments")) {
+                    JsonObject c = ce.getAsJsonObject();
+                    out.add(line(mode, lit("  " + s(c, "author"), AQUA).append(lit(s(c, "where").isEmpty() ? "" : " " + s(c, "where"), FAINT))
+                        .append(lit(": " + firstLine(s(c, "body")), TEXT))));
+                }
+            }
             case "git_conflicts" -> {
                 JsonArray files = e.getAsJsonArray("files");
                 out.add(line(mode, lit("⚠ " + L.t("Конфликты слияния"), files.isEmpty() ? GREEN : RED).withStyle(st -> st.withBold(true))
@@ -648,6 +678,17 @@ final class WorkStyle {
         }
         int more = lines.size() - Math.min(max, lines.size()) + n(d, "more");
         if (more > 0) out.add(line(mode, lit("  … " + L.t("ещё строк: ") + more, FAINT)));
+    }
+
+    /** CI state of a PR: ✔ passing, ✖ failing, … pending. */
+    static MutableComponent checksBadge(JsonObject checks) {
+        String state = checks == null ? "none" : s(checks, "state");
+        return switch (state) {
+            case "passing" -> lit("  ✔ CI", GREEN);
+            case "failing" -> lit("  ✖ CI", RED);
+            case "pending" -> lit("  … CI", GOLD);
+            default -> Component.literal("");
+        };
     }
 
     private static void diff(JsonObject e, String mode, List<Component> out) {

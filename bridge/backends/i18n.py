@@ -157,6 +157,12 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Нужен GitHub CLI (gh): cli.github.com, затем вход — /claude → GitHub': 'GitHub CLI (gh) is needed: cli.github.com, then sign in — /claude → GitHub',
+    'gh вернул не JSON: {}': 'gh returned no JSON: {}',
+    'Claude готовит PR (черновик): описание, push, gh pr create — каждую команду подтверждаешь ты':
+        'Claude prepares a draft PR: description, push, gh pr create — you confirm every command',
+    'Claude разбирает ревью PR #{}: {} комментариев': 'Claude works through the review of PR #{}: {} comments',
+    'pr [list | <номер> | create [база] | reply <номер>]': 'pr [list | <number> | create [base] | reply <number>]',
     'Конфликты': 'Conflicts', 'Конфликтов нет': 'No conflicts',
     'Выбор: ours | theirs | both': 'Choice: ours | theirs | both',
     'Нет такого конфликта (файл изменился?) — обнови список: /cc git conflicts': 'No such conflict (the file changed?) — refresh: /cc git conflicts',
