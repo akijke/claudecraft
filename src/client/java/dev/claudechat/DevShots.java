@@ -40,7 +40,7 @@ final class DevShots {
             case 300 -> Screenshot.grab(client, true);
             case 302 -> {
                 Notify.onEvent(parse("{\"kind\":\"thinking\",\"chat\":\"a\",\"mode\":\"cc\",\"title\":\"Fix the build\"}"));
-                Notify.onEvent(parse("{\"kind\":\"tool\",\"chat\":\"a\",\"mode\":\"cc\",\"text\":\"gradlew build  — Building\"}"));
+                Notify.onEvent(parse("{\"kind\":\"tool\",\"chat\":\"a\",\"mode\":\"cc\",\"text\":\"gradlew build  вЂ” Building\"}"));
                 Notify.onEvent(parse("{\"kind\":\"thinking\",\"chat\":\"b\",\"mode\":\"c\",\"title\":\"Explain mixins\"}"));
                 Notify.onEvent(parse("{\"kind\":\"permission\",\"chat\":\"b\",\"mode\":\"c\",\"title\":\"Explain mixins\"}"));
                 client.setScreenAndShow(new HudPreview());
@@ -48,6 +48,14 @@ final class DevShots {
             case 307 -> Screenshot.grab(client, true);
             case 310 -> client.setScreenAndShow(new FileScreen(mod, null, parse(FILES)));
             case 318 -> Screenshot.grab(client, true);
+            case 362 -> client.setScreenAndShow(new FileScreen(mod, null, parse(FILES)).previewSearch(
+                com.google.gson.JsonParser.parseString("[{\"path\":\"Main.java\",\"line\":12,\"col\":4,\"text\":\"// TODO handle reconnect\"},"
+                    + "{\"path\":\"client/Hud.java\",\"line\":88,\"col\":2,\"text\":\"// TODO scale with GUI\"}]").getAsJsonArray(),
+                parse("{\"path\":\"C:\\\\dev\\\\my-mod\\\\src\\\\Main.java\",\"binary\":false,\"size\":4210,\"start\":4,\"total\":40,"
+                    + "\"lines\":[\"public final class Main {\",\"    private int retries;\",\"\",\"    void connect() {\","
+                    + "\"        open();\",\"        // TODO handle reconnect\",\"        retries++;\",\"    }\",\"}\"]}"), 9));
+            case 368 -> Screenshot.grab(client, true);
+            case 370 -> FileScreen.resetSearchMode();
             case 320 -> client.setScreenAndShow(new ChatPreview(PROJECT));
             case 360 -> Screenshot.grab(client, true);
             case 380 -> client.setScreenAndShow(new ChatPreview(TOOLS));
@@ -64,7 +72,7 @@ final class DevShots {
     private static JsonObject status(boolean logged, String login) {
         return parse("{\"account\":{\"logged_in\":" + logged + ",\"method\":\"claude.ai\","
             + "\"email\":" + (logged ? "\"player@example.com\"" : "null") + "},"
-            + "\"api_key\":" + (logged ? "\"sk-ant-…abcd\"" : "null") + ","
+            + "\"api_key\":" + (logged ? "\"sk-ant-вЂ¦abcd\"" : "null") + ","
             + "\"login\":{\"state\":\"" + login + "\",\"url\":\"https://claude.com/cai/oauth/authorize?code=true\",\"error\":null},"
             + "\"github\":{\"installed\":true,\"login\":\"akijke\",\"connector\":true,\"token\":false,"
             + "\"flow\":{\"state\":\"idle\",\"code\":null,\"url\":null,\"error\":null}}}");
@@ -87,19 +95,19 @@ final class DevShots {
         + "{\"name\":\"notes.md\",\"dir\":false,\"size\":120400,\"mtime\":1790000000,\"hidden\":false}]}";
 
     private static final String[] WORK = {
-        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Fix the build\",\"text\":\"Думаю…\",\"queued\":0}",
-        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"📄\",\"text\":\"Reading build.gradle\"}",
-        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"$\",\"text\":\"gradlew build  — Building the project\"}",
+        "{\"seq\":1,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"thinking\",\"title\":\"Fix the build\",\"text\":\"Р”СѓРјР°СЋвЂ¦\",\"queued\":0}",
+        "{\"seq\":2,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"рџ“„\",\"text\":\"Reading build.gradle\"}",
+        "{\"seq\":3,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"$\",\"text\":\"gradlew build  вЂ” Building the project\"}",
         "{\"seq\":4,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool_error\",\"text\":\"error: cannot find symbol ClientCommandManager\"}",
-        "{\"seq\":5,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"◆\",\"text\":\"Agent debugger: Find the cause of the compile error\"}",
-        "{\"seq\":6,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"🔍\",\"text\":\"Searching “ClientCommands” in .gradle\",\"agent\":\"debugger\"}",
-        "{\"seq\":7,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"✎\",\"text\":\"Editing src/client/Main.java\"}",
+        "{\"seq\":5,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"в—†\",\"text\":\"Agent debugger: Find the cause of the compile error\"}",
+        "{\"seq\":6,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"рџ”Ќ\",\"text\":\"Searching вЂњClientCommandsвЂќ in .gradle\",\"agent\":\"debugger\"}",
+        "{\"seq\":7,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"tool\",\"icon\":\"вњЋ\",\"text\":\"Editing src/client/Main.java\"}",
         "{\"seq\":8,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":true,\"text\":\"## Fixed\"}",
         "{\"seq\":9,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"In 26.3 the class was renamed to **ClientCommands**:\"}",
         "{\"seq\":10,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```java\"}",
         "{\"seq\":11,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"import static ...ClientCommands.*;\"}",
         "{\"seq\":12,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"```\"}",
-        "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- the build passes, `gradlew build` ✔\"}",
+        "{\"seq\":13,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"text_part\",\"first\":false,\"text\":\"- the build passes, `gradlew build` вњ”\"}",
         "{\"seq\":14,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"done\",\"text\":\"Done\",\"seconds\":41.2,\"input\":38200,\"output\":1450,\"cost\":0.092}",
         "{\"seq\":15,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"permission\",\"request\":\"r1\",\"text\":\"Bash\\n{}\",\"summary\":\"$ git push\",\"choices\":[\"Allow\",\"Deny\",\"Always allow Bash\"]}",
     };

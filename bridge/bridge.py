@@ -915,6 +915,13 @@ def create_app(bridge, token):
         return web.json_response(bridge.files.read(mode if mode in ('c', 'cc') else 'cc',
                                                    request.query.get('path', ''),
                                                    int(request.query.get('start', '1') or 1)))
+    async def grep(request):
+        q = request.query
+        mode = q.get('mode', 'cc')
+        result = await asyncio.to_thread(bridge.files.grep, mode if mode in ('c', 'cc') else 'cc', q.get('path', ''),
+                                         q.get('q', ''), q.get('case') == '1', q.get('regex') == '1')
+        return web.json_response(result)
+    app.router.add_get('/grep', grep)
     app.router.add_get('/files', files)
     app.router.add_get('/file', file)
     async def account(request):

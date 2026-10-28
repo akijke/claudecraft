@@ -95,6 +95,7 @@ EN = {
     'Удалить {}?': 'Delete {}?', 'Удалено: {}': 'Deleted: {}', 'Открыто в {}: {}': 'Opened in {}: {}', 'Открыто: {}': 'Opened: {}',
     'Не найден редактор (code, cursor, idea, subl) в PATH': 'No editor (code, cursor, idea, subl) found in PATH',
     'Нужны два пути: откуда и куда': 'Two paths are needed: from and to',
+    'Что искать?': 'What should I search for?', 'Неверное регулярное выражение: {}': 'Invalid regular expression: {}',
     # --- git -----------------------------------------------------------------
     'git не найден в PATH — установи Git: git-scm.com': 'git not found in PATH — install Git: git-scm.com',
     'gh не найден в PATH — установи GitHub CLI: cli.github.com': 'gh not found in PATH — install GitHub CLI: cli.github.com',

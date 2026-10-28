@@ -325,5 +325,13 @@
   "Claude закончил": "Claude is done",
   "Ошибка": "Error",
   "ждёт твоего ответа · K": "waiting for your answer · K",
-  "индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл": "on-screen task panel · /claude toasts · /claude sound — on/off"
+  "индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл": "on-screen task panel · /claude toasts · /claude sound — on/off",
+  "Ищу…": "Searching…",
+  "совпадений в": "matches in",
+  "файлах": "files",
+  "(показаны первые)": "(showing the first ones)",
+  "текст в файлах… (Enter)": "text in files… (Enter)",
+  "в файлах": "in files",
+  "имена": "names",
+  "Искать по именам или по содержимому файлов": "Search file names or file contents"
 }

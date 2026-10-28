@@ -54,6 +54,9 @@ final class FileScreen extends Screen {
     private final List<int[]> crumbs = new ArrayList<>();   // x0, x1, index into crumbPaths
     private final List<String> crumbPaths = new ArrayList<>();
     private int workX0, workX1;  // clickable "… works in" label
+    private static boolean contentMode;  // search box: names (false) or file contents (true)
+    private JsonArray matches;           // results of a contents search, null = none
+    private int fileStart = 1, highlightLine;
 
     FileScreen(ClaudeChat mod, Screen parent) { this(mod, parent, null); }
 
@@ -64,6 +67,20 @@ final class FileScreen extends Screen {
         this.parent = parent;
         this.preview = fixed != null;
         this.dir = fixed;
+    }
+
+    static void resetSearchMode() { contentMode = false; }
+
+    /** Dev screenshots: show contents-search results and an open file at a line. */
+    FileScreen previewSearch(JsonArray found, JsonObject openFile, int line) {
+        contentMode = true;
+        matches = found;
+        file = openFile;
+        fileStart = openFile.get("start").getAsInt();
+        for (JsonElement l : openFile.getAsJsonArray("lines")) fileLines.add(l.getAsString());
+        highlightLine = line;
+        selected = 0;
+        return this;
     }
 
     // ---- data -----------------------------------------------------------------
@@ -103,7 +120,9 @@ final class FileScreen extends Screen {
         }, mod.io).thenAccept(result -> minecraft.execute(() -> {
             loadingMore = false;
             if (result.has("error")) { say(result.get("error").getAsString(), RED); return; }
-            if (start == 1) { file = result; fileLines.clear(); fileScroll = 0; }
+            boolean append = file != null && file.get("path").getAsString().equals(result.get("path").getAsString())
+                && start == fileStart + fileLines.size();
+            if (!append) { file = result; fileLines.clear(); fileScroll = 0; fileStart = start; }
             for (JsonElement line : result.getAsJsonArray("lines")) fileLines.add(line.getAsString());
         }));
     }
@@ -127,6 +146,19 @@ final class FileScreen extends Screen {
 
     private void applyFilter() {
         rows.clear();
+        if (contentMode) {
+            if (matches != null)
+                for (JsonElement e : matches) {
+                    JsonObject m = e.getAsJsonObject(), r = new JsonObject();
+                    r.addProperty("name", m.get("path").getAsString());
+                    r.addProperty("dir", false);
+                    r.addProperty("size", 0);
+                    r.addProperty("line", m.get("line").getAsInt());
+                    r.addProperty("text", m.get("text").getAsString());
+                    rows.add(r);
+                }
+            return;
+        }
         if (dir == null) return;
         String q = filter == null ? "" : filter.getValue().strip().toLowerCase(Locale.ROOT);
         for (JsonElement e : dir.getAsJsonArray("rows")) {
@@ -136,6 +168,24 @@ final class FileScreen extends Screen {
     }
 
     private long messageAt;
+
+    /** Contents search under the current folder (Enter in the search box in "in files" mode). */
+    private void grep(String query) {
+        if (query.isBlank() || preview) return;
+        say(L.t("Ищу…"), DIM);
+        CompletableFuture.supplyAsync(() -> {
+            try { return mod.request("/grep?mode=cc&path=" + enc(path()) + "&q=" + enc(query), null); }
+            catch (Exception e) { return error(e); }
+        }, mod.io).thenAccept(result -> minecraft.execute(() -> {
+            if (result.has("error")) { say(result.get("error").getAsString(), RED); return; }
+            matches = result.getAsJsonArray("matches");
+            selected = -1;
+            listScroll = 0;
+            applyFilter();
+            say(matches.size() + " " + L.t("совпадений в") + " " + result.get("files").getAsInt() + " " + L.t("файлах")
+                + (result.get("truncated").getAsBoolean() ? " " + L.t("(показаны первые)") : ""), matches.isEmpty() ? GOLD : GREEN);
+        }));
+    }
 
     private void say(String text, int color) { message = text; messageColor = color; messageAt = System.currentTimeMillis(); }
 
@@ -168,10 +218,19 @@ final class FileScreen extends Screen {
         filter = new EditBox(font, listX, 54, Math.min(listW, 180), 14, Component.literal("filter"));
         filter.setHint(Component.literal(L.t("фильтр…")));
         filter.setValue(filterValue);
-        filter.setResponder(v -> { applyFilter(); selected = rows.isEmpty() ? -1 : 0; listScroll = 0; });
+        filter.setHint(Component.literal(contentMode ? L.t("текст в файлах… (Enter)") : L.t("фильтр…")));
+        filter.setResponder(v -> { if (!contentMode) { applyFilter(); selected = rows.isEmpty() ? -1 : 0; listScroll = 0; } });
         addRenderableWidget(filter);
         // ✖ clears the search box and shows the whole folder again.
-        addRenderableWidget(Button.builder(Component.literal("✖"), b -> { filter.setValue(""); setFocused(filter); })
+        addRenderableWidget(Button.builder(Component.literal(contentMode ? "≡ " + L.t("в файлах") : "Aa " + L.t("имена")), b -> {
+                contentMode = !contentMode;
+                matches = null;
+                selected = -1;
+                rebuildWidgets();
+            }).bounds(listX + Math.min(listW, 180) + 20, 53, 74, 16)
+            .tooltip(Tooltip.create(Component.literal(L.t("Искать по именам или по содержимому файлов")))).build());
+        addRenderableWidget(Button.builder(Component.literal("✖"), b -> {
+                filter.setValue(""); matches = null; applyFilter(); setFocused(filter); })
             .bounds(listX + Math.min(listW, 180) + 2, 53, 16, 16)
             .tooltip(Tooltip.create(Component.literal(L.t("Очистить поиск")))).build());
         applyFilter();
@@ -306,6 +365,7 @@ final class FileScreen extends Screen {
             return true;
         }
         if (key == InputConstants.KEY_RETURN && !typing) { openSelected(); return true; }
+        if (key == InputConstants.KEY_RETURN && getFocused() == filter && contentMode) { grep(filter.getValue()); return true; }
         if (key == InputConstants.KEY_RETURN && getFocused() == filter && !rows.isEmpty()) { select(0); openSelected(); return true; }
         if (key == InputConstants.KEY_BACKSPACE && !typing && dir != null && !dir.get("parent").isJsonNull()) {
             load(dir.get("parent").getAsString()); return true;
@@ -321,7 +381,11 @@ final class FileScreen extends Screen {
         if (selected < listScroll) listScroll = selected;
         if (selected >= listScroll + visible) listScroll = selected - visible + 1;
         JsonObject r = current();
-        if (r != null && !r.get("dir").getAsBoolean()) loadFile(child(r.get("name").getAsString()), 1);
+        if (r != null && !r.get("dir").getAsBoolean()) {
+            int line = r.has("line") ? r.get("line").getAsInt() : 0;
+            highlightLine = line;
+            loadFile(child(r.get("name").getAsString()), Math.max(1, line - 8));
+        }
     }
 
     @Override public boolean mouseScrolled(double x, double y, double h, double v) {
@@ -334,8 +398,8 @@ final class FileScreen extends Screen {
             int visible = (listH - 14) / 9;
             fileScroll = Math.max(0, Math.min(Math.max(0, fileLines.size() - visible), fileScroll + step));
             if (file != null && !loadingMore && fileScroll + visible >= fileLines.size() - 5
-                    && fileLines.size() < file.get("total").getAsInt())
-                loadFile(file.get("path").getAsString(), fileLines.size() + 1);
+                    && fileStart - 1 + fileLines.size() < file.get("total").getAsInt())
+                loadFile(file.get("path").getAsString(), fileStart + fileLines.size());
             return true;
         }
         return super.mouseScrolled(x, y, h, v);
@@ -424,6 +488,14 @@ final class FileScreen extends Screen {
             if (i == selected) g.fill(listX, y - 1, listX + listW, y + ROW - 1, 0x50FFFFFF);
             else if (mouseX >= listX && mouseX < listX + listW && mouseY >= y - 1 && mouseY < y + ROW - 1)
                 g.fill(listX, y - 1, listX + listW, y + ROW - 1, 0x20FFFFFF);
+            if (r.has("line")) {  // contents search result: path:line  text
+                String loc = r.get("name").getAsString() + ":" + r.get("line").getAsInt();
+                String head = font.plainSubstrByWidth(loc, listW / 2);
+                g.text(font, head, listX + 3, y, DIR);
+                g.text(font, font.plainSubstrByWidth(ChatStyle.clean(r.get("text").getAsString()), listW - font.width(head) - 12),
+                    listX + font.width(head) + 9, y, TEXT);
+                continue;
+            }
             boolean isDir = r.get("dir").getAsBoolean();
             boolean hidden = r.has("hidden") && r.get("hidden").getAsBoolean();
             String size = isDir ? "" : ChatStyle.size(r.get("size").getAsLong());
@@ -440,7 +512,7 @@ final class FileScreen extends Screen {
         }
         String info = rows.size() + " " + L.t("объектов") + (dir.has("more") && dir.get("more").getAsInt() > 0
             ? " (+" + dir.get("more").getAsInt() + ")" : "") + (dir.get("git").getAsBoolean() ? "  ⇄ git" : "");
-        g.text(font, info, listX + Math.min(listW, 180) + 24, 57, FAINT);
+        g.text(font, info, listX + Math.min(listW, 180) + 98, 57, FAINT);
     }
 
     private void drawPreview(GuiGraphicsExtractor g) {
@@ -465,9 +537,11 @@ final class FileScreen extends Screen {
             return;
         }
         int visible = (listH - 14) / 9, y = listY + 14;
-        int numW = font.width(String.valueOf(fileLines.size() + 1)) + 6;
+        int numW = font.width(String.valueOf(fileStart + fileLines.size())) + 6;
         for (int i = fileScroll; i < Math.min(fileLines.size(), fileScroll + visible); i++) {
-            g.text(font, String.valueOf(i + 1), viewX + 3, y, FAINT);
+            int number = fileStart + i;
+            if (number == highlightLine) g.fill(viewX, y - 1, viewX + viewW, y + 8, 0x40F2C14E);
+            g.text(font, String.valueOf(number), viewX + 3, y, number == highlightLine ? GOLD : FAINT);
             g.text(font, font.plainSubstrByWidth(ChatStyle.clean(fileLines.get(i)), viewW - numW - 8), viewX + 3 + numW, y, CODE);
             y += 9;
         }

@@ -68,6 +68,49 @@ class FileManager:
                 'claude': self.bridge.projects.path_of_current(), 'current_project': self.bridge.projects.current,
                 'workspace': str(self.bridge.workspace), 'home': str(Path.home()), 'roots': roots}
 
+    def grep(self, mode, arg, query, case=False, regex=False, limit=300):
+        """Search file contents under a folder (the file window's "in contents" search)."""
+        import re
+        root = self.resolve(mode, arg)
+        if not root.is_dir():
+            raise ValueError(f'Нет такой папки: {root}')
+        query = (query or '').strip()
+        if not query:
+            raise ValueError('Что искать?')
+        flags = 0 if case else re.IGNORECASE
+        try:
+            pattern = re.compile(query if regex else re.escape(query), flags)
+        except re.error as e:
+            raise ValueError(f'Неверное регулярное выражение: {e}') from None
+        skip = {'.git', 'node_modules', '.gradle', 'build', 'dist', 'target', '__pycache__', '.venv', 'venv', '.idea'}
+        found, files, truncated = [], 0, False
+        for folder, dirs, names in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in skip]
+            for name in names:
+                path = Path(folder) / name
+                try:
+                    if path.stat().st_size > 2_000_000:
+                        continue
+                    raw = path.read_bytes()
+                except OSError:
+                    continue
+                if b'\0' in raw[:4000]:
+                    continue
+                files += 1
+                for number, line in enumerate(raw.decode('utf-8', 'replace').splitlines(), 1):
+                    m = pattern.search(line)
+                    if m:
+                        found.append({'path': str(path.relative_to(root)).replace('\\', '/'), 'line': number,
+                                      'col': m.start(), 'text': line.strip()[:200]})
+                        if len(found) >= limit:
+                            truncated = True
+                            break
+                if truncated:
+                    break
+            if truncated:
+                break
+        return {'root': str(root), 'query': query, 'matches': found, 'files': files, 'truncated': truncated}
+
     def read(self, mode, arg, start=1, count=400):
         """Text of a file for the preview pane."""
         path = self.resolve(mode, arg)

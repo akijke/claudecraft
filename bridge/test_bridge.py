@@ -662,6 +662,19 @@ class FileWindowTests(unittest.IsolatedAsyncioTestCase):
         response = await self.app.middlewares[0](request, route.handler)
         return response.status, json.loads(response.text)
 
+    async def test_grep_in_contents(self):
+        ws = self.bridge.workspace
+        (ws / 'src' / 'B.java').write_text('class B {\n  // TODO fix\n}\n', encoding='utf-8')
+        (ws / 'node_modules').mkdir()
+        (ws / 'node_modules' / 'x.js').write_text('TODO hidden', encoding='utf-8')
+        status, data = await self.get('/grep?mode=cc&q=todo')
+        self.assertEqual(status, 200)
+        self.assertEqual([(m['path'], m['line']) for m in data['matches']], [('src/B.java', 2)])  # skips node_modules
+        status, data = await self.get('/grep?mode=cc&q=TODO&case=1&regex=1')
+        self.assertEqual(len(data['matches']), 1)
+        status, data = await self.get('/grep?mode=cc&q=' + quote('line[') + '&regex=1')
+        self.assertEqual(status, 400)
+
     async def test_listing_preview_and_errors(self):
         status, data = await self.get('/files?mode=cc')
         self.assertEqual(status, 200)
