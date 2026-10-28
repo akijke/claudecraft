@@ -362,6 +362,26 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('SKILL-HIDDEN-DESCRIPTION', request)
         self.assertIn('Skill', [t['name'] for t in self.fake.requests[0].get('tools', [])])
 
+    async def test_hook_added_in_game_runs_and_is_logged(self):
+        await self.start([tool('Bash', {'command': 'echo work'}), text('done')])
+        ws = self.bridge.workspace
+        config = os.environ['CLAUDE_CONFIG_DIR']
+        os.makedirs(config, exist_ok=True)
+        with open(os.path.join(config, '.claude.json'), 'w', encoding='utf-8') as f:   # trusted folder
+            json.dump({'projects': {str(ws).replace('\\', '/'): {'hasTrustDialogAccepted': True}}}, f)
+        await self.bridge.command({'mode': 'cc', 'action': 'hooks', 'text': 'add PostToolUse Bash -- echo hooked > hooked.txt'})
+        rows = [e for e in self.bridge.events if e['kind'] == 'hooks'][-1]['rows']
+        self.assertEqual((rows[0]['event'], rows[0]['matcher'], rows[0]['source']), ('PostToolUse', 'Bash', 'project'))
+        await self.bridge.command({'mode': 'cc', 'action': 'auto', 'text': 'all'})
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.enqueue(chat, 'run it')
+        await self.until(lambda: chat.task is None)
+        await self.until(lambda: os.path.exists(os.path.join(ws, 'hooked.txt')), timeout=10)
+        from backends import hooks
+        self.assertTrue(any(r['event'] == 'PostToolUse' for r in hooks.LOG), list(hooks.LOG))
+        await self.bridge.command({'mode': 'cc', 'action': 'hooks', 'text': 'rm ' + rows[0]['id']})
+        self.assertEqual([e for e in self.bridge.events if e['kind'] == 'hooks'][-1]['rows'], [])
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

@@ -820,6 +820,24 @@ class Bridge:
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
+        elif action == 'hooks':
+            from backends import hooks
+            project = self.chat_cwd(chat)
+            sub, _, rest = text.strip().partition(' ')
+            if sub == 'add':
+                head, _, command = rest.partition(' -- ')
+                event, _, matcher = head.strip().partition(' ')
+                hooks.add(project, event.strip(), matcher.strip(), command)
+            elif sub in ('rm', 'remove'):
+                hooks.remove(project, rest.strip())
+            elif sub == 'log':
+                self.emit(chat, 'Журнал хуков', kind='hooks_log', rows=list(hooks.LOG)[-30:])
+                return {'ok': True}
+            elif sub:
+                raise ValueError('hooks [add <Событие> [matcher] -- <команда> | rm <id> | log]')
+            self.emit(chat, 'Хуки', kind='hooks', rows=hooks.listing(project),
+                      files=[{'source': s, 'path': str(p)} for s, p in hooks.sources(project)],
+                      loaded=self.config.get('load_claude_settings', True))
         elif action == 'skills':
             from backends import skills
             from backends.util import save_json

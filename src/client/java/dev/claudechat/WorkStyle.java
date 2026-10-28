@@ -182,6 +182,41 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "hooks" -> {
+                out.add(line(mode, lit("⚙ " + L.t("Хуки"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(b(e, "loaded") ? L.t("   выполняет сам Claude Code") : L.t("   не загружаются: /cc memory on"), b(e, "loaded") ? FAINT : RED))
+                    .append(sp()).append(button("+", cmd + "hooks add PostToolUse Edit|Write -- ", true, GREEN,
+                        L.t("Напр.: PostToolUse Edit|Write -- npm run lint")))
+                    .append(sp()).append(button(L.t("журнал"), cmd + "hooks log", false, AQUA, null))));
+                JsonArray rows = e.getAsJsonArray("rows");
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  хуков нет"), FAINT)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    MutableComponent row = lit("  " + s(r, "event"), AQUA).append(lit(s(r, "matcher").isEmpty() ? "" : " [" + s(r, "matcher") + "]", GOLD))
+                        .append(lit("  " + s(r, "command"), TEXT)).append(lit("  " + s(r, "source") + " ", FAINT));
+                    if (s(r, "source").equals("project")) row.append(button("✖", cmd + "hooks rm " + s(r, "id"), false, DIM, L.t("Удалить")));
+                    out.add(line(mode, row));
+                }
+                MutableComponent files = lit("  ", FAINT);
+                for (JsonElement f : e.getAsJsonArray("files")) {
+                    JsonObject o = f.getAsJsonObject();
+                    files.append(button("✎ " + s(o, "source"), "/edit " + s(o, "path"), false, DIM, s(o, "path"))).append(sp());
+                }
+                out.add(line(mode, files));
+            }
+            case "hooks_log" -> {
+                out.add(line(mode, lit("⚙ " + L.t("Журнал хуков"), GOLD).withStyle(st -> st.withBold(true))));
+                JsonArray rows = e.getAsJsonArray("rows");
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  пока ничего не запускалось"), FAINT)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    boolean ok = s(r, "outcome").equals("success") || s(r, "exit").equals("0");
+                    out.add(line(mode, lit(ok ? "  ✔ " : "  ✖ ", ok ? GREEN : RED).append(lit(s(r, "event") + " " + s(r, "name"), TEXT))
+                        .append(lit("  " + firstLine(s(r, "output")), FAINT))));
+                }
+            }
+            case "hook_failed" -> out.add(line(mode, lit("⚠ " + s(e, "text"), GOLD)
+                .withStyle(st -> st.withHoverEvent(new HoverEvent.ShowText(lit(s(e, "output"), TEXT))))));
             case "skills" -> {
                 out.add(line(mode, lit("✦ " + L.t("Скиллы"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit(L.t("   Claude сам берёт включённые, когда нужны"), FAINT))));

@@ -209,6 +209,13 @@ class SdkTurn:
                                          'allowed_warning' else 'исчерпан'), kind='error' if info.status ==
                                          'rejected' else 'status')
                     continue
+                if isinstance(message, getattr(T, 'HookEventMessage', ())) :
+                    from backends import hooks as hook_log
+                    row = hook_log.record(message)
+                    if row and (row['outcome'] not in ('success', '') or (row['exit'] not in (0, None))):
+                        self.bridge.emit(self.chat, f"Хук {row['event']} {row['name']}: {row['outcome'] or row['exit']}",
+                                         kind='hook_failed', output=row['output'])
+                    continue
                 if isinstance(message, T.SystemMessage) and message.subtype == 'compact_boundary':
                     meta = message.data.get('compact_metadata') or {}
                     self.chat.context = 0
@@ -463,7 +470,7 @@ async def run(bridge, chat, text):
         # CLAUDE.md memory, permission rules and hooks from disk, like Claude Code (off: load_claude_settings=false)
         setting_sources=['user', 'project', 'local'] if bridge.config.get('load_claude_settings', True) else [],
         # Lines of the answer are shown while they are generated.
-        include_partial_messages=True,
+        include_partial_messages=True, include_hook_events=True,
         hooks={'PreToolUse': [HookMatcher(matcher='Write|Edit|MultiEdit|NotebookEdit', hooks=[snapshot_hook])]}
         if chat.mode == 'cc' else None,
         model=chat.model, effort=chat.effort, skills=skills,

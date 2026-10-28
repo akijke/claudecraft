@@ -302,7 +302,7 @@
   "Спросить Claude про выбранный файл или папку": "Ask Claude about the selected file or folder",
   "Терминал здесь": "Terminal here",
   "Точно удалить?": "Really delete?",
-  "Удалить": "Delete",
+  "Удалить": "Remove",
   "Файл": "File",
   "имя нового файла": "new file name",
   "имя новой папки": "new folder name",
@@ -552,5 +552,14 @@
   "   Claude сам берёт включённые, когда нужны": "   Claude uses the enabled ones when they fit",
   "  нет — положи папку со SKILL.md в ": "  none — put a folder with SKILL.md into ",
   " или ": " or ",
-  "скиллы .claude/skills проекта и ~/.claude/skills: вкл/выкл, открыть SKILL.md": "skills from the project's .claude/skills and ~/.claude/skills: on/off, open SKILL.md"
+  "скиллы .claude/skills проекта и ~/.claude/skills: вкл/выкл, открыть SKILL.md": "skills from the project's .claude/skills and ~/.claude/skills: on/off, open SKILL.md",
+  "Хуки": "Hooks",
+  "   выполняет сам Claude Code": "   Claude Code runs them itself",
+  "   не загружаются: /cc memory on": "   not loaded: /cc memory on",
+  "Напр.: PostToolUse Edit|Write -- npm run lint": "E.g.: PostToolUse Edit|Write -- npm run lint",
+  "журнал": "log",
+  "  хуков нет": "  no hooks",
+  "Журнал хуков": "Hook log",
+  "  пока ничего не запускалось": "  nothing ran yet",
+  "хуки из settings.json: список, add <Событие> [matcher] -- <команда>, rm, log": "hooks from settings.json: list, add <Event> [matcher] -- <command>, rm, log"
 }
