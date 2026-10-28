@@ -659,6 +659,19 @@ class Bridge:
             self.emit(chat, json.dumps(self.capabilities(), ensure_ascii=False, indent=2), kind='status')
         elif action == 'tokens':
             self.tokens_report(chat)
+        elif action in ('perms', 'permissions'):
+            from backends import permrules
+            project = self.chat_cwd(chat)
+            sub, _, rule = text.strip().partition(' ')
+            if sub in permrules.KINDS:
+                permrules.add(project, sub, rule)
+            elif sub in ('rm', 'remove', 'del'):
+                permrules.remove(project, rule.strip())
+            elif sub:
+                raise ValueError('perms [allow|deny|ask <правило> | rm <правило>]')
+            table = permrules.rules(project)
+            self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
+                      rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
         elif action == 'commands':
             from backends.commands import listing
             self.emit(chat, 'Команды', kind='commands', rows=listing(self.chat_cwd(chat) if mode == 'cc' else None))

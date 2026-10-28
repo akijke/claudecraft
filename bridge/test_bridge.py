@@ -862,6 +862,62 @@ class OAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.bridge.oauth.has_token('fake'))
 
 
+class PermissionRuleTests(unittest.IsolatedAsyncioTestCase):
+    def test_matching(self):
+        from backends.permrules import matches, suggest
+        project = tempfile.gettempdir()
+        p = lambda rel: str(Path(project) / rel)
+        cases = [
+            ('Bash', 'Bash', {'command': 'rm -rf x'}, True),
+            ('Bash(git *)', 'Bash', {'command': 'git push origin main'}, True),
+            ('Bash(git *)', 'Bash', {'command': 'gitk'}, False),
+            ('Bash(npm run test:*)', 'Bash', {'command': 'npm run test -- --watch'}, True),
+            ('Bash(npm run test:*)', 'Bash', {'command': 'npm run build'}, False),
+            ('Bash(git status)', 'Bash', {'command': 'git  status'}, True),
+            ('Edit(src/**)', 'Write', {'file_path': p('src/a/b/C.java')}, True),
+            ('Edit(src/**)', 'Edit', {'file_path': p('docs/x.md')}, False),
+            ('Edit(*.md)', 'Edit', {'file_path': p('docs/x.md')}, True),
+            ('Read(**/.env)', 'Read', {'file_path': p('app/.env')}, True),
+            ('Read(**/.env)', 'Grep', {'path': p('.env')}, True),
+            ('WebFetch(domain:github.com)', 'WebFetch', {'url': 'https://api.github.com/x'}, True),
+            ('WebFetch(domain:github.com)', 'WebFetch', {'url': 'https://evilgithub.com/'}, False),
+            ('mcp__github', 'mcp__github__create_issue', {}, True),
+            ('mcp__github__get_me', 'mcp__github__create_issue', {}, False),
+        ]
+        for rule, name, data, expected in cases:
+            self.assertEqual(matches(rule, name, data, project), expected, (rule, name, data))
+        self.assertEqual(suggest('Bash', {'command': 'git push origin'}, project), 'Bash(git push:*)')
+        self.assertEqual(suggest('Bash', {'command': 'ls -la'}, project), 'Bash(ls:*)')
+        self.assertEqual(suggest('Write', {'file_path': p('src/ui/A.java')}, project), 'Edit(src/ui/**)')
+
+    async def test_rules_file_deny_wins_and_command(self):
+        from backends import permrules
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        env = mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': str(Path(temp.name) / 'home')})
+        env.start()
+        self.addCleanup(env.stop)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        project = Path(bridge.projects.path_of_current())
+        (project / '.claude').mkdir()
+        (project / '.claude' / 'settings.json').write_text(json.dumps({'model': 'keep-me'}), encoding='utf-8')
+        await bridge.command({'mode': 'cc', 'action': 'perms', 'text': 'allow Bash(git *)'})
+        await bridge.command({'mode': 'cc', 'action': 'perms', 'text': 'deny Bash(git push:*)'})
+        saved = json.loads((project / '.claude' / 'settings.json').read_text(encoding='utf-8'))
+        self.assertEqual(saved['model'], 'keep-me')
+        self.assertEqual(saved['permissions'], {'allow': ['Bash(git *)'], 'deny': ['Bash(git push:*)']})
+        self.assertEqual(permrules.decide('Bash', {'command': 'git push'}, project)[0], 'deny')
+        self.assertEqual(permrules.decide('Bash', {'command': 'git log'}, project)[0], 'allow')
+        self.assertEqual(permrules.decide('Bash', {'command': 'ls'}, project)[0], None)
+        await bridge.command({'mode': 'cc', 'action': 'perms', 'text': 'rm Bash(git push:*)'})
+        self.assertEqual(permrules.decide('Bash', {'command': 'git push'}, project)[0], 'allow')
+        event = [e for e in bridge.events if e['kind'] == 'perms'][-1]
+        self.assertEqual(event['rules']['allow'], [{'rule': 'Bash(git *)', 'source': 'project'}])
+        with self.assertRaises(ValueError):
+            await bridge.command({'mode': 'cc', 'action': 'perms', 'text': 'allow ((bad'})
+
+
 class SlashCommandTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()

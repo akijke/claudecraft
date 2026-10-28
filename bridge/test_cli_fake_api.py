@@ -201,6 +201,20 @@ class CliWithFakeApi(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(e['kind'] == 'status' and 'compacted' in e['text'] or 'сжата' in e['text']
                             for e in self.bridge.events), [e['text'] for e in self.bridge.events][-8:])
 
+    async def test_permission_rules_allow_and_deny_without_asking(self):
+        await self.start([tool('Bash', {'command': 'echo rule-ok'}), tool('Bash', {'command': 'git push --force'},
+                          tool_id='toolu_2'), text('finished')])
+        chat = self.bridge.chats[self.bridge.selected['cc']]
+        await self.bridge.command({'mode': 'cc', 'action': 'perms', 'text': 'allow Bash(echo:*)'})
+        await self.bridge.command({'mode': 'cc', 'action': 'perms', 'text': 'deny Bash(git push:*)'})
+        await self.bridge.enqueue(chat, 'run two commands')
+        await self.until(lambda: chat.task is None or self.bridge.pending)
+        self.assertEqual(self.bridge.pending, {})  # nothing was asked
+        await self.until(lambda: chat.task is None)
+        results = json.dumps(self.fake.requests[-1]['messages'], ensure_ascii=False)
+        self.assertIn('rule-ok', results)
+        self.assertIn('Denied by the permission rule Bash(git push:*)', results)
+
     async def test_cancel_stops_cli(self):
         await self.start([text('never shown', delay=20)])
         chat = self.bridge.chats[self.bridge.selected['c']]

@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 from backends.describe import EDIT_TOOLS, describe, todo_rows, clip
 from backends import undo as undo_files
 from backends import images
+from backends import permrules
 
 
 log = logging.getLogger('claudecraft.sdk')
@@ -332,24 +333,31 @@ async def run(bridge, chat, text):
         path = undo_files.target(name, data, effective) if chat.mode == 'cc' else None
         changes = undo_files.diff(name, data, path) if path else None
         icon, line = describe(name, data, effective)
-        if auto_allows(chat, name):
+        verdict, rule = permrules.decide(name, data, effective) if chat.mode == 'cc' else (None, None)
+        if verdict == 'deny':
+            bridge.emit(chat, f'{name} запрещён правилом {rule}', kind='status')
+            return PermissionResultDeny(message=f'Denied by the permission rule {rule}')
+        if verdict == 'allow' or (verdict is None and auto_allows(chat, name)):
             if path:
                 bridge.checkpoints.remember(chat.id, path)
                 if changes:
                     bridge.emit(chat, f'{icon} {line}', kind='edit_diff', path=str(path), **changes)
             return PermissionResultAllow(updated_input=data)
+        suggestion = permrules.suggest(name, data, effective) if chat.mode == 'cc' else name
         answer = await bridge.ask_user(chat, 'permission',
             f'{name}\n' + json.dumps(data, ensure_ascii=False)[:16000],
-            ['Разрешить', 'Отклонить', f'Всегда разрешать {name}'], summary=f'{icon} {line}', tool=name,
-            diff=changes, path=str(path) if path else None)
+            ['Разрешить', 'Отклонить', f'Всегда: {suggestion}'], summary=f'{icon} {line}', tool=name,
+            diff=changes, path=str(path) if path else None, rule=rule, suggestion=suggestion)
         if path and answer in ('1', '3'):
             bridge.checkpoints.remember(chat.id, path)
         if answer == '3':
-            if name not in chat.allowed:
+            if chat.mode == 'cc':
+                permrules.add(effective, 'allow', suggestion)
+                bridge.emit(chat, f'Правило allow {suggestion} записано в .claude/settings.json проекта '
+                            '(/cc perms — все правила).', kind='status')
+            elif name not in chat.allowed:
                 chat.allowed.append(name)
                 bridge.persist()
-            bridge.emit(chat, f'{name} теперь разрешается без вопроса в этом чате (/cc auto off — сбросить).',
-                        kind='status')
         return (PermissionResultAllow(updated_input=data) if answer in ('1', '3')
                 else PermissionResultDeny(message='User declined in Minecraft'))
 

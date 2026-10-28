@@ -118,6 +118,8 @@ final class LiveTest {
         step("/cc model shows the model picker", () -> { markEvents(); mod.runLine("cc", "/cc model"); }, () -> event("model"), 20);
         step("/cc commands lists slash commands", () -> { markEvents(); mod.runLine("cc", "/cc commands"); },
             () -> event("commands"), 20);
+        step("/cc perms adds and shows a rule", () -> { markEvents(); mod.runLine("cc", "/cc perms ask Bash(rm:*)"); },
+            () -> event("perms"), 20);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

@@ -156,6 +156,28 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "perms" -> {
+                out.add(line(mode, lit("⚙ " + L.t("Правила разрешений"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + s(e, "path"), FAINT))));
+                JsonObject rules = e.getAsJsonObject("rules");
+                for (String kind : new String[]{"deny", "ask", "allow"}) {
+                    int color = kind.equals("deny") ? RED : kind.equals("ask") ? GOLD : GREEN;
+                    MutableComponent head = lit("  " + kind + "  ", color).withStyle(st -> st.withBold(true))
+                        .append(button("+", cmd + "perms " + kind + " ", true, color,
+                            L.t("Добавить правило, напр. Bash(git *), Edit(src/**), WebFetch(domain:github.com)")));
+                    out.add(line(mode, head));
+                    JsonArray list = rules.has(kind) ? rules.getAsJsonArray(kind) : new JsonArray();
+                    if (list.isEmpty()) out.add(line(mode, lit(L.t("    — нет"), FAINT)));
+                    for (JsonElement item : list) {
+                        JsonObject r = item.getAsJsonObject();
+                        MutableComponent row = lit("    " + s(r, "rule"), TEXT);
+                        if (s(r, "source").equals("user")) row.append(lit(L.t("  (~/.claude, только чтение)"), FAINT));
+                        else row.append(sp()).append(button("✖", cmd + "perms rm " + s(r, "rule"), false, DIM, L.t("Удалить правило")));
+                        out.add(line(mode, row));
+                    }
+                }
+                out.add(line(mode, lit(L.t("  deny важнее ask, ask важнее allow; без совпадения — режим /cc auto"), FAINT)));
+            }
             case "commands" -> {
                 out.add(line(mode, lit("/ " + L.t("Команды"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit(L.t("   свои: .claude/commands/*.md в проекте или ~/.claude/commands"), FAINT))));

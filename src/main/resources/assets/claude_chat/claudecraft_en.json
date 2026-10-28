@@ -414,5 +414,12 @@
   "пользователь": "user",
   "встроенные": "built-in",
   "  → в очередь Claude": "  → queued for Claude",
-  "slash-команды: /review, /init, /test… и свои из .claude/commands (Tab — подсказки) · commands — список": "slash commands: /review, /init, /test… and your own from .claude/commands (Tab completes) · commands — list"
+  "slash-команды: /review, /init, /test… и свои из .claude/commands (Tab — подсказки) · commands — список": "slash commands: /review, /init, /test… and your own from .claude/commands (Tab completes) · commands — list",
+  "Правила разрешений": "Permission rules",
+  "Добавить правило, напр. Bash(git *), Edit(src/**), WebFetch(domain:github.com)": "Add a rule, e.g. Bash(git *), Edit(src/**), WebFetch(domain:github.com)",
+  "    — нет": "    — none",
+  "  (~/.claude, только чтение)": "  (~/.claude, read-only)",
+  "Удалить правило": "Remove the rule",
+  "  deny важнее ask, ask важнее allow; без совпадения — режим /cc auto": "  deny beats ask, ask beats allow; no match — the /cc auto mode",
+  "правила разрешений allow/deny/ask: perms allow Bash(git *) · perms rm <правило>": "permission rules allow/deny/ask: perms allow Bash(git *) · perms rm <rule>"
 }
