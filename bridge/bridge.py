@@ -106,6 +106,8 @@ class Bridge:
         self.budget = Budget(self)
         from backends.ledger import Ledger
         self.ledger = Ledger(self.directory)
+        from backends.lsp import Lsp
+        self.lsp = Lsp(self)
         self.terminals = Terminals(self)
         self.oauth = OAuth(self)
         self.port = 18741  # set by main(); used for the OAuth redirect
@@ -1333,6 +1335,7 @@ class Bridge:
         await self.shell.close()
         self.terminals.close_all()
         await self.oauth.close()
+        await self.lsp.close()
         self.persist()
 
 
@@ -1472,6 +1475,24 @@ def create_app(bridge, token):
         text, tool = await formatters.format_text(path, str(data.get('text', '')))
         return web.json_response({'text': text, 'tool': tool})
     app.router.add_post('/format', format_code)
+    async def lsp(request):
+        data = await request.json()
+        op = request.path.rsplit('/', 1)[-1]
+        mode = data.get('mode') if data.get('mode') in ('c', 'cc') else 'cc'
+        path = bridge.files.resolve(mode, data.get('path', ''))
+        root = bridge.chat_cwd(bridge.current_chat('cc'))
+        if not str(path).startswith(str(Path(root).resolve())):
+            root = str(path.parent)  # a file outside the project: its own folder is the workspace
+        text = str(data.get('text', ''))
+        if op == 'sync':
+            return web.json_response(await bridge.lsp.sync(path, text, root))
+        line, col = int(data.get('line') or 0), int(data.get('col') or 0)
+        if op == 'definition':
+            return web.json_response(await bridge.lsp.definition(path, text, line, col, root))
+        if op == 'complete':
+            return web.json_response(await bridge.lsp.complete(path, text, line, col, root))
+        raise ValueError('lsp: sync | definition | complete')
+    app.router.add_post('/lsp/{op}', lsp)
     async def index(request):
         mode = request.query.get('mode', 'cc')
         chat = bridge.current_chat(mode if mode in ('c', 'cc') else 'cc')

@@ -1122,6 +1122,38 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bridge.runner.await_args.args[1], 'waits')
 
 
+class LspTests(unittest.IsolatedAsyncioTestCase):
+    async def test_diagnostics_definition_completion_with_a_real_protocol_server(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        bridge.config['lsp'] = {'.py': [sys.executable, str(Path(__file__).with_name('fake_lsp.py'))]}
+        project = Path(bridge.projects.path_of_current())
+        app = create_app(bridge, 't')
+        async def post(op, body):
+            request = make_mocked_request('POST', f'/lsp/{op}', headers={'Authorization': 'Bearer t'})
+            request.json = AsyncMock(return_value={'mode': 'cc', 'path': str(project / 'main.py'), **body})
+            route = await app.router.resolve(request)
+            r = await app.middlewares[0](request, route.handler)
+            return r.status, json.loads(r.text)
+        text = 'def helper():\n    pass\nx = helper()\ny = error_here\nhel'
+        status, data = await post('sync', {'text': text})
+        self.assertEqual(status, 200, data)
+        self.assertEqual([(d['line'], d['col'], d['message']) for d in data['diagnostics']],
+                         [(3, 4, 'found error on line 4')])
+        status, data = await post('definition', {'text': text, 'line': 2, 'col': 6})
+        self.assertEqual(data['locations'], [{'path': str((project / 'main.py').resolve()), 'line': 1}])
+        status, data = await post('complete', {'text': text, 'line': 4, 'col': 3})
+        self.assertEqual([i['label'] for i in data['items']], ['helper'])
+        status, data = await post('sync', {'text': text.replace('error_here', 'fine')})   # didChange
+        self.assertEqual(data['diagnostics'], [])
+        bridge.config['lsp'] = {}
+        status, data = await post('sync', {'text': 'x', 'path': str(project / 'a.go')})
+        self.assertEqual(status, 400)
+        self.assertIn('gopls', data['error'])
+
+
 class FormatterTests(unittest.IsolatedAsyncioTestCase):
     async def test_formatter_from_path_and_missing_hint(self):
         temp = tempfile.TemporaryDirectory()

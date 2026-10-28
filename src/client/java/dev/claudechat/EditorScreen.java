@@ -1,5 +1,7 @@
 package dev.claudechat;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -268,6 +270,9 @@ final class EditorScreen extends Screen {
     }
 
     int foldsForTest() { return folds.size(); }
+    int diagnosticsForTest() { return diagnostics.size(); }
+    int completionsForTest() { return completions.size(); }
+    void caretForTest(int r, int c) { row = r; col = c; anchorRow = -1; }
     int caretsForTest() { return carets.size(); }
 
     String textForTest() { return String.join("\n", lines); }
@@ -307,6 +312,7 @@ final class EditorScreen extends Screen {
             loaded = true;
             dirty = false;
             say(L.t("Открыт") + " · " + lines.size() + L.t(" строк"), 0xFF8A8A8A);
+            lspDue = 1;  // first diagnostics as soon as possible
             path = r.get("path").getAsString();  // the bridge resolved it (relative → project)
             jump();
         }));
@@ -339,6 +345,108 @@ final class EditorScreen extends Screen {
     }
 
     private void say(String text, int color) { message = text; messageColor = color; }
+
+    // ---- language server (#50): diagnostics, F12 definition, Ctrl+Space completion ----
+    private JsonArray diagnostics = new JsonArray();
+    private boolean lspOff;          // no server for this file type: stop asking
+    private long lspDue;             // when to send the text again (after typing stops)
+    private boolean lspBusy;
+    private List<JsonObject> completions = new ArrayList<>();
+    private int completionIndex;
+    private String lspServer = "";
+
+    private JsonObject lspBody() {
+        JsonObject body = new JsonObject();
+        body.addProperty("mode", "cc");
+        body.addProperty("path", path);
+        body.addProperty("text", String.join("\n", lines) + "\n");
+        body.addProperty("line", row);
+        body.addProperty("col", col);
+        return body;
+    }
+
+    private void lspCall(String op, java.util.function.Consumer<JsonObject> done) {
+        if (lspOff || !loaded) return;
+        JsonObject body = lspBody();
+        CompletableFuture.supplyAsync(() -> {
+            try { return mod.request("/lsp/" + op, body); }
+            catch (Exception e) { JsonObject o = new JsonObject(); o.addProperty("error", e.getMessage()); return o; }
+        }, mod.io).thenAccept(r -> minecraft.execute(() -> {
+            lspBusy = false;
+            if (r.has("error")) {
+                String err = r.get("error").getAsString();
+                if (err.contains("языкового сервера") || err.contains("language server")) {
+                    lspOff = true;
+                    if (op.equals("sync")) return;  // quietly: the hint is shown on F12 / Ctrl+Space
+                }
+                say(err, 0xFFF2C14E);
+                return;
+            }
+            done.accept(r);
+        }));
+    }
+
+    private void lspSync() {
+        lspBusy = true;
+        lspCall("sync", r -> { diagnostics = r.getAsJsonArray("diagnostics"); lspServer = r.get("server").getAsString(); });
+    }
+
+    private void lspTick() {
+        if (!lspOff && loaded && !lspBusy && lspDue > 0 && System.currentTimeMillis() >= lspDue) { lspDue = 0; lspSync(); }
+    }
+
+    private void nextDiagnostic() {
+        if (diagnostics.isEmpty()) { say(L.t("Ошибок нет") + (lspServer.isEmpty() ? "" : " · " + lspServer), 0xFF6BD08B); return; }
+        JsonObject best = null, first = null;
+        for (JsonElement e : diagnostics) {
+            JsonObject d = e.getAsJsonObject();
+            if (first == null) first = d;
+            int l = d.get("line").getAsInt(), c = d.get("col").getAsInt();
+            if (best == null && (l > row || (l == row && c > col))) best = d;
+        }
+        JsonObject d = best != null ? best : first;
+        row = Math.min(d.get("line").getAsInt(), lines.size() - 1);
+        col = Math.min(d.get("col").getAsInt(), lines.get(row).length());
+        anchorRow = -1;
+        reveal();
+        say((d.get("severity").getAsInt() == 1 ? "✖ " : "⚠ ") + d.get("message").getAsString(), d.get("severity").getAsInt() == 1 ? 0xFFF0626A : 0xFFF2C14E);
+    }
+
+    private void goToDefinition() {
+        if (lspOff) { lspOff = false; }  // ask once more: the reply explains what to install
+        lspCall("definition", r -> {
+            JsonArray locs = r.getAsJsonArray("locations");
+            if (locs.isEmpty()) { say(L.t("Определение не найдено"), 0xFF8A8A8A); return; }
+            JsonObject loc = locs.get(0).getAsJsonObject();
+            String target = loc.get("path").getAsString();
+            int line = loc.get("line").getAsInt();
+            if (new File(target).getAbsoluteFile().equals(new File(path).getAbsoluteFile())) { gotoLine = line; jump(); }
+            else minecraft.setScreenAndShow(new EditorScreen(mod, this, target).at(line));
+        });
+    }
+
+    private void complete() {
+        if (lspOff) { lspOff = false; }
+        lspCall("complete", r -> {
+            completions = new ArrayList<>();
+            for (JsonElement e : r.getAsJsonArray("items")) completions.add(e.getAsJsonObject());
+            completionIndex = 0;
+            if (completions.isEmpty()) say(L.t("Нет вариантов"), 0xFF8A8A8A);
+        });
+    }
+
+    private void acceptCompletion() {
+        JsonObject item = completions.get(completionIndex);
+        completions = new ArrayList<>();
+        String l = lines.get(row);
+        int start = col;
+        while (start > 0 && (Character.isLetterOrDigit(l.charAt(start - 1)) || l.charAt(start - 1) == '_')) start--;
+        snapshot();
+        String insert = item.get("insert").getAsString();
+        lines.set(row, l.substring(0, start) + insert + l.substring(col));
+        col = start + insert.length();
+        lspDue = System.currentTimeMillis() + 300;
+    }
 
     /** Ctrl+Shift+F: the installed formatter (ruff/black, prettier, google-java-format, gofmt…) via the bridge. */
     private void format() {
@@ -444,6 +552,7 @@ final class EditorScreen extends Screen {
     // ---- editing --------------------------------------------------------------
     private void snapshot() {
         folds.clear();
+        lspDue = System.currentTimeMillis() + 800;
         undo.push(new State(new ArrayList<>(lines), row, col));
         if (undo.size() > 300) undo.removeLast();
         redo.clear();
@@ -628,8 +737,21 @@ final class EditorScreen extends Screen {
             if (key == InputConstants.KEY_ESCAPE) { goingTo = false; rebuildWidgets(); return true; }
             return super.keyPressed(event);
         }
+        if (key == InputConstants.KEY_ESCAPE && !completions.isEmpty()) { completions = new ArrayList<>(); return true; }
         if (key == InputConstants.KEY_ESCAPE && !carets.isEmpty()) { carets.clear(); return true; }
         if (key == InputConstants.KEY_ESCAPE) { if (finding) closeFind(); else onClose(); return true; }
+        if (!completions.isEmpty()) {
+            switch (key) {
+                case InputConstants.KEY_DOWN -> { completionIndex = (completionIndex + 1) % completions.size(); return true; }
+                case InputConstants.KEY_UP -> { completionIndex = (completionIndex - 1 + completions.size()) % completions.size(); return true; }
+                case InputConstants.KEY_RETURN, InputConstants.KEY_TAB -> { acceptCompletion(); return true; }
+                case InputConstants.KEY_ESCAPE -> { completions = new ArrayList<>(); return true; }
+                default -> completions = new ArrayList<>();
+            }
+        }
+        if (key == InputConstants.KEY_F8) { nextDiagnostic(); return true; }
+        if (key == InputConstants.KEY_F12) { goToDefinition(); return true; }
+        if (ctrl && key == InputConstants.KEY_SPACE) { complete(); return true; }
         if (ctrl && key == InputConstants.KEY_G) { openGoto(); return true; }
         if (ctrl && shift && key == InputConstants.KEY_F) { format(); return true; }
         if (ctrl && shift && key == InputConstants.KEY_LBRACKET) { toggleFold(row); return true; }
@@ -785,6 +907,7 @@ final class EditorScreen extends Screen {
 
     // ---- render ---------------------------------------------------------------
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
+        lspTick();
         g.fill(0, 0, width, height, Theme.SCREEN_BG);
         super.extractRenderState(g, mouseX, mouseY, delta);
         String title = "✎ " + new File(path).getName() + (dirty ? " ●" : "");
@@ -832,6 +955,19 @@ final class EditorScreen extends Screen {
                         g.fill(bx - 1, y - 1, bx + font.width(text.substring(bracket[b + 1], bracket[b + 1] + 1)) + 1, y + LINE - 1, 0x50FFFFFF);
                     }
             g.text(font, Highlighter.line(text, lang, block), textX - scrollX, y, 0xFFFFFFFF, !Theme.current().equals("light"));
+            for (JsonElement de : diagnostics) {
+                JsonObject d = de.getAsJsonObject();
+                if (d.get("line").getAsInt() != r) continue;
+                int c0 = Math.min(d.get("col").getAsInt(), text.length());
+                int c1 = d.get("end_line").getAsInt() == r ? Math.min(Math.max(d.get("end_col").getAsInt(), c0 + 1), text.length()) : text.length();
+                int ux0 = textX - scrollX + font.width(text.substring(0, c0));
+                int ux1 = Math.max(ux0 + 4, textX - scrollX + font.width(text.substring(0, Math.max(c0, c1))));
+                int color = d.get("severity").getAsInt() == 1 ? 0xFFF0626A : 0xFFF2C14E;
+                for (int ux = ux0; ux < ux1; ux += 2) g.fill(ux, y + LINE - 2 - (ux / 2 % 2), ux + 2, y + LINE - 1 - (ux / 2 % 2), color);
+                g.fill(areaX + 1, y, areaX + 3, y + LINE - 2, color);
+                if (mouseY >= y - 1 && mouseY < y + LINE - 1 && mouseX >= ux0 && mouseX <= ux1)
+                    g.setTooltipForNextFrame(font, Component.literal(d.get("message").getAsString()), mouseX, mouseY);
+            }
             Integer foldEnd = folds.get(r);
             if (foldEnd != null) {
                 int fx = textX - scrollX + font.width(text) + 6;
@@ -852,9 +988,26 @@ final class EditorScreen extends Screen {
             g.disableScissor();
         }
         if (!loaded) g.text(font, L.t("Загрузка…"), textX, areaY + 4, 0xFF8A8A8A);
+        if (!completions.isEmpty()) {
+            int shownRows = 0;
+            for (int rr = scrollRow; rr < row && rr < lines.size(); rr = stepVisible(rr, 1)) { shownRows++; if (stepVisible(rr, 1) == rr) break; }
+            int px = textX - scrollX + font.width(lines.get(row).substring(0, Math.min(col, lines.get(row).length())));
+            int py = areaY + 2 + (shownRows + 1) * LINE, n = Math.min(8, completions.size()), pw = 180;
+            int first = Math.max(0, Math.min(completionIndex - n + 1, completions.size() - n));
+            g.fill(px - 2, py - 1, px + pw, py + n * LINE + 1, 0xF0202028);
+            for (int i = 0; i < n; i++) {
+                JsonObject it = completions.get(first + i);
+                int yy = py + i * LINE;
+                if (first + i == completionIndex) g.fill(px - 2, yy - 1, px + pw, yy + LINE - 1, 0xFF2D3A4F);
+                g.text(font, font.plainSubstrByWidth(it.get("label").getAsString(), pw - 60), px, yy, 0xFFE8E8E8, false);
+                String detail = it.get("detail").getAsString();
+                if (!detail.isEmpty()) g.text(font, font.plainSubstrByWidth(detail, 56), px + pw - 58, yy, 0xFF7A7A7A, false);
+            }
+        }
         String status = L.t("Стр ") + (row + 1) + ", " + L.t("кол ") + (col + 1) + " · " + (lang.isEmpty() ? "text" : lang)
             + " · " + (eol.equals("\r\n") ? "CRLF" : "LF") + " · " + lines.size() + L.t(" строк")
-            + (carets.isEmpty() ? "" : " · " + (carets.size() + 1) + L.t(" курсоров"));
+            + (carets.isEmpty() ? "" : " · " + (carets.size() + 1) + L.t(" курсоров"))
+            + (diagnostics.isEmpty() ? "" : " · ⚠ " + diagnostics.size() + " (F8)");
         g.text(font, status, width - font.width(status) - 6, height - 13, Theme.WINDOW_DIM);
         if (!message.isEmpty()) g.text(font, font.plainSubstrByWidth(message, width - font.width(status) - 20), 6, height - 13, messageColor);
     }

@@ -47,6 +47,7 @@ final class LiveTest {
     private Path editFile;
     private TerminalScreen terminal;
     private boolean foldCheck;
+    private int lspStage;
     private final List<String> confirmations = new ArrayList<>();
 
     LiveTest(ClaudeChat mod) {
@@ -269,6 +270,28 @@ final class LiveTest {
             if (waited == 10) { ed.keyPressed(new KeyEvent(InputConstants.KEY_G, 0, 2)); }
             return waited > 20 && foldCheck && ed.textForTest().contains("#print(f)()\n#end") && ed.caretsForTest() == 1;
         }, 10);
+        step("editor + language server: diagnostics, F12, Ctrl+Space", () -> {
+            try {
+                Path f = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("claude-chat/workspace/livetest-lsp.py");
+                Files.writeString(f, "def helper():\n    pass\nx = helper()\ny = error_here\nhel");
+                mc().setScreenAndShow(new EditorScreen(mod, null, f.toString()));
+            } catch (IOException e) { throw new RuntimeException(e); }
+        }, () -> {
+            if (!(screen() instanceof EditorScreen ed) || !ed.isLoaded()) return false;
+            if (lspStage == 0 && ed.diagnosticsForTest() == 1) {
+                ed.caretForTest(2, 6);
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_F12, 0, 0));
+                lspStage = 1;
+            } else if (lspStage == 1 && ed.cursorRow() == 0) {
+                ed.caretForTest(4, 3);
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_SPACE, 0, 2));
+                lspStage = 2;
+            } else if (lspStage == 2 && ed.completionsForTest() > 0) {
+                ed.keyPressed(new KeyEvent(InputConstants.KEY_RETURN, 0, 0));
+                lspStage = 3;
+            }
+            return lspStage == 3 && ed.textForTest().endsWith("\nhelper");
+        }, 20);
         step("settings screen", () -> mc().setScreenAndShow(new SettingsScreen(mod, null)), () -> waited > 60, 10);
         quiet("close screens", () -> mc().setScreenAndShow(null), () -> waited > 5, 5);
     }
