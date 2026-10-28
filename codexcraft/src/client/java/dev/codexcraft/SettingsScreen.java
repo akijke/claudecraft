@@ -21,6 +21,7 @@ final class SettingsScreen extends Screen {
     private boolean fetching;
     private boolean autoStart;
     private boolean preview;
+    private Boolean cliInstalled;  // null until the bridge answers
 
     SettingsScreen(ClaudeChat mod, Screen parent) {
         super(Component.literal("Codexcraft"));
@@ -41,10 +42,18 @@ final class SettingsScreen extends Screen {
     @Override protected void init() {
         int x = width / 2 - 150;
         int y = Math.max(28, height / 2 - 105);
-        addRenderableWidget(Button.builder(Component.literal(t("Войти через ChatGPT", "Sign in with ChatGPT")),
-            b -> action("login")).bounds(x, y + 32, 148, 20).build());
-        addRenderableWidget(Button.builder(Component.literal(t("Отменить вход", "Cancel sign-in")),
-            b -> action("login_cancel")).bounds(x + 152, y + 32, 148, 20).build());
+        if (Boolean.FALSE.equals(cliInstalled)) {
+            // No Codex CLI yet: one click runs npm install -g @openai/codex on the bridge.
+            addRenderableWidget(Button.builder(Component.literal(t("Установить Codex CLI", "Install Codex CLI")),
+                b -> action("install_cli")).bounds(x, y + 32, 300, 20)
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(
+                    "npm install -g @openai/codex" + t(" (нужен Node.js)", " (needs Node.js)")))).build());
+        } else {
+            addRenderableWidget(Button.builder(Component.literal(t("Войти через ChatGPT", "Sign in with ChatGPT")),
+                b -> action("login")).bounds(x, y + 32, 148, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(t("Отменить вход", "Cancel sign-in")),
+                b -> action("login_cancel")).bounds(x + 152, y + 32, 148, 20).build());
+        }
         addRenderableWidget(Button.builder(Component.literal(t("Открыть страницу входа", "Open sign-in page")), b -> {
             JsonObject login = status != null && status.has("login") ? status.getAsJsonObject("login") : null;
             String url = string(login, "url");
@@ -89,7 +98,12 @@ final class SettingsScreen extends Screen {
         CompletableFuture.supplyAsync(() -> {
             try { return mod.request("/account", null); }
             catch (Exception e) { return null; }
-        }, mod.io).thenAccept(value -> minecraft.execute(() -> { status = value; fetching = false; }));
+        }, mod.io).thenAccept(value -> minecraft.execute(() -> {
+            status = value;
+            fetching = false;
+            Boolean installed = value != null && value.has("cli") ? value.getAsJsonObject("cli").get("installed").getAsBoolean() : null;
+            if (installed != null && !installed.equals(cliInstalled)) { cliInstalled = installed; rebuildWidgets(); }
+        }));
     }
 
     @Override public void onClose() {
@@ -118,6 +132,15 @@ final class SettingsScreen extends Screen {
             message = string(login, "code");
             if (!message.isEmpty()) message = t("Код на странице входа: ", "Code for sign-in page: ") + message;
             if (!string(login, "error").isEmpty()) message = string(login, "error");
+            JsonObject install = status.has("cli") ? status.getAsJsonObject("cli").getAsJsonObject("install") : null;
+            String state = string(install, "state");
+            if (state.equals("running")) {
+                var log = install.getAsJsonArray("log");
+                message = t("Устанавливаю Codex CLI… ", "Installing Codex CLI… ") + (log.isEmpty() ? "" : log.get(log.size() - 1).getAsString());
+            } else if (state.equals("failed")) message = string(install, "error");
+            else if (state.equals("done")) message = t("Codex CLI установлен — теперь войди через ChatGPT", "Codex CLI installed — now sign in with ChatGPT");
+            if (Boolean.FALSE.equals(cliInstalled) && !state.equals("running") && !state.equals("failed"))
+                accountText = t("Codex CLI не установлен", "Codex CLI is not installed");
         }
         g.text(font, font.plainSubstrByWidth(accountText, 300), x, y, CodexTheme.opaque(CodexTheme.TEXT));
         g.text(font, font.plainSubstrByWidth(message, 300), x, y + 82, CodexTheme.opaque(CodexTheme.WARNING));

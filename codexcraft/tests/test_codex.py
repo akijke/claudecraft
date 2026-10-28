@@ -183,6 +183,30 @@ class CodexTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(status['account']['logged_in'])
             await account.cancel_login()
 
+    @unittest.skipUnless(os.name == 'nt', 'fake npm is a .cmd script')
+    async def test_one_click_cli_install_with_fake_npm(self):
+        npm_dir = Path(self.temp.name) / 'npm'
+        (npm_dir / 'node_modules/@openai/codex/bin').mkdir(parents=True)
+        (npm_dir / 'node_modules/@openai/codex/bin/codex.js').write_text('', encoding='utf-8')
+        (npm_dir / 'npm.cmd').write_text(
+            '@echo off\r\nif "%1"=="prefix" (echo %~dp0& exit /b 0)\r\n'
+            'echo args %*\r\necho added 1 package\r\necho @echo off> "%~dp0codex.cmd"\r\n', encoding='utf-8')
+        npm = str(npm_dir / 'npm.cmd')
+        real_which = __import__('shutil').which
+        def which(name, *a, **k):
+            return npm if name == 'npm' else None if name == 'codex' else real_which(name, *a, **k)
+        account = self.bridge.account
+        with patch('shutil.which', which):
+            self.assertFalse(account.cli_info()['installed'])
+            await self.bridge.command({'mode': 'c', 'action': 'install_cli', 'text': ''})
+            await asyncio.wait_for(account.install_task, 30)
+            info = account.cli_info()
+        self.assertEqual(account.install['state'], 'done', account.install)
+        self.assertTrue(info['installed'], info)
+        self.assertIn('install -g @openai/codex', ' '.join(account.install['log']))
+        saved = json.loads((self.bridge.directory / 'bridge-config.json').read_text(encoding='utf-8'))
+        self.assertTrue(saved['codex_path'].lower().endswith('codex.cmd'))
+
     async def test_mcp_http_configuration_is_translated_for_codex(self):
         self.bridge.extensions = {'test': {'type': 'http', 'url': 'https://example.com/mcp',
                                            'headers': {'X-Test': 'value'}}}

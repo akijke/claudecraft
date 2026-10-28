@@ -157,6 +157,12 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Claude Code CLI уже встроен в SDK — ставить нечего': 'Claude Code CLI is bundled with the SDK — nothing to install',
+    'Нужен Node.js (npm): установи с nodejs.org, перезапусти мост и нажми ещё раз':
+        'Node.js (npm) is needed: install it from nodejs.org, restart the bridge and press again',
+    'npm install завершился с кодом {}': 'npm install exited with code {}',
+    'Codex установлен, но codex не найден в PATH — укажи codex_path в bridge-config.json':
+        'Codex is installed but codex is not on PATH — set codex_path in bridge-config.json',
     'Вход через браузер': 'Browser sign-in',
     'Задачи, проекты и циклы Linear': 'Linear issues, projects and cycles',
     'Jira и Confluence': 'Jira & Confluence',

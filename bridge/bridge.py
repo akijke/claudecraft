@@ -742,12 +742,12 @@ class Bridge:
                 self.reload_extensions()
                 self.emit(chat, f'{cid}: вход забыт', kind='status')
                 self.connectors_menu(mode)
-                return
+                return {'ok': True}
             if self.connectors.is_oauth(cid) and (not self.oauth.has_token(cid) or extra.strip() == 'login'):
                 url = await self.oauth.start(cid, CONNECTOR_CATALOG[cid]['url'])
                 self.emit(chat, f'Войди в {CONNECTOR_CATALOG[cid]["name"]} в браузере — потом всё подключится само.',
                           kind='url', url=url)
-                return
+                return {'ok': True}
             missing = self.connectors.connect(cid, data.get('secret'))
             if missing:
                 self.emit(chat, f'{cid}: нужен ключ', kind='need_key', connector=cid,
@@ -856,6 +856,11 @@ class Bridge:
             await self.account.cancel_login()
         elif action == 'logout':
             await self.account.logout()
+        elif action == 'install_cli':
+            install = getattr(self.account, 'install_cli', None)
+            if install is None:
+                raise ValueError('Claude Code CLI уже встроен в SDK — ставить нечего')
+            await install()
         elif action == 'apikey':
             self.account.set_api_key(text)
         elif action == 'local':
