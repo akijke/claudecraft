@@ -123,6 +123,12 @@ final class LiveTest {
         step("/cc worktree lists worktrees", () -> { markEvents(); mod.runLine("cc", "/cc worktree"); },
             () -> event("worktrees"), 20);
         step("/cc budget shows limits", () -> { markEvents(); mod.runLine("cc", "/cc budget"); }, () -> event("budget"), 20);
+        step("/claude sound sets and plays a custom sound", () -> {
+            mod.runLine("c", "/claude sound done block.note_block.bell");
+            mod.runLine("c", "/claude sound test error");
+        }, () -> waited > 10 && Sounds.sound("done").equals("minecraft:block.note_block.bell"), 10);
+        quiet("restore the default sound", () -> mod.runLine("c", "/claude sound done default"),
+            () -> Sounds.sound("done").equals(Sounds.DEFAULTS.get("done")), 5);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

@@ -53,16 +53,17 @@ final class Notify {
             case "permission", "question", "plan", "budget_hit" -> {
                 Task t = TASKS.get(chat);
                 if (t != null) t.waiting = true;
-                if (!viewing(chat)) alert(L.t("Claude ждёт твоего ответа"), title, true);
+                if (!viewing(chat)) alert(L.t("Claude ждёт твоего ответа"), title, "ask");
+                else if (on("sound")) Sounds.play("ask");  // the card is on screen, a sound still helps
             }
             case "done" -> {
                 Task t = TASKS.remove(chat);
                 long seconds = t == null ? 0 : (System.currentTimeMillis() - t.started) / 1000;
-                if (!viewing(chat) && seconds >= 5) alert("✔ " + L.t("Claude закончил"), title, false);
+                if (!viewing(chat) && seconds >= 5) alert("✔ " + L.t("Claude закончил"), title, "done");
             }
             case "error" -> {
                 TASKS.remove(chat);
-                if (!viewing(chat)) alert("✖ " + L.t("Ошибка"), title, true);
+                if (!viewing(chat)) alert("✖ " + L.t("Ошибка"), title, "error");
             }
             case "status" -> {
                 String text = str(e, "text");
@@ -78,15 +79,12 @@ final class Notify {
         return ConversationScreen.isOpen() && chat.equals(ConversationScreen.shownChat());
     }
 
-    private static void alert(String head, String title, boolean important) {
+    private static void alert(String head, String title, String sound) {
         Minecraft client = Minecraft.getInstance();
         if (on("toasts"))
             SystemToast.addOrUpdate(client.gui.toastManager(), TOAST, Component.literal(head),
                 Component.literal(title == null ? "" : title));
-        if (on("sound"))
-            client.getSoundManager().play(important
-                ? SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_PLING, 1.6f)
-                : SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.7f));
+        if (on("sound")) Sounds.play(sound);
     }
 
     /** Dev screenshots: draw the panel outside a world. */

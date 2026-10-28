@@ -477,5 +477,19 @@
   "без лимита": "no limit",
   " ток.": " tok.",
   "  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume": "  at the limit the request is interrupted and the queue waits for /cc budget resume",
-  "лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume": "$ / token limits: budget task $0.50 · chat 2M · day $5 · resume"
+  "лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume": "$ / token limits: budget task $0.50 · chat 2M · day $5 · resume",
+  "Неверный звук: ": "Invalid sound: ",
+  "Формат: /claude sound [on|off|test|done|ask|error|volume] …": "Usage: /claude sound [on|off|test|done|ask|error|volume] …",
+  "Звуки": "Sounds",
+  "выключить": "turn off",
+  "включить": "turn on",
+  "  громкость %.0f%% ": "  volume %.0f%% ",
+  "готово": "done",
+  "вопрос": "question",
+  "Послушать": "Listen",
+  "другой": "change",
+  "Любой id звука, напр. ": "Any sound id, e.g. ",
+  "…; свои — через ресурспак": "…; your own via a resource pack",
+  "сброс": "reset",
+  "звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка": "sounds: done / question / error — a sound for each, volume, test"
 }

@@ -265,7 +265,28 @@ public final class ClaudeChat implements ClientModInitializer {
                 String id = parts.length > 1 ? parts[1].strip() : "";
                 open(() -> new KeyScreen(this, id, keyFields.getOrDefault(id, new JsonArray())));
             }
-            case "hud", "toasts", "sound" -> {
+            case "sound", "sounds" -> {
+                // /claude sound [on|off] · sound done|ask|error <id|off|default> · sound volume 0.5 · sound test [kind]
+                String[] args = parts.length > 1 ? parts[1].strip().split("\\s+", 2) : new String[0];
+                if (args.length == 0 || args[0].equals("on") || args[0].equals("off")) {
+                    boolean on = args.length == 0 ? !launcher.flag("sound", true) : args[0].equals("on");
+                    launcher.setFlag("sound", on);
+                    say("c", "sound: " + (on ? L.t("вкл") : L.t("выкл")));
+                    soundMenu();
+                } else if (args[0].equals("test")) {
+                    Sounds.play(args.length > 1 ? args[1] : "done");
+                } else if (args[0].equals("list")) {
+                    soundMenu();
+                } else if (Sounds.DEFAULTS.containsKey(args[0]) || args[0].equals("volume")) {
+                    if (args.length < 2) { soundMenu(); return; }
+                    try {
+                        Sounds.set(args[0], args[1].strip());
+                        if (!args[0].equals("volume")) Sounds.play(args[0]);
+                        soundMenu();
+                    } catch (RuntimeException e) { say("c", L.t("Неверный звук: ") + args[1]); }
+                } else say("c", L.t("Формат: /claude sound [on|off|test|done|ask|error|volume] …"));
+            }
+            case "hud", "toasts" -> {
                 // /claude hud|toasts|sound [on|off]: toggles without an argument.
                 String value = parts.length > 1 ? parts[1].strip() : "";
                 boolean on = value.isEmpty() ? !launcher.flag(parts[0], true) : !value.equals("off");
@@ -273,6 +294,33 @@ public final class ClaudeChat implements ClientModInitializer {
                 say("c", parts[0] + ": " + (on ? L.t("вкл") : L.t("выкл")));
             }
             default -> open(() -> new SettingsScreen(this, null));
+        }
+    }
+
+    /** Sound settings with clickable choices. */
+    private void soundMenu() {
+        int c = ChatStyle.AQUA;
+        show(ChatStyle.line("c", ChatStyle.lit("♪ " + L.t("Звуки"), ChatStyle.GOLD).withStyle(s -> s.withBold(true))
+            .append(ChatStyle.lit("  " + (launcher.flag("sound", true) ? L.t("вкл") : L.t("выкл")) + "  ", ChatStyle.DIM))
+            .append(ChatStyle.button(launcher.flag("sound", true) ? L.t("выключить") : L.t("включить"),
+                "/claude sound " + (launcher.flag("sound", true) ? "off" : "on"), false, c, null))
+            .append(ChatStyle.lit(String.format(java.util.Locale.ROOT, L.t("  громкость %.0f%% "), Sounds.volume() * 100), ChatStyle.DIM))
+            .append(ChatStyle.button("−", "/claude sound volume " + Math.max(0, Sounds.volume() - 0.2f), false, c, null))
+            .append(ChatStyle.button("+", "/claude sound volume " + Math.min(1, Sounds.volume() + 0.2f), false, c, null))));
+        for (String kind : Sounds.DEFAULTS.keySet()) {
+            String label = kind.equals("done") ? L.t("готово") : kind.equals("ask") ? L.t("вопрос") : L.t("ошибка");
+            Component row = ChatStyle.line("c", ChatStyle.lit(String.format("  %-9s ", label), ChatStyle.TEXT)
+                .append(ChatStyle.lit(Sounds.sound(kind).replace("minecraft:", "") + "  ", ChatStyle.DIM))
+                .append(ChatStyle.button("▶", "/claude sound test " + kind, false, ChatStyle.GREEN, L.t("Послушать")))
+                .append(ChatStyle.lit(" ", ChatStyle.DIM))
+                .append(ChatStyle.button(L.t("другой"), "/claude sound " + kind + " ", true, c,
+                    L.t("Любой id звука, напр. ") + String.join(", ", java.util.Arrays.copyOf(Sounds.SUGGESTED, 4))
+                        + L.t("…; свои — через ресурспак")))
+                .append(ChatStyle.lit(" ", ChatStyle.DIM))
+                .append(ChatStyle.button(L.t("выкл"), "/claude sound " + kind + " off", false, ChatStyle.DIM, null))
+                .append(ChatStyle.lit(" ", ChatStyle.DIM))
+                .append(ChatStyle.button(L.t("сброс"), "/claude sound " + kind + " default", false, ChatStyle.DIM, null)));
+            show(row);
         }
     }
 
@@ -454,6 +502,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
             {"/pty", L.t("[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один")},
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
+            {"/claude sound", L.t("звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},
             {c + "ls", L.t("файлы: cd · pwd · cat · tree · find · mkdir · mv · cp · rm · open · code")},

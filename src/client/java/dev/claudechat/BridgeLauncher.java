@@ -86,6 +86,9 @@ final class BridgeLauncher {
         write();
     }
 
+    /** Saves client.json after a direct change of `settings` (e.g. the "sounds" section). */
+    void saveAll() { write(); }
+
     private void write() {
         try {
             Files.createDirectories(configDir);
