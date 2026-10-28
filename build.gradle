@@ -15,6 +15,13 @@ loom {
             vmArg '-Dclaudecraft.devshots=true'
             runDir 'run'
         }
+        // gradlew runLiveTest: drives the mod in a real test world, report in run/livetest/report.md.
+        liveTest {
+            client()
+            name = 'Claudecraft live test'
+            vmArg '-Dclaudecraft.livetest=true'
+            runDir 'run'
+        }
     }
     mods {
         'claude_chat' {

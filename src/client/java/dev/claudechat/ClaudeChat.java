@@ -73,6 +73,7 @@ public final class ClaudeChat implements ClientModInitializer {
     private String shotMode, shotQuestion;
     private boolean shotHidGui, shotReopen;
     private final DevShots devShots = new DevShots(this);
+    private final LiveTest liveTest = new LiveTest(this);
     private volatile long cursor;
     // Bridge instance id: when it changes the bridge restarted and its event numbers reset.
     private volatile String boot = "";
@@ -127,6 +128,7 @@ public final class ClaudeChat implements ClientModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             devShots.tick(client);
+            liveTest.tick(client);
             if (shotTicks > 0 && --shotTicks == 0) takeShot(client);
             while (openKey.consumeClick()) open(() -> new ConversationScreen(this));
             Supplier<Screen> next = openNext;

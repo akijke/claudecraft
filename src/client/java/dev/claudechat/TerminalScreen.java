@@ -261,7 +261,7 @@ final class TerminalScreen extends Screen {
         return true;
     }
 
-    private String screenText() {
+    String screenText() {
         if (snap == null) return "";
         StringBuilder b = new StringBuilder();
         for (JsonElement row : snap.getAsJsonArray("rows")) {

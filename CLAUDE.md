@@ -110,6 +110,30 @@ bridge/ с заменой строк ('ClaudeChat', '/cc', 'literal(mode)', 'SHO
 опираются замены, — правь и codexcraft/build.gradle. Codex CLI на этом ПК не
 установлен (2026-10-28).
 
+## Сделано 2026-10-28/29 (пакет 1,3,5–12,16,17)
+
+- Модель/усилие на чат (/cc model, effort); HUD-панель задач и тосты/звук (Notify.java).
+- Окно файлов: поиск по содержимому (/grep); EditorScreen (/edit, F4) + Highlighter
+  (подсветка и в превью, и в ```-блоках чата); мост GET /edit, POST /save (409 при конфликте).
+- backends/undo.py: снимок файла перед первой правкой Claude в запросе (в колбэке
+  разрешений, видит и автоодобренные); diff в карточке разрешения и событие edit_diff;
+  /cc undo, /cc undo list. Bash-правки не отслеживаются.
+- backends/images.py: маркер [[image:путь]] в тексте очереди → image-блок SDK (картинка
+  сохраняется в JSONL сессии = видна в Claude Code на ПК). /cc img, /cc shot (без HUD,
+  ≤1600 px, config/claude-chat/shots, последние 30), кнопка «Скриншот» в окне K.
+- backends/vt.py + ptyterm.py: настоящий терминал (/pty): ConPTY через ctypes
+  (STARTF_USESTDHANDLES обязателен, после выхода процесса ClosePseudoConsole), pty на
+  POSIX; TerminalScreen. Без новых зависимостей (pip download пользователь отклонил).
+- backends/oauth.py: вход через браузер для удалённых MCP (Linear, Atlassian, Notion,
+  Sentry, Asana, Vercel); колбэк /oauth/callback без токена моста (защита state).
+- Codexcraft: «Установить Codex CLI» (npm i -g @openai/codex), codex_path сохраняется.
+- PortablePython.java: если Python нет — python-build-standalone 3.13 по SHA256SUMS,
+  свой распаковщик tar. Реальная загрузка ещё не проверялась.
+- LiveTest.java: `gradlew runLiveTest` — мост, тестовый мир, команды и клики, отчёт
+  run/livetest/report.md со скриншотами. Claude не вызывается.
+- Подвох инструментов: в heredoc Bash `\\n`/`\\r` становятся настоящими переводами
+  строки — Java/Python-строки с экранированием писать через Write/Edit.
+
 ## Отложено: аддон для модеров (просьба пользователя 2026-10-28, не забыть)
 
 Сделать ОТДЕЛЬНЫМ аддоном (как Codexcraft), не в основном моде:
