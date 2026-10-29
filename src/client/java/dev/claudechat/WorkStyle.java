@@ -750,10 +750,15 @@ final class WorkStyle {
                 .append(button(name, "/cc agent " + name + " ", true, on ? AQUA : FAINT, s(r, "description")))
                 .append(lit("  " + s(r, "source"), FAINT)).append(sp())
                 .append(button(on ? L.t("выкл") : L.t("вкл"), "/cc agent " + (on ? "off " : "on ") + name, false, on ? DIM : GREEN, null))
-                .append(sp()).append(button("∥", "/cc spawn @" + name + " ", true, CODE_MODE, L.t("Запустить параллельно в отдельном чате")))));
+                .append(sp()).append(button("∥", "/cc spawn @" + name + " ", true, CODE_MODE, L.t("Запустить параллельно в отдельном чате")))
+                .append(sp()).append(button("✎", "/cc agent edit " + name, false, AQUA,
+                    L.t("Править .claude/agents/") + name + L.t(".md в редакторе (встроенный сначала копируется в проект)")))));
         }
         out.add(line("cc", Component.literal("  ").append(button(L.t("+ свой агент"), "/cc agent new ", true, GOLD,
-            L.t("agent new <имя> <чем занимается>"))).append(lit(L.t("  или файлы .claude/agents/*.md в проекте"), FAINT))));
+            L.t("agent new <имя> <чем занимается>"))).append(sp())
+            .append(button(L.t("+ файлом .md"), "/cc agent file ", true, GOLD, L.t("Создать .claude/agents/<имя>.md и открыть в редакторе"))).append(sp())
+            .append(button(L.t("импорт"), "/cc agent import ", true, AQUA, L.t("Скопировать .md агента из другого проекта или ~/.claude/agents")))
+            .append(lit(L.t("  или файлы .claude/agents/*.md в проекте"), FAINT))));
     }
 
     private static void tasks(JsonObject e, List<Component> out) {

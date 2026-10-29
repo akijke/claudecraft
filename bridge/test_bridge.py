@@ -1269,6 +1269,32 @@ class PullRequestTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Closes #3', prompt)
 
 
+class AgentFileTests(unittest.IsolatedAsyncioTestCase):
+    async def test_export_edit_new_import(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        project = Path(bridge.projects.path_of_current())
+        await bridge.command({'mode': 'cc', 'action': 'agent', 'text': 'edit code-reviewer'})
+        opened = [e for e in bridge.events if e['kind'] == 'open_editor'][-1]['path']
+        self.assertEqual(Path(opened), project / '.claude' / 'agents' / 'code-reviewer.md')
+        text = Path(opened).read_text(encoding='utf-8')
+        self.assertTrue(text.startswith('---\nname: code-reviewer\n'))
+        Path(opened).write_text(text.replace('senior code reviewer', 'EDITED reviewer'), encoding='utf-8')
+        self.assertIn('EDITED reviewer', bridge.agents.enabled(str(project))['code-reviewer']['prompt'])   # project file wins
+        self.assertEqual([r['source'] for r in bridge.agents.rows() if r['name'] == 'code-reviewer'], ['проект'])
+        await bridge.command({'mode': 'cc', 'action': 'agent', 'text': 'file my-helper'})
+        self.assertIn('my-helper', bridge.agents.enabled(str(project)))
+        other = Path(temp.name) / 'other.md'
+        other.write_text('---\nname: imported-one\ndescription: From elsewhere\ntools: Read, Grep\n---\nDo things.', encoding='utf-8')
+        await bridge.command({'mode': 'cc', 'action': 'agent', 'text': f'import {other}'})
+        agent = bridge.agents.enabled(str(project))['imported-one']
+        self.assertEqual((agent['description'], agent['tools']), ('From elsewhere', ['Read', 'Grep']))
+        with self.assertRaises(ValueError):
+            await bridge.command({'mode': 'cc', 'action': 'agent', 'text': 'file Bad Name'})
+
+
 class CrossReviewTests(unittest.IsolatedAsyncioTestCase):
     async def test_review_goes_to_the_other_bridge_or_a_subagent(self):
         from aiohttp.test_utils import TestServer

@@ -656,5 +656,11 @@
   " запусков · ": " runs · ",
   "<команда> — при изменениях файлов запускать тесты/сборку, при падении — кнопка «Claude, почини» · watch stop": "<command> — rerun tests/build when files change; on failure a “Claude, fix it” button · watch stop",
   "Кросс-ревью изменений": "Cross-review of the changes",
-  "[фокус] — ревью изменений другим ИИ: Codexcraft ↔ Claudecraft (или агент code-reviewer)": "[focus] — another AI reviews the changes: Codexcraft ↔ Claudecraft (or the code-reviewer agent)"
+  "[фокус] — ревью изменений другим ИИ: Codexcraft ↔ Claudecraft (или агент code-reviewer)": "[focus] — another AI reviews the changes: Codexcraft ↔ Claudecraft (or the code-reviewer agent)",
+  "Править .claude/agents/": "Edit .claude/agents/",
+  ".md в редакторе (встроенный сначала копируется в проект)": ".md in the editor (a built-in one is copied into the project first)",
+  "+ файлом .md": "+ as an .md file",
+  "Создать .claude/agents/<имя>.md и открыть в редакторе": "Create .claude/agents/<name>.md and open it in the editor",
+  "импорт": "import",
+  "Скопировать .md агента из другого проекта или ~/.claude/agents": "Copy an agent .md from another project or ~/.claude/agents"
 }

@@ -157,6 +157,12 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Агент': 'Agent', 'Агент сохранён в проект: {}': 'Agent saved to the project: {}',
+    'Агент {} импортирован: {}': 'Agent {} imported: {}',
+    'Нужен файл агента .md: {}': 'An agent .md file is needed: {}',
+    'В файле нет заголовка агента (--- name / description ---)': 'The file has no agent header (--- name / description ---)',
+    'agent <имя> <задача> | new <имя> <описание> | file <имя> | edit <имя> | export <имя> | import <файл.md> | on/off <имя> | rm <имя>':
+        'agent <name> <task> | new <name> <description> | file <name> | edit <name> | export <name> | import <file.md> | on/off <name> | rm <name>',
     'Изменения отправлены на ревью в {} — ответ появится там': 'The changes were sent for review to {} — the answer appears there',
     'Второго мода нет — ревью делает отдельный агент code-reviewer': 'The other mod is not running — a separate code-reviewer agent reviews',
     'Наблюдение остановлено': 'Watching stopped', 'Сейчас ничего не падает': 'Nothing is failing right now',

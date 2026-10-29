@@ -1214,12 +1214,27 @@ class Bridge:
             elif sub in ('on', 'off'):
                 self.agents.toggle(rest.strip(), sub == 'on')
                 self.agents_menu(mode)
+            elif sub in ('edit', 'export'):
+                path = self.agents.export(rest.strip(), self.chat_cwd(chat))
+                if sub == 'edit':
+                    self.emit(chat, 'Агент', kind='open_editor', path=str(path))
+                else:
+                    self.emit(chat, f'Агент сохранён в проект: {path}', kind='status')
+                    self.agents_menu(mode)
+            elif sub == 'file':
+                path = self.agents.new_file(rest.strip(), self.chat_cwd(chat))
+                self.emit(chat, 'Агент', kind='open_editor', path=str(path))
+            elif sub == 'import':
+                name, path = self.agents.import_file(self.files.resolve(mode, rest.strip()), self.chat_cwd(chat))
+                self.emit(chat, f'Агент {name} импортирован: {path}', kind='status')
+                self.agents_menu(mode)
             elif sub in self.agents.enabled():
                 if not rest.strip():
                     raise ValueError(f'Формат: agent {sub} <задача>')
                 await self.enqueue(self.current_chat('cc'), f'Use the {sub} subagent to do this: {rest.strip()}')
             else:
-                raise ValueError('agent <имя> <задача> | new <имя> <описание> | on/off <имя> | rm <имя>')
+                raise ValueError('agent <имя> <задача> | new <имя> <описание> | file <имя> | edit <имя> | export <имя> | '
+                                 'import <файл.md> | on/off <имя> | rm <имя>')
         elif action in ('worktree', 'wt'):
             sub, _, rest = text.strip().partition(' ')
             if sub in ('', 'list', 'ls'):

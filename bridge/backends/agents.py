@@ -137,6 +137,56 @@ class Agents:
         del self.custom[name]
         self.save()
 
+    def project_folder(self, project_path=None):
+        return Path(project_path or self.bridge.projects.path_of_current()) / '.claude' / 'agents'
+
+    @staticmethod
+    def to_markdown(name, d):
+        lines = ['---', f'name: {name}', f"description: {d['description']}"]
+        if d.get('tools'):
+            lines.append('tools: ' + ', '.join(d['tools']))
+        if d.get('model'):
+            lines.append(f"model: {d['model']}")
+        return '\n'.join(lines + ['---', '', d['prompt'].strip(), ''])
+
+    def export(self, name, project_path=None):
+        """Writes the agent as <project>/.claude/agents/<name>.md (shared through git, editable in the editor)."""
+        found = self.all(project_path).get(name)
+        if not found:
+            raise ValueError(f'Нет агента {name}')
+        folder = self.project_folder(project_path)
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f'{name}.md'
+        if not path.exists():
+            path.write_text(self.to_markdown(name, found[0]), encoding='utf-8')
+        return path
+
+    def new_file(self, name, project_path=None):
+        if not NAME.fullmatch(name or ''):
+            raise ValueError('Имя агента: латиница в нижнем регистре, цифры, дефис (например my-helper)')
+        path = self.project_folder(project_path) / f'{name}.md'
+        if path.exists():
+            return path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.to_markdown(name, {'description': 'What this agent does and when Claude should use it.',
+                                                'tools': READ_ONLY, 'prompt': 'You are a specialised assistant. '
+                                                'Describe the role, the steps and the expected report here.'}),
+                        encoding='utf-8')
+        return path
+
+    def import_file(self, source, project_path=None):
+        """Copies an agent .md (e.g. from another project or ~/.claude/agents) into this project."""
+        source = Path(source).expanduser()
+        if not source.is_file() or source.suffix.lower() != '.md':
+            raise ValueError(f'Нужен файл агента .md: {source}')
+        parsed = parse_markdown_agent(source)
+        if not parsed:
+            raise ValueError('В файле нет заголовка агента (--- name / description ---)')
+        target = self.project_folder(project_path) / f'{parsed[0]}.md'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source.read_text(encoding='utf-8'), encoding='utf-8')
+        return parsed[0], target
+
     def toggle(self, name, on):
         if name not in self.all():
             raise ValueError(f'Нет агента {name}')
