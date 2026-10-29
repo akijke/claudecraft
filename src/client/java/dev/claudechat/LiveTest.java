@@ -84,7 +84,7 @@ final class LiveTest {
     private long mark;  // only events after the step started count
     private int expandedWidth;
     private int[] gripBox;
-    private boolean gripResized;
+    private boolean gripResized, edgesOk;
 
     private void markEvents() {
         mark = 0;
@@ -186,6 +186,40 @@ final class LiveTest {
             if (waited == 25 || waited == 27) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
             if (waited == 26 || waited == 28) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
             return waited > 32 && gripResized && ChatSize.width(true) == 0;
+        }, 10);
+        // top edge = height only, right edge = width only, the bottom left corner stays; then ↺ resets
+        step("vanilla chat: the top edge drags the height, the right edge the width",() -> { edgesOk = false; }, () -> {
+            var mouse = mc().mouseHandler;
+            long win = mc().getWindow().handle();
+            double k = mc().getWindow().getGuiScale();
+            if (waited == 5) { gripBox = ChatSize.boxForTest(); mouse.onMove(win, (gripBox[2] / 2.0) * k, (gripBox[1] + 1) * k, 0, 0); }
+            if (waited == 7) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
+            if (waited >= 8 && waited <= 14) mouse.onMove(win, (gripBox[2] / 2.0) * k, (gripBox[1] + 1 - 5 * (waited - 7)) * k, 0, 0);
+            if (waited == 16) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
+            if (waited == 18) {
+                int[] b = ChatSize.boxForTest();
+                edgesOk = b[1] < gripBox[1] - 20 && b[2] == gripBox[2] && b[0] == 0 && b[3] == gripBox[3];
+                gripBox = b;
+                mouse.onMove(win, (b[2] + 1) * k, ((b[1] + b[3]) / 2.0) * k, 0, 0);
+            }
+            if (waited == 20) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
+            if (waited >= 21 && waited <= 27) mouse.onMove(win, (gripBox[2] + 1 + 6 * (waited - 20)) * k, ((gripBox[1] + gripBox[3]) / 2.0) * k, 0, 0);
+            if (waited == 29) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
+            if (waited == 31) {
+                int[] b = ChatSize.boxForTest();
+                edgesOk &= b[2] > gripBox[2] + 20 && b[1] == gripBox[1] && b[3] == gripBox[3];
+                int[] r = ChatSize.resetButtonForTest();
+                edgesOk &= r != null;
+                if (r != null) mouse.onMove(win, ((r[0] + r[2]) / 2.0) * k, ((r[1] + r[3]) / 2.0) * k, 0, 0);
+            }
+            return waited > 34 && edgesOk;   // the screenshot shows the toolbar with ↺ under the cursor
+        }, 10);
+        step("vanilla chat: the reset button brings the game's size back", () -> { }, () -> {
+            var mouse = mc().mouseHandler;
+            long win = mc().getWindow().handle();
+            if (waited == 3) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
+            if (waited == 4) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
+            return waited > 8 && ChatSize.isDefault() && ChatSize.resetButtonForTest() == null;
         }, 10);
         quiet("close the chat", () -> mc().setScreenAndShow(null), () -> screen() == null, 5);
         step("/cc chats opens the chat picker with this mode's chats", () -> mod.runLine("cc", "/cc chats"),

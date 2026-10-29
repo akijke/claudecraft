@@ -767,5 +767,9 @@
   " чат(ов)": " chat(s)",
   "Чат на весь экран и обратно. Размер — тяни за уголок справа сверху, двойной клик по нему — обычный размер": "Chat full screen and back. Drag the top right corner to resize, double click it for the normal size",
   "Свернуть": "Collapse",
-  "Развернуть": "Expand"
+  "Развернуть": "Expand",
+  "Обычный размер чата": "Default chat size",
+  "Тяните, чтобы изменить высоту": "Drag to change the height",
+  "Тяните, чтобы изменить ширину": "Drag to change the width",
+  "Тяните, чтобы изменить размер; двойной клик — обычный размер": "Drag to resize; double click for the default size"
 }
