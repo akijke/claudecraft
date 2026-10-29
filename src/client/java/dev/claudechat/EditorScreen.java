@@ -510,33 +510,33 @@ final class EditorScreen extends Screen {
         areaH = height - areaY - 18;
         if (finding) {
             int bw = Math.min(200, (width - 200) / 2);
-            findBox = new net.minecraft.client.gui.components.EditBox(font, 6, 29, bw, 18, Component.literal("find"));
+            findBox = new Ui.Field(font, 6, 29, bw, 18, Component.literal("find"));
             findBox.setHint(Component.literal(L.t("найти… (Enter — дальше)")));
             findBox.setMaxLength(1000);
             findBox.setValue(findValue);
             findBox.setResponder(v -> { findValue = v; refreshMatches(); });
             addRenderableWidget(findBox);
             int x = 10 + bw;
-            addRenderableWidget(Button.builder(Component.literal(findRegex ? "[.*]" : ".*"), b -> {
+            addRenderableWidget(Ui.button(Component.literal(findRegex ? "[.*]" : ".*"), b -> {
                 findRegex = !findRegex; refreshMatches(); rebuildWidgets(); }).bounds(x, 29, 26, 18)
                 .tooltip(Tooltip.create(Component.literal(L.t("Регулярное выражение")))).build());
-            addRenderableWidget(Button.builder(Component.literal(findCase ? "[Aa]" : "Aa"), b -> {
+            addRenderableWidget(Ui.button(Component.literal(findCase ? "[Aa]" : "Aa"), b -> {
                 findCase = !findCase; refreshMatches(); rebuildWidgets(); }).bounds(x + 28, 29, 26, 18)
                 .tooltip(Tooltip.create(Component.literal(L.t("Учитывать регистр")))).build());
             x += 58;
             if (replacing) {
-                replaceBox = new net.minecraft.client.gui.components.EditBox(font, x, 29, bw, 18, Component.literal("replace"));
+                replaceBox = new Ui.Field(font, x, 29, bw, 18, Component.literal("replace"));
                 replaceBox.setHint(Component.literal(L.t("заменить на…") + (findRegex ? " ($1)" : "")));
                 replaceBox.setMaxLength(1000);
                 replaceBox.setValue(replaceValue);
                 replaceBox.setResponder(v -> replaceValue = v);
                 addRenderableWidget(replaceBox);
                 x += bw + 4;
-                addRenderableWidget(Button.builder(Component.literal(L.t("Заменить")), b -> replaceOne()).bounds(x, 29, 60, 18).build());
-                addRenderableWidget(Button.builder(Component.literal(L.t("Все")), b -> replaceAll()).bounds(x + 62, 29, 34, 18).build());
+                addRenderableWidget(Ui.button(Component.literal(L.t("Заменить")), b -> replaceOne()).bounds(x, 29, 60, 18).build());
+                addRenderableWidget(Ui.button(Component.literal(L.t("Все")), b -> replaceAll()).bounds(x + 62, 29, 34, 18).build());
                 x += 98;
             }
-            addRenderableWidget(Button.builder(Component.literal("✕"), b -> closeFind()).bounds(x, 29, 18, 18).build());
+            addRenderableWidget(Ui.button(Component.literal("✕"), b -> closeFind()).bounds(x, 29, 18, 18).build());
             refreshMatches();
         }
         int x = width - 6;
@@ -548,7 +548,7 @@ final class EditorScreen extends Screen {
         x = button(x, "✔ " + L.t("Сохранить"), "Ctrl+S", () -> save(confirmOverwrite));
         buttonsLeft = button(x, "{ }", L.t("Форматировать (Ctrl+Shift+F)"), this::format);
         if (goingTo) {
-            gotoBox = new net.minecraft.client.gui.components.EditBox(font, 6, 29, 120, 18, Component.literal("line"));
+            gotoBox = new Ui.Field(font, 6, 29, 120, 18, Component.literal("line"));
             gotoBox.setHint(Component.literal(L.t("строка… (Enter)")));
             gotoBox.setMaxLength(7);
             addRenderableWidget(gotoBox);
@@ -560,7 +560,7 @@ final class EditorScreen extends Screen {
 
     private int button(int right, String label, String tip, Runnable action) {
         int w = font.width(label) + 12;
-        addRenderableWidget(Button.builder(Component.literal(label), b -> action.run())
+        addRenderableWidget(Ui.button(Component.literal(label), b -> action.run())
             .bounds(right - w, 5, w, 18).tooltip(Tooltip.create(Component.literal(tip))).build());
         return right - w - 3;
     }
@@ -938,6 +938,9 @@ final class EditorScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         lspTick();
         g.fill(0, 0, width, height, Theme.SCREEN_BG);
+        Ui.header(g, 0, 0, width, 28);
+        g.fill(0, height - 16, width, height, Theme.HEADER);  // status bar
+        g.fill(0, height - 16, width, height - 15, Theme.LINE);
         super.extractRenderState(g, mouseX, mouseY, delta);
         String title = "✎ " + new File(path).getName() + (dirty ? " ●" : "");
         g.text(font, Component.literal(title).withColor(dirty ? 0xF2C14E : 0xD97757), 6, 10, 0xFFFFFFFF, Theme.shadow());
@@ -948,6 +951,8 @@ final class EditorScreen extends Screen {
         gutterW = font.width(String.valueOf(lines.size())) + GUTTER_PAD * 2 + (showBlame && blame != null ? BLAME_W : 0);
         g.fill(areaX, areaY, areaX + areaW, areaY + areaH, Theme.PANEL);
         g.fill(areaX, areaY, areaX + gutterW, areaY + areaH, Theme.GUTTER);
+        g.fill(areaX + gutterW - 1, areaY, areaX + gutterW, areaY + areaH, Theme.LINE);
+        g.outline(areaX - 1, areaY - 1, areaW + 2, areaH + 2, Theme.LINE);
         int visible = areaH / LINE, textX = areaX + gutterW + 4;
         boolean[] block = {false};
         // block-comment state for the lines above the view
@@ -1027,6 +1032,7 @@ final class EditorScreen extends Screen {
             }
             g.disableScissor();
         }
+        Ui.scrollbar(g, areaX + areaW - 4, areaY + 1, areaH - 2, scrollRow, visible, lines.size());
         if (!loaded) g.text(font, L.t("Загрузка…"), textX, areaY + 4, 0xFF8A8A8A, Theme.shadow());
         if (!completions.isEmpty()) {
             int shownRows = 0;
@@ -1034,11 +1040,14 @@ final class EditorScreen extends Screen {
             int px = textX - scrollX + font.width(lines.get(row).substring(0, Math.min(col, lines.get(row).length())));
             int py = areaY + 2 + (shownRows + 1) * LINE, n = Math.min(8, completions.size()), pw = 180;
             int first = Math.max(0, Math.min(completionIndex - n + 1, completions.size() - n));
-            g.fill(px - 2, py - 1, px + pw, py + n * LINE + 1, 0xF0202028);
+            Ui.panel(g, px - 3, py - 2, pw + 4, n * LINE + 3, 0xF0202028, 0xFF3A3A42);
             for (int i = 0; i < n; i++) {
                 JsonObject it = completions.get(first + i);
                 int yy = py + i * LINE;
-                if (first + i == completionIndex) g.fill(px - 2, yy - 1, px + pw, yy + LINE - 1, 0xFF2D3A4F);
+                if (first + i == completionIndex) {
+                    g.fill(px - 2, yy - 1, px + pw, yy + LINE - 1, 0xFF2E2A22);
+                    g.fill(px - 2, yy - 1, px - 1, yy + LINE - 1, 0xFFF2C14E);
+                }
                 g.text(font, font.plainSubstrByWidth(it.get("label").getAsString(), pw - 60), px, yy, 0xFFE8E8E8, false);
                 String detail = it.get("detail").getAsString();
                 if (!detail.isEmpty()) g.text(font, font.plainSubstrByWidth(detail, 56), px + pw - 58, yy, 0xFF7A7A7A, false);

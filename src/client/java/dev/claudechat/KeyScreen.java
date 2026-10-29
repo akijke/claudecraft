@@ -41,7 +41,7 @@ final class KeyScreen extends Screen {
         int y = top + 24;
         for (JsonElement f : fields) {
             JsonObject field = f.getAsJsonObject();
-            EditBox box = new EditBox(font, x, y + 12, w, 18, Component.literal(field.get("var").getAsString()));
+            EditBox box = new Ui.Field(font, x, y + 12, w, 18, Component.literal(field.get("var").getAsString())).dark();
             box.setMaxLength(4000);
             box.setHint(Component.literal(field.get("set").getAsBoolean() ? L.t("задан — оставь пустым, чтобы не менять")
                 : field.get("hint").getAsString()));
@@ -51,10 +51,10 @@ final class KeyScreen extends Screen {
             vars.add(field.get("var").getAsString());
             y += 34;
         }
-        addRenderableWidget(Button.builder(Component.literal(L.t("✔ Сохранить и подключить")), b -> save())
-            .bounds(x, y + 8, w / 2 - 2, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
-            .bounds(x + w / 2 + 2, y + 8, w / 2 - 2, 20).build());
+        addRenderableWidget(Ui.button(Component.literal(L.t("✔ Сохранить и подключить")), b -> save())
+            .bounds(x, y + 8, w / 2 - 2, 20).dark().build());
+        addRenderableWidget(Ui.button(CommonComponents.GUI_CANCEL, b -> onClose())
+            .bounds(x + w / 2 + 2, y + 8, w / 2 - 2, 20).dark().build());
         if (!boxes.isEmpty()) setInitialFocus(boxes.get(0));
     }
 
@@ -71,10 +71,14 @@ final class KeyScreen extends Screen {
     }
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
-        super.extractRenderState(g, mouseX, mouseY, delta);
         int w = Math.min(320, width - 40), x = width / 2 - w / 2;
+        int cardBottom = top + 24 + fields.size() * 34 + 36;
+        Ui.panel(g, x - 12, top - 10, w + 24, cardBottom - top + 10, 0xE8141418, Theme.darkUi().line());
+        g.fill(x - 12, top - 10, x + w + 12, top - 9, 0xFFF2C14E);
+        g.fill(x - 11, top + 20, x + w + 11, top + 21, Theme.darkUi().line());
+        super.extractRenderState(g, mouseX, mouseY, delta);
         g.centeredText(font, Component.literal("🔑 " + connector).withColor(0xF2C14E), width / 2, top, 0xFFFFFFFF);
-        g.centeredText(font, L.t("Ключ хранится только в config/claude-chat/secrets.json"), width / 2, top + 11, 0xFF8A8A8A);
+        g.centeredText(font, L.t("Ключ хранится только в config/claude-chat/secrets.json"), width / 2, top + 10, 0xFF8A8A8A);
         int y = top + 24;
         for (JsonElement f : fields) {
             JsonObject field = f.getAsJsonObject();

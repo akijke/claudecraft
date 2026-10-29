@@ -109,13 +109,13 @@ final class Notify {
             long s = (System.currentTimeMillis() - t.started) / 1000;
             String time = s >= 60 ? (s / 60) + "m " + (s % 60) + "s" : s + "s";
             int accent = "cc".equals(t.mode) ? 0xFFB48EF0 : 0xFFD97757;
-            g.fill(x - 3, y - 2, x + w + 1, y + 21, t.waiting ? 0xB0503A10 : 0x90000000);
-            g.fill(x - 3, y - 2, x - 1, y + 21, t.waiting ? 0xFFF2C14E : accent);
+            Ui.panel(g, x - 3, y - 3, w + 5, 25, t.waiting ? 0xC83A2C0E : 0xB8101014, t.waiting ? 0x90F2C14E : 0x30FFFFFF);
+            g.fill(x - 3, y - 3, x - 1, y + 22, t.waiting ? 0xFFF2C14E : accent);
             String head = (t.waiting ? "⚠ " : "✦ ") + font.plainSubstrByWidth(t.title == null ? "" : t.title, w - 40);
             g.text(font, head, x + 1, y, t.waiting ? 0xFFF2C14E : 0xFFE8E8E8);
             g.text(font, time, x + w - font.width(time) - 1, y, 0xFF8A8A8A);
             String step = t.waiting ? L.t("ждёт твоего ответа · K") : t.step;
-            g.text(font, font.plainSubstrByWidth(ChatStyle.clean(step == null ? "" : step), w - 2), x + 1, y + 10, 0xFF8A8A8A);
+            g.text(font, font.plainSubstrByWidth(ChatStyle.clean(step == null ? "" : step), w - 2), x + 1, y + 11, 0xFF9A9AA2);
             y += 26;
         }
         if (TASKS.size() > 3) g.text(font, "+" + (TASKS.size() - 3), x + 1, y, 0xFF8A8A8A);

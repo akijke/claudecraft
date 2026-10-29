@@ -158,7 +158,7 @@ final class PaletteScreen extends Screen {
     @Override protected void init() {
         int w = Math.min(420, width - 40), x = (width - w) / 2;
         String value = query == null ? "" : query.getValue();
-        query = new EditBox(font, x, 30, w, 18, Component.literal("query"));
+        query = new Ui.Field(font, x, 30, w, 18, Component.literal("query"));
         query.setHint(Component.literal(files ? L.t("Имя файла… (> — команды)") : L.t("Команда…")));
         query.setMaxLength(200);
         query.setValue(value);
@@ -214,13 +214,22 @@ final class PaletteScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, width, height, 0xC0101014);
         int w = Math.min(420, width - 40), x = (width - w) / 2;
-        g.fill(x - 4, 12, x + w + 4, Math.min(height - 8, 58 + visible() * ROW), Theme.PALETTE_BG);
-        g.text(font, files ? L.t("Перейти к файлу") + "  Ctrl+P" : L.t("Команды") + "  Ctrl+Shift+P", x, 17, 0xFFD97757, Theme.shadow());
+        int bottom = Math.min(height - 8, 58 + visible() * ROW);
+        Ui.panel(g, x - 6, 12, w + 12, bottom - 12, Theme.PALETTE_BG, Theme.LINE);
+        g.fill(x - 6, 12, x + w + 6, 13, Theme.ACCENT);
+        String title = files ? L.t("Перейти к файлу") : L.t("Команды"), keys = files ? "Ctrl+P" : "Ctrl+Shift+P";
+        g.text(font, title, x, 18, Theme.ACCENT, Theme.shadow());
+        g.text(font, keys, x + w - font.width(keys), 18, Theme.WINDOW_DIM, Theme.shadow());
+        g.fill(x - 5, 51, x + w + 5, 52, Theme.LINE);
         super.extractRenderState(g, mouseX, mouseY, delta);
+        int hover = mouseX >= x && mouseX < x + w && mouseY >= 54 ? (mouseY - 54) / ROW + scroll : -1;
         for (int i = 0; i < visible() && scroll + i < shown.size(); i++) {
             Entry e = shown.get(scroll + i);
             int y = 54 + i * ROW;
-            if (scroll + i == selected) g.fill(x - 2, y - 2, x + w + 2, y + ROW - 2, Theme.PALETTE_SELECTED);
+            if (scroll + i == selected) {
+                g.fill(x - 4, y - 2, x + w + 2, y + ROW - 2, Theme.PALETTE_SELECTED);
+                g.fill(x - 4, y - 2, x - 2, y + ROW - 2, Theme.ACCENT);
+            } else if (scroll + i == hover) g.fill(x - 4, y - 2, x + w + 2, y + ROW - 2, Theme.ui().hover());
             if (files) {
                 int slash = e.label().lastIndexOf('/');
                 String name = e.label().substring(slash + 1), dir = slash < 0 ? "" : e.label().substring(0, slash);
@@ -233,6 +242,7 @@ final class PaletteScreen extends Screen {
                 g.text(font, right, x + w - font.width(right), y, Theme.WINDOW_DIM, Theme.shadow());
             }
         }
+        Ui.scrollbar(g, x + w + 2, 53, bottom - 56, scroll, visible(), shown.size());
         if (shown.isEmpty()) g.text(font, L.t("ничего не найдено"), x, 56, 0xFF8A8A8A, Theme.shadow());
         if (!status.isEmpty()) g.text(font, font.plainSubstrByWidth(status, w), x, height - 14, 0xFF5E5E5E, Theme.shadow());
     }

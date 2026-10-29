@@ -157,9 +157,10 @@ final class TerminalScreen extends Screen {
             String label = (t.get("alive").getAsBoolean() ? "" : "✖ ") + t.get("shell").getAsString();
             int w = font.width(label) + 10;
             if (tx + w > x - 4) break;
-            Button b = Button.builder(Component.literal(label), btn -> { id = tid; lastId = tid; version = -1; snap = null; resizeRemote(); rebuildWidgets(); })
+            Ui.Flat b = Ui.button(Component.literal(label), btn -> { id = tid; lastId = tid; version = -1; snap = null; resizeRemote(); rebuildWidgets(); })
                 .bounds(tx, 2, w, 16).tooltip(Tooltip.create(Component.literal(t.get("cwd").getAsString()))).build();
             b.active = !tid.equals(id);
+            b.selected = tid.equals(id);
             addRenderableWidget(b);
             tx += w + 2;
         }
@@ -171,7 +172,7 @@ final class TerminalScreen extends Screen {
 
     private int button(int right, String label, String tip, Runnable action) {
         int w = font.width(label) + 10;
-        addRenderableWidget(Button.builder(Component.literal(label), b -> action.run())
+        addRenderableWidget(Ui.button(Component.literal(label), b -> action.run())
             .bounds(right - w, 2, w, 16).tooltip(Tooltip.create(Component.literal(tip))).build());
         return right - w - 2;
     }
@@ -305,6 +306,9 @@ final class TerminalScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         poll();
         g.fill(0, 0, width, height, Theme.TERMINAL_BG);
+        Ui.header(g, 0, 0, width, 20);
+        g.fill(0, height - 12, width, height, Theme.HEADER);  // status bar
+        g.fill(0, height - 12, width, height - 11, Theme.LINE);
         super.extractRenderState(g, mouseX, mouseY, delta);
         float z = zoom();
         int x0 = 4, y0 = TOP;
@@ -352,7 +356,7 @@ final class TerminalScreen extends Screen {
         if (font.width(status) > width / 2) status = (scroll > 0 ? "−" + scroll + " · " : "") + cols + "×" + rows;
         String head = font.plainSubstrByWidth("$ " + title, Math.max(0, width - font.width(status) - 16));
         g.text(font, head, 4, height - 10, alive ? 0xFF6BD08B : 0xFF8A8A8A, Theme.shadow());
-        g.text(font, status, width - font.width(status) - 4, height - 10, 0xFF5E5E5E, Theme.shadow());
+        g.text(font, status, width - font.width(status) - 4, height - 10, Theme.WINDOW_DIM, Theme.shadow());
         if (!message.isEmpty()) g.centeredText(font, message, width / 2, height / 2, 0xFFF2C14E);
         if (!alive) g.text(font, L.t("оболочка завершилась — ✕ закрыть, + новая"), width / 2 - font.width(L.t("оболочка завершилась — ✕ закрыть, + новая")) / 2, height - 22, 0xFF8A8A8A, Theme.shadow());
     }

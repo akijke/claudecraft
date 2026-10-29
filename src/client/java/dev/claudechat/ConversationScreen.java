@@ -167,13 +167,13 @@ final class ConversationScreen extends Screen {
             int y = 46;
             if (mode.equals("cc") && state != null) {
                 String project = state.get("project").getAsString();
-                addRenderableWidget(Button.builder(Component.literal("✦ " + project).withColor(ChatStyle.CODE_MODE),
+                addRenderableWidget(Ui.button(Component.literal("✦ " + project).withColor(ChatStyle.CODE_MODE),
                         b -> mod.runLine(mode, "/cc project"))
                     .bounds(left, y, panel - 24, 20)
-                    .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + L.t("\nСменить проект")))).build());
-                addRenderableWidget(Button.builder(Component.literal("+"), b -> FolderPicker.pick(mod))
+                    .tooltip(Tooltip.create(Component.literal(state.get("project_path").getAsString() + L.t("\nСменить проект")))).dark().build());
+                addRenderableWidget(Ui.button(Component.literal("+"), b -> FolderPicker.pick(mod))
                     .bounds(left + panel - 22, y, 22, 20)
-                    .tooltip(Tooltip.create(Component.literal(L.t("Открыть папку на ПК как проект")))).build());
+                    .tooltip(Tooltip.create(Component.literal(L.t("Открыть папку на ПК как проект")))).dark().build());
                 y += 24;
             }
             String selected = selectedChat();
@@ -183,33 +183,35 @@ final class ConversationScreen extends Screen {
                 String id = c.get("id").getAsString();
                 boolean running = c.get("running").getAsBoolean();
                 String label = (running ? "▶ " : "") + font.plainSubstrByWidth(c.get("title").getAsString(), panel - 18);
-                Button b = Button.builder(Component.literal(label).withColor(id.equals(selected) ? 0x6BD08B : 0xE8E8E8), btn -> {
+                Ui.Flat b = Ui.button(Component.literal(label).withColor(id.equals(selected) ? 0x6BD08B : 0xE8E8E8), btn -> {
                     mod.send(mode, mod.command(mode, "select", id));
                     scroll = 0;
                     nextState = 0;
-                }).bounds(left, y, panel, 20).build();
+                }).bounds(left, y, panel, 20).dark().left().build();
                 b.active = !id.equals(selected);
+                b.selected = id.equals(selected);
                 addRenderableWidget(b);
                 y += 22;
             }
-            addRenderableWidget(Button.builder(Component.literal(L.t("+ Новый чат")), b -> { mod.dispatch(mode, "new"); nextState = 0; })
-                .bounds(left, y, panel, 20).build());
+            addRenderableWidget(Ui.button(Component.literal(L.t("+ Новый чат")), b -> { mod.dispatch(mode, "new"); nextState = 0; })
+                .bounds(left, y, panel, 20).dark().build());
 
             int bw = (panel - 2) / 2;  // two per row so labels are not cut
-            addRenderableWidget(Button.builder(Component.literal(L.t("Файлы")), b -> minecraft.setScreenAndShow(new FileScreen(mod, this)))
-                .bounds(left, height - 70, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Файловый менеджер")))).build());
+            addRenderableWidget(Ui.button(Component.literal(L.t("Файлы")), b -> minecraft.setScreenAndShow(new FileScreen(mod, this)))
+                .bounds(left, height - 70, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Файловый менеджер")))).dark().build());
             addRenderableWidget(small(L.t("Агенты"), "/cc agents", L.t("Агенты-помощники"), left + bw + 2, height - 70, bw));
             addRenderableWidget(small(L.t("Задачи"), "/cc tasks", L.t("Все работающие задачи и агенты"), left, height - 48, bw));
             addRenderableWidget(small("Git", "/cc git", L.t("Git текущего проекта"), left + bw + 2, height - 48, bw));
             addRenderableWidget(small("MCP", "/cc connectors", L.t("Коннекторы"), left, height - 26, bw));
-            addRenderableWidget(Button.builder(Component.literal("⚙"), b -> mod.runLine(mode, "/claude"))
-                .bounds(left + bw + 2, height - 26, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Настройки")))).build());
+            addRenderableWidget(Ui.button(Component.literal("⚙"), b -> mod.runLine(mode, "/claude"))
+                .bounds(left + bw + 2, height - 26, bw, 20).tooltip(Tooltip.create(Component.literal(L.t("Настройки")))).dark().build());
 
         }
         int inputW = mainW - 92;
         input = new MultiLineEditBox.Builder()
             .setPlaceholder(Component.literal(mode.equals("cc") ? L.t("Задача для Claude Code… Enter — отправить · Shift+Enter — новая строка · /cc … — команда")
                 : L.t("Сообщение Claude… Enter — отправить · Shift+Enter — новая строка")))
+            .setShowBackground(false)  // flat frame drawn in extractRenderState
             .build(font, inputW, 42, Component.literal("input"));
         input.setX(mainX);
         input.setY(height - 58);
@@ -219,36 +221,37 @@ final class ConversationScreen extends Screen {
         input.setValue(draft);
         addRenderableWidget(input);
         int bx = mainX + inputW + 4;
-        addRenderableWidget(Button.builder(Component.literal(L.t("Отправить")), b -> submit(""))
-            .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal(L.t("В очередь (Enter)")))).build());
-        addRenderableWidget(Button.builder(Component.literal("✚ " + L.t("сейчас")), b -> submit("f "))
-            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Добавить в работу, которая идёт сейчас, не останавливая её (Ctrl+Shift+Enter)")))).build());
-        addRenderableWidget(Button.builder(Component.literal("✖"), b -> mod.dispatch(mode, "cancel"))
-            .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Остановить и очистить очередь")))).build());
-        addRenderableWidget(Button.builder(Component.literal("◎ " + L.t("Скриншот")), b -> {
+        addRenderableWidget(Ui.button(Component.literal(L.t("Отправить")), b -> submit(""))
+            .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal(L.t("В очередь (Enter)")))).dark().build());
+        addRenderableWidget(Ui.button(Component.literal("✚ " + L.t("сейчас")), b -> submit("f "))
+            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Добавить в работу, которая идёт сейчас, не останавливая её (Ctrl+Shift+Enter)")))).dark().build());
+        addRenderableWidget(Ui.button(Component.literal("✖"), b -> mod.dispatch(mode, "cancel"))
+            .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Остановить и очистить очередь")))).dark().build());
+        addRenderableWidget(Ui.button(Component.literal("◎ " + L.t("Скриншот")), b -> {
                 String question = input.getValue().strip();
                 input.setValue("");
                 draft = "";
                 mod.screenshot(mode, question);
             }).bounds(bx, height - 18, 88, 16)
-            .tooltip(Tooltip.create(Component.literal(L.t("Снимок игры без интерфейса → Claude; текст из поля уйдёт вопросом")))).build());
+            .tooltip(Tooltip.create(Component.literal(L.t("Снимок игры без интерфейса → Claude; текст из поля уйдёт вопросом")))).dark().build());
         setInitialFocus(input);
         dirty = true;
     }
 
     private Button tab(String label, String m, int x, int y, int w) {
-        Button b = Button.builder(Component.literal(label).withColor(m.equals("cc") ? ChatStyle.CODE_MODE : ChatStyle.CLAUDE), btn -> {
+        Ui.Flat b = Ui.button(Component.literal(label).withColor(m.equals("cc") ? ChatStyle.CODE_MODE : ChatStyle.CLAUDE), btn -> {
             mode = m;
             scroll = 0;
             rebuildWidgets();
-        }).bounds(x, y, w, 20).build();
+        }).bounds(x, y, w, 20).dark().build();
         b.active = !mode.equals(m);
+        b.selected = mode.equals(m);
         return b;
     }
 
     private Button small(String label, String line, String tip, int x, int y, int w) {
-        return Button.builder(Component.literal(label), b -> mod.runLine(mode, line))
-            .bounds(x, y, w, 20).tooltip(Tooltip.create(Component.literal(tip))).build();
+        return Ui.flat(Button.builder(Component.literal(label), b -> mod.runLine(mode, line))
+            .bounds(x, y, w, 20).tooltip(Tooltip.create(Component.literal(tip))).build()).dark();
     }
 
     private void submit(String prefix) {
@@ -439,7 +442,12 @@ final class ConversationScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, width, height, 0xB0101014);
         g.fill(mainX - 2, mainY - 2, mainX + mainW, mainY + mainH, 0x90000000);
+        g.outline(mainX - 2, mainY - 2, mainW + 2, mainH + 2, Theme.darkUi().line());
+        if (input != null)
+            Ui.field(g, input.getX(), input.getY(), input.getWidth(), input.getHeight(), getFocused() == input,
+                input.isMouseOver(mouseX, mouseY), Theme.darkUi());
         super.extractRenderState(g, mouseX, mouseY, delta);
+        Ui.scrollbar(g, mainX + mainW - 5, mainY + 1, mainH - 4, firstVisible(), mainH / 9, lines.size());
         if (mainX - left >= font.width("✦ Claudecraft") + 8)  // narrow (IDE) pane: the status line takes the row
             g.text(font, Component.literal("✦ Claudecraft").withColor(ChatStyle.CLAUDE), left, 8, 0xFFFFFFFF);
         if (state != null && state.has("status") && state.getAsJsonObject("status").has(mode))
@@ -456,7 +464,9 @@ final class ConversationScreen extends Screen {
         if (scroll > 0)
         {
             String below = L.t("↓ ещё ") + scroll + L.t(" строк ниже (колесо мыши)");
-            g.text(font, below, mainX + mainW - font.width(below) - 6, mainY + mainH - 11, 0xFFF2C14E);
+            int bx = mainX + mainW - font.width(below) - 12, by = mainY + mainH - 14;
+            Ui.panel(g, bx - 4, by - 2, font.width(below) + 8, 12, 0xE0141418, 0x80F2C14E);
+            g.text(font, below, bx, by, 0xFFF2C14E);
         }
         // Hover text of buttons inside the log.
         if (mouseX >= mainX && mouseX < mainX + mainW && mouseY >= mainY && mouseY < mainY + mainH) {

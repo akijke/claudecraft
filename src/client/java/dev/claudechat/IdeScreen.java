@@ -164,10 +164,11 @@ final class IdeScreen extends Screen {
             g.pose().popMatrix();
         }
         int sx = Math.round(width * splitX), sy = Math.round(height * splitY);
-        g.fill(sx - 1, 0, sx + 1, height, dragging == 0 ? 0xFFD97757 : 0xFF2A2A30);
-        g.fill(sx + 1, sy - 1, width, sy + 1, dragging == 1 ? 0xFFD97757 : 0xFF2A2A30);
+        boolean overV = dragging < 0 && Math.abs(mouseX - sx) <= 3, overH = dragging < 0 && !overV && mouseX > sx && Math.abs(mouseY - sy) <= 3;
+        g.fill(sx - 1, 0, sx + 1, height, dragging == 0 ? Theme.ACCENT : overV ? 0xFF5C5C66 : 0xFF2A2A30);
+        g.fill(sx + 1, sy - 1, width, sy + 1, dragging == 1 ? Theme.ACCENT : overH ? 0xFF5C5C66 : 0xFF2A2A30);
         int[] f = rect(focus);
-        int c = 0x80D97757;
+        int c = (Theme.ACCENT & 0x00FFFFFF) | 0x90000000;
         g.fill(f[0], f[1], f[0] + f[2], f[1] + 1, c);
         g.fill(f[0], f[1] + f[3] - 1, f[0] + f[2], f[1] + f[3], c);
         g.fill(f[0], f[1], f[0] + 1, f[1] + f[3], c);

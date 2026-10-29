@@ -215,38 +215,38 @@ final class FileScreen extends Screen {
         }
         x = tool(x, y, "⟳", L.t("Обновить"), () -> load(path()));
         x = tool(x, y, "📁 " + L.t("Папка на ПК…"), L.t("Системное окно выбора; папка станет проектом"), () -> FolderPicker.pick(mod));
-        filter = new EditBox(font, listX, 54, Math.min(listW, 180), 14, Component.literal("filter"));
+        filter = new Ui.Field(font, listX, 54, Math.min(listW, 180), 14, Component.literal("filter")).dark();
         filter.setHint(Component.literal(L.t("фильтр…")));
         filter.setValue(filterValue);
         filter.setHint(Component.literal(contentMode ? L.t("текст в файлах… (Enter)") : L.t("фильтр…")));
         filter.setResponder(v -> { if (!contentMode) { applyFilter(); selected = rows.isEmpty() ? -1 : 0; listScroll = 0; } });
         addRenderableWidget(filter);
         // ✖ clears the search box and shows the whole folder again.
-        addRenderableWidget(Button.builder(Component.literal(contentMode ? "☰ " + L.t("в файлах") : "Aa " + L.t("имена")), b -> {
+        addRenderableWidget(Ui.button(Component.literal(contentMode ? "☰ " + L.t("в файлах") : "Aa " + L.t("имена")), b -> {
                 contentMode = !contentMode;
                 matches = null;
                 selected = -1;
                 rebuildWidgets();
             }).bounds(listX + Math.min(listW, 180) + 20, 53, 74, 16)
-            .tooltip(Tooltip.create(Component.literal(L.t("Искать по именам или по содержимому файлов")))).build());
-        addRenderableWidget(Button.builder(Component.literal("✖"), b -> {
+            .tooltip(Tooltip.create(Component.literal(L.t("Искать по именам или по содержимому файлов")))).dark().build());
+        addRenderableWidget(Ui.button(Component.literal("✖"), b -> {
                 filter.setValue(""); matches = null; applyFilter(); setFocused(filter); })
             .bounds(listX + Math.min(listW, 180) + 2, 53, 16, 16)
-            .tooltip(Tooltip.create(Component.literal(L.t("Очистить поиск")))).build());
+            .tooltip(Tooltip.create(Component.literal(L.t("Очистить поиск")))).dark().build());
         applyFilter();
 
         // bottom actions
         int bottom1 = height - 48, bottom2 = height - 25;
         if (!pending.isEmpty()) {
-            nameInput = new EditBox(font, 6, bottom1, width - 180, 18, Component.literal("name"));
+            nameInput = new Ui.Field(font, 6, bottom1, width - 180, 18, Component.literal("name")).dark();
             nameInput.setMaxLength(255);
             nameInput.setHint(Component.literal(pending.equals("rename") ? L.t("новое имя") : pending.equals("mkdir")
                 ? L.t("имя новой папки") : L.t("имя нового файла")));
             nameInput.setValue(nameValue);
             addRenderableWidget(nameInput);
-            addRenderableWidget(Button.builder(Component.literal("✔ OK"), b -> confirmName()).bounds(width - 170, bottom1 - 1, 80, 20).build());
-            addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> { pending = ""; rebuildWidgets(); })
-                .bounds(width - 86, bottom1 - 1, 80, 20).build());
+            addRenderableWidget(Ui.button(Component.literal("✔ OK"), b -> confirmName()).bounds(width - 170, bottom1 - 1, 80, 20).dark().build());
+            addRenderableWidget(Ui.button(CommonComponents.GUI_CANCEL, b -> { pending = ""; rebuildWidgets(); })
+                .bounds(width - 86, bottom1 - 1, 80, 20).dark().build());
             setInitialFocus(nameInput);
         } else {
             nameInput = null;
@@ -295,9 +295,9 @@ final class FileScreen extends Screen {
 
     private int tool(int x, int y, String label, String tip, Runnable action) {
         int w = font.width(label) + 10;
-        Button.Builder b = Button.builder(Component.literal(label), btn -> action.run()).bounds(x, y - 1, w, 20);
+        Ui.Builder b = Ui.button(Component.literal(label), btn -> action.run()).bounds(x, y - 1, w, 20);
         if (tip != null) b.tooltip(Tooltip.create(Component.literal(tip)));
-        addRenderableWidget(b.build());
+        addRenderableWidget(b.dark().build());
         return x + w + 2;
     }
 
@@ -305,10 +305,10 @@ final class FileScreen extends Screen {
         int n = labels.length, w = (width - 12 - (n - 1) * 3) / n;
         for (int i = 0; i < n; i++) {
             Runnable action = actions[i];
-            Button.Builder b = Button.builder(Component.literal(labels[i][0]), btn -> action.run())
+            Ui.Builder b = Ui.button(Component.literal(labels[i][0]), btn -> action.run())
                 .bounds(6 + i * (w + 3), y - 1, w, 20);
             if (labels[i][1] != null) b.tooltip(Tooltip.create(Component.literal(labels[i][1])));
-            addRenderableWidget(b.build());
+            addRenderableWidget(b.dark().build());
         }
     }
 
@@ -445,8 +445,8 @@ final class FileScreen extends Screen {
     // ---- render ---------------------------------------------------------------
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, width, height, 0xB0101014);
-        g.fill(listX - 2, listY - 2, listX + listW + 2, listY + listH + 2, 0x90000000);
-        g.fill(viewX - 2, listY - 2, viewX + viewW + 2, listY + listH + 2, 0x90000000);
+        Ui.panel(g, listX - 2, listY - 2, listW + 4, listH + 4, 0x90000000, Theme.darkUi().line());
+        Ui.panel(g, viewX - 2, listY - 2, viewW + 4, listH + 4, 0x90000000, Theme.darkUi().line());
         super.extractRenderState(g, mouseX, mouseY, delta);
         g.text(font, Component.literal("📁 " + L.t("Файлы")).withColor(0xD97757), 6, 7, TEXT);
         if (dir != null) {
@@ -520,8 +520,10 @@ final class FileScreen extends Screen {
         for (int i = listScroll; i < Math.min(rows.size(), listScroll + visible); i++) {
             JsonObject r = rows.get(i);
             int y = listY + 2 + (i - listScroll) * ROW;
-            if (i == selected) g.fill(listX, y - 1, listX + listW, y + ROW - 1, 0x50FFFFFF);
-            else if (mouseX >= listX && mouseX < listX + listW && mouseY >= y - 1 && mouseY < y + ROW - 1)
+            if (i == selected) {
+                g.fill(listX, y - 1, listX + listW, y + ROW - 1, 0xE0332D20);
+                g.fill(listX, y - 1, listX + 2, y + ROW - 1, 0xFFF2C14E);
+            } else if (mouseX >= listX && mouseX < listX + listW && mouseY >= y - 1 && mouseY < y + ROW - 1)
                 g.fill(listX, y - 1, listX + listW, y + ROW - 1, 0x20FFFFFF);
             if (r.has("line")) {  // contents search result: path:line  text
                 String loc = r.get("name").getAsString() + ":" + r.get("line").getAsInt();
@@ -540,11 +542,7 @@ final class FileScreen extends Screen {
             g.text(font, name, listX + 3, y, hidden ? DIM : isDir ? DIR : TEXT);
             g.text(font, size, listX + listW - sizeW - 3, y, FAINT);
         }
-        if (rows.size() > visible) {  // scrollbar
-            int barH = Math.max(10, listH * visible / rows.size());
-            int barY = listY + (listH - barH) * listScroll / Math.max(1, rows.size() - visible);
-            g.fill(listX + listW - 1, barY, listX + listW + 1, barY + barH, 0x80FFFFFF);
-        }
+        Ui.scrollbar(g, listX + listW - 3, listY, listH, listScroll, visible, rows.size());
         String info = rows.size() + " " + L.t("объектов") + (dir.has("more") && dir.get("more").getAsInt() > 0
             ? " (+" + dir.get("more").getAsInt() + ")" : "") + (dir.get("git").getAsBoolean() ? "  ⇄ git" : "");
         g.text(font, info, listX + Math.min(listW, 180) + 98, 57, FAINT);

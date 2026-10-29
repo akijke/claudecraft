@@ -85,8 +85,14 @@ final class DevShots {
             case 590 -> Screenshot.grab(client, true);
             case 594 -> client.setScreenAndShow(ChatPickerScreen.preview(mod, parse(PICKER)));
             case 604 -> Screenshot.grab(client, true);
-            case 610 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
-            case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
+            case 606 -> client.setScreenAndShow(new PaletteScreen(mod, null, false));
+            case 612 -> Screenshot.grab(client, true);
+            case 614 -> client.setScreenAndShow(new KeyScreen(mod, "sentry", JsonParser.parseString(
+                "[{\"var\":\"SENTRY_ACCESS_TOKEN\",\"required\":true,\"set\":false,\"hint\":\"sntrys_...\"},"
+                + "{\"var\":\"SENTRY_HOST\",\"required\":false,\"set\":true,\"hint\":\"sentry.io\"}]").getAsJsonArray()));
+            case 620 -> Screenshot.grab(client, true);
+            case 624 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 640 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
             case 720 -> client.stop();
             default -> { }

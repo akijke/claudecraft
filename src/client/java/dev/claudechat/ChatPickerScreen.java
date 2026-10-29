@@ -122,7 +122,7 @@ final class ChatPickerScreen extends Screen {
         String value = query == null ? "" : query.getValue();
         addRenderableWidget(tab("Claude", "c", x, 22));
         addRenderableWidget(tab("Claude Code", "cc", x + 64, 22));
-        query = new EditBox(font, x, 42, w, 16, Component.literal("search"));
+        query = new Ui.Field(font, x, 42, w, 16, Component.literal("search"));
         query.setHint(Component.literal(L.t("Поиск по названию и последнему сообщению…")));
         query.setMaxLength(100);
         query.setValue(value);
@@ -130,24 +130,25 @@ final class ChatPickerScreen extends Screen {
         addRenderableWidget(query);
         setInitialFocus(query);
         int by = height - 24;
-        addRenderableWidget(Button.builder(Component.literal("✚ " + L.t("Новый чат")), b -> {
+        addRenderableWidget(Ui.button(Component.literal("✚ " + L.t("Новый чат")), b -> {
                 mod.dispatch(mode, "new local");
                 nextFetch = System.currentTimeMillis() + 400;
             }).bounds(x, by, 90, 18).build());
         if (mode.equals("c"))
-            addRenderableWidget(Button.builder(Component.literal("✚ API"), b -> { mod.dispatch("c", "new api"); nextFetch = System.currentTimeMillis() + 400; })
+            addRenderableWidget(Ui.button(Component.literal("✚ API"), b -> { mod.dispatch("c", "new api"); nextFetch = System.currentTimeMillis() + 400; })
                 .bounds(x + 94, by, 56, 18).tooltip(Tooltip.create(Component.literal(L.t("Чат через Messages API")))).build());
         else
-            addRenderableWidget(Button.builder(Component.literal(L.t("Синхр. с ПК")), b -> { mod.runLine("cc", "/cc sync"); nextFetch = System.currentTimeMillis() + 1500; })
+            addRenderableWidget(Ui.button(Component.literal(L.t("Синхр. с ПК")), b -> { mod.runLine("cc", "/cc sync"); nextFetch = System.currentTimeMillis() + 1500; })
                 .bounds(x + 94, by, 96, 18).tooltip(Tooltip.create(Component.literal(L.t("Подтянуть сессии Claude Code этой папки с ПК")))).build());
-        addRenderableWidget(Button.builder(Component.literal(L.t("Открыть")), b -> { if (!shown.isEmpty()) open(shown.get(selected)); })
+        addRenderableWidget(Ui.button(Component.literal(L.t("Открыть")), b -> { if (!shown.isEmpty()) open(shown.get(selected)); })
             .bounds(x + w - 70, by, 70, 18).build());
         if (state == null) fetch(); else filter(selectedId());
     }
 
     private Button tab(String label, String m, int x, int y) {
-        Button b = Button.builder(Component.literal(label), btn -> switchMode(m)).bounds(x, y, m.equals("c") ? 60 : 84, 16).build();
+        Ui.Flat b = Ui.button(Component.literal(label), btn -> switchMode(m)).bounds(x, y, m.equals("c") ? 60 : 84, 16).build();
         b.active = !mode.equals(m);
+        b.selected = mode.equals(m);
         return b;
     }
 
@@ -209,8 +210,9 @@ final class ChatPickerScreen extends Screen {
         int x = panelX(), w = panelW();
         int bottom = Math.min(height - 30, TOP + visible() * ROW + 4);
         g.fill(0, 0, width, height, 0xB0101014);
-        g.fill(x - 8, 8, x + w + 8, height - 2, Theme.PALETTE_BG);
+        Ui.panel(g, x - 8, 8, w + 16, height - 10, Theme.PALETTE_BG, Theme.LINE);
         g.fill(x - 8, 8, x + w + 8, 10, accent());  // accent bar of the current tab
+        g.fill(x - 7, height - 29, x + w + 7, height - 28, Theme.LINE);  // footer separator
         g.text(font, "☰ " + L.t("Чаты"), x, 12, accent(), Theme.shadow());
         String hint = L.t("↑↓ выбор · Enter открыть · Tab — другой режим · Esc назад");
         g.text(font, font.plainSubstrByWidth(hint, w - 60), x + w - Math.min(w - 60, font.width(hint)), 12, Theme.WINDOW_DIM, Theme.shadow());
@@ -219,8 +221,6 @@ final class ChatPickerScreen extends Screen {
             g.text(font, font.plainSubstrByWidth(p, w - 160), x + w - Math.min(w - 160, font.width(p)), 26, 0xFF000000 | ChatStyle.CODE_MODE, Theme.shadow());
         }
         super.extractRenderState(g, mouseX, mouseY, delta);
-        // underline under the current tab (the inactive one is the clickable button)
-        if (mode.equals("c")) g.fill(x, 38, x + 60, 40, accent()); else g.fill(x + 64, 38, x + 148, 40, accent());
         hover = rowAt(mouseX, mouseY);
         String now = current();
         long blink = System.currentTimeMillis() / 500 % 2;
@@ -230,7 +230,9 @@ final class ChatPickerScreen extends Screen {
             int y = TOP + i * ROW;
             boolean sel = index == selected, isCurrent = str(c, "id").equals(now);
             if (sel) g.fill(x - 4, y - 1, x + w + 4, y + ROW - 3, Theme.PALETTE_SELECTED);
-            else if (index == hover) g.fill(x - 4, y - 1, x + w + 4, y + ROW - 3, 0x20FFFFFF);
+            else if (index == hover) g.fill(x - 4, y - 1, x + w + 4, y + ROW - 3, Theme.ui().hover());
+            else if (index + 1 != selected && i + 1 < visible() && index + 1 < shown.size())
+                g.fill(x + 14, y + ROW - 2, x + w, y + ROW - 1, Theme.LINE);  // hairline between rows
             if (sel) g.fill(x - 4, y - 1, x - 2, y + ROW - 3, accent());
             boolean running = c.has("running") && c.get("running").getAsBoolean();
             String dot = running ? "▶" : isCurrent ? "●" : "○";
@@ -264,11 +266,7 @@ final class ChatPickerScreen extends Screen {
         }
         if (state != null && shown.isEmpty())
             g.text(font, query.getValue().isBlank() ? L.t("Чатов пока нет — «✚ Новый чат»") : L.t("ничего не найдено"), x + 14, TOP + 4, 0xFF8A8A8A, Theme.shadow());
-        if (shown.size() > visible()) {  // scrollbar
-            int track = bottom - TOP, thumb = Math.max(12, track * visible() / shown.size());
-            int ty = TOP + (track - thumb) * scroll / Math.max(1, shown.size() - visible());
-            g.fill(x + w + 5, ty, x + w + 7, ty + thumb, 0x80FFFFFF);
-        }
+        Ui.scrollbar(g, x + w + 4, TOP, bottom - TOP, scroll, visible(), shown.size());
         String foot = status.isEmpty() ? shown.size() + L.t(" чат(ов)") : status;
         g.text(font, foot, x + 200, height - 19, status.isEmpty() ? Theme.WINDOW_DIM : 0xFFF0626A, Theme.shadow());
     }

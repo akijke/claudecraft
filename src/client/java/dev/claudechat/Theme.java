@@ -18,8 +18,30 @@ final class Theme {
     // window colours (ARGB)
     static int SCREEN_BG = 0xE0151518, PANEL = 0xFF1E1E22, GUTTER = 0xFF19191D, CURRENT_LINE = 0xFF26262C,
         LINE_NUMBER = 0xFF5A5A5A, LINE_NUMBER_ON = 0xFFC6C6C6, CARET = 0xFFFFFFFF, SELECTION = 0xFF264F78,
-        TERMINAL_BG = 0xF00C0C0C, TERMINAL_FG = 0xCCCCCC, PALETTE_BG = 0xF01E1E22, PALETTE_SELECTED = 0xFF2D3A4F,
-        WINDOW_TEXT = 0xFFE8E8E8, WINDOW_DIM = 0xFF6A6A6A;
+        TERMINAL_BG = 0xF00C0C0C, TERMINAL_FG = 0xCCCCCC, PALETTE_BG = 0xF01B1B1F, PALETTE_SELECTED = 0xFF2E2A22,
+        WINDOW_TEXT = 0xFFE8E8E8, WINDOW_DIM = 0xFF85858D;
+    /** The one accent of the mod's windows: focus frames, selection bars, active tabs. */
+    static int ACCENT = 0xFFF2C14E;
+    /** Hairlines: panel borders, header separators. */
+    static int LINE = 0xFF2E2E35, HEADER = 0xF0141418;
+
+    /**
+     * Flat widget colours (buttons, text fields). The K window, file manager and key screen
+     * stay dark in every theme (chat text is light), so they use {@link #DARK_UI}; the editor,
+     * terminal, palette, picker and dashboard follow the theme ({@link #ui()}).
+     */
+    record Pal(int bg, int hover, int down, int line, int lineHover, int text, int off, int selected,
+               int field, int accent, boolean shadow) { }
+    static final Pal DARK_UI = new Pal(0xD0222227, 0xE82E2E35, 0xE818181C, 0xFF3A3A42, 0xFF5C5C66,
+        0xFFE8E8E8, 0xFF66666E, 0xE8332D20, 0xE00C0C0F, 0xFFF2C14E, true);
+    static final Pal LIGHT_UI = new Pal(0xFFFFFFFF, 0xFFF1F1F3, 0xFFE2E2E6, 0xFFC9C9CF, 0xFF9A9AA2,
+        0xFF202020, 0xFFA0A0A6, 0xFFFFF1CC, 0xFFFFFFFF, 0xFFC08A10, false);
+    static final Pal CONTRAST_UI = new Pal(0xFF000000, 0xFF1E1E1E, 0xFF0A0A0A, 0xFFB0B0B0, 0xFFFFFFFF,
+        0xFFFFFFFF, 0xFF9A9A9A, 0xFF3A3010, 0xFF000000, 0xFFFFD84D, true);
+    /** Widgets of a window that follows the theme. */
+    static Pal ui() { return current.equals("light") ? LIGHT_UI : current.equals("contrast") ? CONTRAST_UI : DARK_UI; }
+    /** Widgets of an always-dark window (contrast still applies). */
+    static Pal darkUi() { return current.equals("contrast") ? CONTRAST_UI : DARK_UI; }
     private static String current = "dark";
     private static int savedScale = -1;
 
@@ -68,17 +90,20 @@ final class Theme {
         if (current.equals("light")) {
             SCREEN_BG = 0xF0F3F3F3; PANEL = 0xFFFFFFFF; GUTTER = 0xFFEDEDED; CURRENT_LINE = 0xFFF0F4FA;
             LINE_NUMBER = 0xFF9A9A9A; LINE_NUMBER_ON = 0xFF6E7781; CARET = 0xFF000000; SELECTION = 0xFFB4D5FE;
-            TERMINAL_BG = 0xF8FAFAFA; TERMINAL_FG = 0x202020; PALETTE_BG = 0xF8F5F5F5; PALETTE_SELECTED = 0xFFD6E4FA;
+            TERMINAL_BG = 0xF8FAFAFA; TERMINAL_FG = 0x202020; PALETTE_BG = 0xF8F5F5F5; PALETTE_SELECTED = 0xFFFBEBC0;
             WINDOW_TEXT = 0xFF202020; WINDOW_DIM = 0xFF707070;
+            ACCENT = 0xFFC08A10; LINE = 0xFFD4D4D9; HEADER = 0xF8E9E9EC;
             Highlighter.palette(0x24292F, 0xCF222E, 0x0A3069, 0x0550AE, 0x6E7781, 0x8250DF, 0x953800, 0x57606A, 0x0550AE, 0x9A6700);
         } else {
             SCREEN_BG = contrast ? 0xF0000000 : 0xE0151518; PANEL = contrast ? 0xFF000000 : 0xFF1E1E22;
             GUTTER = contrast ? 0xFF0A0A0A : 0xFF19191D; CURRENT_LINE = contrast ? 0xFF202430 : 0xFF26262C;
             LINE_NUMBER = contrast ? 0xFF9A9A9A : 0xFF5A5A5A; LINE_NUMBER_ON = 0xFFFFFFFF; CARET = 0xFFFFFFFF;
             SELECTION = contrast ? 0xFF1F5FA0 : 0xFF264F78; TERMINAL_BG = contrast ? 0xFF000000 : 0xF00C0C0C;
-            TERMINAL_FG = contrast ? 0xFFFFFF : 0xCCCCCC; PALETTE_BG = contrast ? 0xF8000000 : 0xF01E1E22;
-            PALETTE_SELECTED = contrast ? 0xFF1F5FA0 : 0xFF2D3A4F; WINDOW_TEXT = contrast ? 0xFFFFFFFF : 0xFFE8E8E8;
-            WINDOW_DIM = contrast ? 0xFFB0B0B0 : 0xFF6A6A6A;
+            TERMINAL_FG = contrast ? 0xFFFFFF : 0xCCCCCC; PALETTE_BG = contrast ? 0xF8000000 : 0xF01B1B1F;
+            PALETTE_SELECTED = contrast ? 0xFF3A3010 : 0xFF2E2A22; WINDOW_TEXT = contrast ? 0xFFFFFFFF : 0xFFE8E8E8;
+            WINDOW_DIM = contrast ? 0xFFB0B0B0 : 0xFF85858D;
+            ACCENT = contrast ? 0xFFFFD84D : 0xFFF2C14E; LINE = contrast ? 0xFF8A8A8A : 0xFF2E2E35;
+            HEADER = contrast ? 0xFF000000 : 0xF0141418;
             if (contrast) Highlighter.palette(0xFFFFFF, 0xFF7AF2, 0xFFB38A, 0xC8FFB0, 0x8FD17A, 0x5CF5DA, 0xFFFF8A, 0xC8C8C8, 0xA8E4FF, 0xFFD84D);
             else Highlighter.palette(0xD4D4D4, 0xC586C0, 0xCE9178, 0xB5CEA8, 0x6A9955, 0x4EC9B0, 0xDCDCAA, 0xA0A0A0, 0x9CDCFE, 0xF2C14E);
         }

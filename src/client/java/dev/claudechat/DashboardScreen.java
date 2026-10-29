@@ -57,7 +57,7 @@ final class DashboardScreen extends Screen {
 
     private int button(int right, String label, Runnable action) {
         int w = font.width(label) + 12;
-        addRenderableWidget(Button.builder(Component.literal(label), b -> action.run()).bounds(right - w, 4, w, 18).build());
+        addRenderableWidget(Ui.button(Component.literal(label), b -> action.run()).bounds(right - w, 4, w, 18).build());
         return right - w - 3;
     }
 
@@ -72,6 +72,7 @@ final class DashboardScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, width, height, Theme.SCREEN_BG);
+        Ui.header(g, 0, 0, width, 26);
         super.extractRenderState(g, mouseX, mouseY, delta);
         g.text(font, Component.literal("$ " + L.t("Расходы")).withColor(ChatStyle.GOLD), 6, 9, 0xFFFFFFFF);
         if (data == null) { g.text(font, error.isEmpty() ? L.t("Загрузка…") : error, 6, 30, 0xFF8A8A8A); return; }
@@ -84,7 +85,9 @@ final class DashboardScreen extends Screen {
         // per day: vertical bars
         JsonArray perDay = data.getAsJsonArray("days");
         int x0 = 10, y0 = 34, w = width - 20, h = Math.max(60, height / 2 - 40);
-        g.fill(x0, y0, x0 + w, y0 + h, Theme.PANEL);
+        Ui.panel(g, x0, y0, w, h, Theme.PANEL, Theme.LINE);
+        for (int q = 1; q < 4; q++)  // faint guide lines at quarters of the maximum
+            g.fill(x0 + 1, y0 + h - 12 - (h - 22) * q / 4, x0 + w - 1, y0 + h - 11 - (h - 22) * q / 4, 0x10FFFFFF);
         double max = 0;
         for (JsonElement e : perDay) max = Math.max(max, value(e.getAsJsonObject()));
         int n = Math.max(1, perDay.size()), bw = Math.max(2, w / n - 2);
@@ -93,10 +96,11 @@ final class DashboardScreen extends Screen {
             double v = value(d);
             int bh = max <= 0 ? 0 : (int) Math.round((h - 22) * v / max);
             int bx = x0 + 2 + i * (w / n);
-            g.fill(bx, y0 + h - 12 - bh, bx + bw, y0 + h - 12, 0xFFD97757);
+            boolean over = mouseX >= bx && mouseX < bx + bw + 2 && mouseY >= y0 && mouseY < y0 + h;
+            g.fill(bx, y0 + h - 12 - bh, bx + bw, y0 + h - 12, over ? 0xFFF2C14E : 0xFFD97757);
             String day = d.get("key").getAsString().substring(8);
-            if (n <= 16 || i % 2 == 0) g.text(font, day, bx + bw / 2 - font.width(day) / 2, y0 + h - 10, 0xFF6A6A6A);
-            if (mouseX >= bx && mouseX < bx + bw + 2 && mouseY >= y0 && mouseY < y0 + h)
+            if (n <= 16 || i % 2 == 0) g.text(font, day, bx + bw / 2 - font.width(day) / 2, y0 + h - 10, Theme.WINDOW_DIM);
+            if (over)
                 g.setTooltipForNextFrame(font, Component.literal(d.get("key").getAsString() + ": " + fmt(v)), mouseX, mouseY);
         }
         if (max > 0) g.text(font, fmt(max), x0 + 3, y0 + 3, 0xFF8A8A8A);
@@ -105,7 +109,7 @@ final class DashboardScreen extends Screen {
         int top = y0 + h + 12, colW = (width - 30) / 2;
         bars(g, L.t("Проекты"), data.getAsJsonArray("projects"), 10, top, colW);
         bars(g, L.t("Модели"), data.getAsJsonArray("models"), 20 + colW, top, colW);
-        g.text(font, L.t("Оценка Claude Code по ценам API; на подписке тратится лимит, а не деньги"), 10, height - 12, 0xFF5E5E5E);
+        g.text(font, L.t("Оценка Claude Code по ценам API; на подписке тратится лимит, а не деньги"), 10, height - 12, Theme.WINDOW_DIM);
     }
 
     private void bars(GuiGraphicsExtractor g, String title, JsonArray rows, int x, int y, int w) {
@@ -119,6 +123,7 @@ final class DashboardScreen extends Screen {
             g.text(font, font.plainSubstrByWidth(r.get("key").getAsString().replaceFirst("^claude-", ""), labelW - 4), x, yy, 0xFFC8C8C8);
             double v = value(r);
             int bw = max <= 0 ? 0 : (int) Math.round((w - labelW - 50) * v / max);
+            g.fill(x + labelW, yy, x + w - 50, yy + 8, 0x14FFFFFF);  // track
             g.fill(x + labelW, yy, x + labelW + Math.max(1, bw), yy + 8, 0xFF5CC8E6);
             g.text(font, fmt(v), x + labelW + bw + 4, yy, 0xFF8A8A8A);
         }

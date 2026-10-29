@@ -82,69 +82,69 @@ final class SettingsScreen extends Screen {
         int cw = columnWidth;
 
         // ---- left: bridge ----
-        addRenderableWidget(Button.builder(Component.literal(L.t("⟳ Перезапустить мост")), b -> restartBridge())
-            .bounds(leftX, top + 34, cw, 20).build());
-        addRenderableWidget(Button.builder(autoLabel(), b -> { autoStart = !autoStart; b.setMessage(autoLabel()); })
+        addRenderableWidget(Ui.button(Component.literal(L.t("⟳ Перезапустить мост")), b -> restartBridge())
+            .bounds(leftX, top + 34, cw, 20).dark().build());
+        addRenderableWidget(Ui.button(autoLabel(), b -> { autoStart = !autoStart; b.setMessage(autoLabel()); })
             .bounds(leftX, top + 58, cw / 2 - 2, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Запускать мост вместе с игрой")))).build());
+            .tooltip(Tooltip.create(Component.literal(L.t("Запускать мост вместе с игрой")))).dark().build());
         // Language of the mod and of bridge messages (Claude answers in the language you write in).
-        addRenderableWidget(Button.builder(Component.literal("Lang: " + (L.russian() ? "RU" : "EN")), b -> {
+        addRenderableWidget(Ui.button(Component.literal("Lang: " + (L.russian() ? "RU" : "EN")), b -> {
                 mod.launcher.saveSettings(autoStart, python.getValue());
                 mod.launcher.setLanguage(L.russian() ? "en" : "ru");
                 rebuildWidgets();
             }).bounds(leftX + cw / 2 + 2, top + 58, cw / 2 - 2, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Language / Язык: English ⇄ Русский")))).build());
-        python = new EditBox(font, leftX, top + 82, cw, 18, Component.literal("Python"));
+            .tooltip(Tooltip.create(Component.literal(L.t("Language / Язык: English ⇄ Русский")))).dark().build());
+        python = new Ui.Field(font, leftX, top + 82, cw, 18, Component.literal("Python")).dark();
         python.setMaxLength(500);
         python.setHint(Component.literal(L.t("путь к python.exe (пусто = авто)")));
         python.setValue(pythonValue == null ? "" : pythonValue);
         addRenderableWidget(python);
 
         // ---- left: API key ----
-        apiKey = new EditBox(font, leftX, top + 136, cw - 66, 18, Component.literal(L.t("API-ключ")));
+        apiKey = new Ui.Field(font, leftX, top + 136, cw - 66, 18, Component.literal(L.t("API-ключ"))).dark();
         apiKey.setMaxLength(300);
         apiKey.setHint(Component.literal("sk-ant-…"));
         apiKey.addFormatter((text, offset) -> FormattedCharSequence.forward("•".repeat(text.length()), Style.EMPTY));
         apiKey.setValue(keyValue);
         addRenderableWidget(apiKey);
-        addRenderableWidget(Button.builder(Component.literal("✔"), b -> {
+        addRenderableWidget(Ui.button(Component.literal("✔"), b -> {
             String key = apiKey.getValue().strip();
             if (!key.isEmpty()) { action("apikey", key); keyValue = ""; apiKey.setValue(""); }
-        }).bounds(leftX + cw - 62, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal(L.t("Сохранить ключ")))).build());
-        addRenderableWidget(Button.builder(Component.literal("✖"), b -> action("apikey", ""))
-            .bounds(leftX + cw - 30, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal(L.t("Удалить ключ")))).build());
+        }).bounds(leftX + cw - 62, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal(L.t("Сохранить ключ")))).dark().build());
+        addRenderableWidget(Ui.button(Component.literal("✖"), b -> action("apikey", ""))
+            .bounds(leftX + cw - 30, top + 135, 30, 20).tooltip(Tooltip.create(Component.literal(L.t("Удалить ключ")))).dark().build());
 
         // ---- right: account ----
         if (waitingForCode()) {
             String url = str(status.getAsJsonObject("login"), "url");
-            Button open = addRenderableWidget(Button.builder(Component.literal(L.t("1. Открыть страницу входа")), b -> {
+            Button open = addRenderableWidget(Ui.button(Component.literal(L.t("1. Открыть страницу входа")), b -> {
                 if (url != null) ConfirmLinkScreen.confirmLinkNow(this, URI.create(url));
-            }).bounds(rightX, top + 34, cw, 20).build());
+            }).bounds(rightX, top + 34, cw, 20).dark().build());
             open.active = url != null;
-            code = new EditBox(font, rightX, top + 59, cw, 18, Component.literal(L.t("Код")));
+            code = new Ui.Field(font, rightX, top + 59, cw, 18, Component.literal(L.t("Код"))).dark();
             code.setMaxLength(2000);
             code.setHint(Component.literal(L.t("2. вставь код (Ctrl+V)")));
             code.setValue(codeValue);
             addRenderableWidget(code);
-            addRenderableWidget(Button.builder(Component.literal(L.t("3. Отправить код")), b -> {
+            addRenderableWidget(Ui.button(Component.literal(L.t("3. Отправить код")), b -> {
                 action("login_code", code.getValue().strip());
                 codeValue = "";
                 code.setValue("");
-            }).bounds(rightX, top + 82, cw - 64, 20).build());
-            addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> action("login_cancel", ""))
-                .bounds(rightX + cw - 60, top + 82, 60, 20).build());
+            }).bounds(rightX, top + 82, cw - 64, 20).dark().build());
+            addRenderableWidget(Ui.button(CommonComponents.GUI_CANCEL, b -> action("login_cancel", ""))
+                .bounds(rightX + cw - 60, top + 82, 60, 20).dark().build());
         } else {
             code = null;
             if (loggedIn()) {
-                addRenderableWidget(Button.builder(Component.literal(L.t("Выйти из аккаунта")), b -> action("logout", ""))
-                    .bounds(rightX, top + 34, cw, 20).build());
+                addRenderableWidget(Ui.button(Component.literal(L.t("Выйти из аккаунта")), b -> action("logout", ""))
+                    .bounds(rightX, top + 34, cw, 20).dark().build());
             } else {
-                addRenderableWidget(Button.builder(Component.literal(L.t("Войти: подписка Claude")), b -> action("login", ""))
+                addRenderableWidget(Ui.button(Component.literal(L.t("Войти: подписка Claude")), b -> action("login", ""))
                     .bounds(rightX, top + 34, cw, 20)
-                    .tooltip(Tooltip.create(Component.literal(L.t("Pro / Max — как claude auth login")))).build());
-                addRenderableWidget(Button.builder(Component.literal(L.t("Войти: Console (API)")), b -> action("login", "console"))
+                    .tooltip(Tooltip.create(Component.literal(L.t("Pro / Max — как claude auth login")))).dark().build());
+                addRenderableWidget(Ui.button(Component.literal(L.t("Войти: Console (API)")), b -> action("login", "console"))
                     .bounds(rightX, top + 58, cw, 20)
-                    .tooltip(Tooltip.create(Component.literal(L.t("Оплата по API через console.anthropic.com")))).build());
+                    .tooltip(Tooltip.create(Component.literal(L.t("Оплата по API через console.anthropic.com")))).dark().build());
             }
         }
 
@@ -153,39 +153,39 @@ final class SettingsScreen extends Screen {
         int gy = top + 137;
         if (gh != null && "waiting".equals(str(gh.getAsJsonObject("flow"), "state"))) {
             String url = str(gh.getAsJsonObject("flow"), "url");
-            Button open = addRenderableWidget(Button.builder(Component.literal(L.t("Открыть github.com/login/device")), b ->
+            Button open = addRenderableWidget(Ui.button(Component.literal(L.t("Открыть github.com/login/device")), b ->
                 ConfirmLinkScreen.confirmLinkNow(this, URI.create(url != null ? url : "https://github.com/login/device")))
-                .bounds(rightX, gy, cw - 64, 20).build());
+                .bounds(rightX, gy, cw - 64, 20).dark().build());
             open.active = true;
-            addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> action("gh_cancel", ""))
-                .bounds(rightX + cw - 60, gy, 60, 20).build());
+            addRenderableWidget(Ui.button(CommonComponents.GUI_CANCEL, b -> action("gh_cancel", ""))
+                .bounds(rightX + cw - 60, gy, 60, 20).dark().build());
         } else if (gh != null && str(gh, "login") != null && !str(gh, "login").isEmpty()) {
             boolean on = gh.get("connector").getAsBoolean();
-            addRenderableWidget(Button.builder(Component.literal("MCP: " + (on ? L.t("вкл") : L.t("выкл"))),
+            addRenderableWidget(Ui.button(Component.literal("MCP: " + (on ? L.t("вкл") : L.t("выкл"))),
                     b -> action("gh_connector", on ? "off" : "on"))
                 .bounds(rightX, gy, cw / 2 - 2, 20)
-                .tooltip(Tooltip.create(Component.literal(L.t("Коннектор GitHub для Claude: issues, PR, Actions")))).build());
-            addRenderableWidget(Button.builder(Component.literal(L.t("Выйти")), b -> action("gh_logout", ""))
-                .bounds(rightX + cw / 2 + 2, gy, cw / 2 - 2, 20).build());
+                .tooltip(Tooltip.create(Component.literal(L.t("Коннектор GitHub для Claude: issues, PR, Actions")))).dark().build());
+            addRenderableWidget(Ui.button(Component.literal(L.t("Выйти")), b -> action("gh_logout", ""))
+                .bounds(rightX + cw / 2 + 2, gy, cw / 2 - 2, 20).dark().build());
         } else if (gh != null && gh.get("installed").getAsBoolean()) {
-            addRenderableWidget(Button.builder(Component.literal(L.t("Войти через GitHub")), b -> action("gh_login", ""))
+            addRenderableWidget(Ui.button(Component.literal(L.t("Войти через GitHub")), b -> action("gh_login", ""))
                 .bounds(rightX, gy, cw, 20)
-                .tooltip(Tooltip.create(Component.literal(L.t("Вход GitHub CLI по коду: git push/pull без паролей + коннектор для Claude")))).build());
+                .tooltip(Tooltip.create(Component.literal(L.t("Вход GitHub CLI по коду: git push/pull без паролей + коннектор для Claude")))).dark().build());
         } else if (gh != null) {
-            addRenderableWidget(Button.builder(Component.literal(L.t("Установить GitHub CLI")), b ->
+            addRenderableWidget(Ui.button(Component.literal(L.t("Установить GitHub CLI")), b ->
                     ConfirmLinkScreen.confirmLinkNow(this, URI.create("https://cli.github.com")))
-                .bounds(rightX, gy, cw / 2 - 2, 20).build());
-            addRenderableWidget(Button.builder(Component.literal(L.t("Токен…")), b -> mod.runLine("cc", "/claude key github"))
+                .bounds(rightX, gy, cw / 2 - 2, 20).dark().build());
+            addRenderableWidget(Ui.button(Component.literal(L.t("Токен…")), b -> mod.runLine("cc", "/claude key github"))
                 .bounds(rightX + cw / 2 + 2, gy, cw / 2 - 2, 20)
-                .tooltip(Tooltip.create(Component.literal(L.t("Personal access token для коннектора (без gh)")))).build());
+                .tooltip(Tooltip.create(Component.literal(L.t("Personal access token для коннектора (без gh)")))).dark().build());
         }
 
         int extra = errorLines().size() * 9;
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
-            .bounds(width / 2 - 100, top + 184 + extra, 200, 20).build());
+        addRenderableWidget(Ui.button(CommonComponents.GUI_DONE, b -> onClose())
+            .bounds(width / 2 - 100, top + 184 + extra, 200, 20).dark().build());
         if (extra > 0)
-            addRenderableWidget(Button.builder(Component.literal(L.t("Копировать ошибку")), b -> minecraft.keyboardHandler.setClipboard(mod.launcher.detail()))
-                .bounds(width / 2 + 104, top + 184 + extra, 110, 20).build());
+            addRenderableWidget(Ui.button(Component.literal(L.t("Копировать ошибку")), b -> minecraft.keyboardHandler.setClipboard(mod.launcher.detail()))
+                .bounds(width / 2 + 104, top + 184 + extra, 110, 20).dark().build());
         layoutKey = layoutKey();
     }
 
@@ -285,8 +285,10 @@ final class SettingsScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         int cw = columnWidth;
         // Panels behind the two columns.
-        g.fill(leftX - 6, top - 6, leftX + cw + 6, top + 162, PANEL);
-        g.fill(rightX - 6, top - 6, rightX + cw + 6, top + 162, PANEL);
+        Ui.panel(g, leftX - 6, top - 6, cw + 12, 168, PANEL, Theme.darkUi().line());
+        Ui.panel(g, rightX - 6, top - 6, cw + 12, 168, PANEL, Theme.darkUi().line());
+        g.fill(leftX - 6, top - 6, leftX + cw + 6, top - 5, 0xFFF2C14E);
+        g.fill(rightX - 6, top - 6, rightX + cw + 6, top - 5, 0xFFF2C14E);
         super.extractRenderState(g, mouseX, mouseY, delta);
         g.centeredText(font, Component.literal("✦ Claudecraft").withColor(0xD97757), width / 2, top - 20, WHITE);
 
