@@ -144,6 +144,18 @@ Minecraft (Fabric mod)                       Local bridge (Python, 127.0.0.1)
 - Sessions are stored by Claude Code itself, so the same session is visible in the
   game, in the terminal and in the Claude app.
 
+## Remote bridge (VPS / another PC)
+
+The bridge can run on another machine — Claude then works on that machine's files.
+The bridge still listens only on 127.0.0.1 there; the game reaches it through an SSH tunnel:
+
+1. On the server: copy `bridge/` from this mod, `pip install -r requirements.txt`,
+   `python bridge.py --game-dir ~/claudecraft` (log in once: `claude auth login`).
+2. On this PC: `ssh -N -L 18751:127.0.0.1:18741 user@server`.
+3. In the game: `/claude remote 18751 <token>` — the token is in
+   `~/claudecraft/config/claude-chat/bridge-token` on the server. `/claude remote off`
+   returns to the local bridge. The local bridge is not started while remote mode is on.
+
 ## Security
 
 - The bridge listens on `127.0.0.1` only, with a random bearer token; requests with a

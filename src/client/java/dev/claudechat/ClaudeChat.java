@@ -368,6 +368,32 @@ public final class ClaudeChat implements ClientModInitializer {
                 say("c", "osnotify: " + (on ? L.t("вкл") : L.t("выкл")) + L.t(" — системные уведомления, когда игра свёрнута"));
                 if (value.equals("test")) OsNotify.show("Claudecraft", L.t("Проверка уведомления"));
             }
+            case "remote" -> {
+                // /claude remote <local port> <token> | off — use a bridge on a VPS / another PC via ssh -L
+                String[] a = parts.length > 1 ? parts[1].strip().split("\\s+") : new String[0];
+                if (a.length == 1 && a[0].equals("off")) {
+                    launcher.setRemote(null);
+                    say("c", L.t("Удалённый мост выключен — снова локальный (перезапуск моста: /claude)"));
+                    launcher.restart();
+                } else if (a.length == 2 && a[0].matches("\\d{4,5}") && a[1].length() >= 16) {
+                    JsonObject r = new JsonObject();
+                    r.addProperty("port", Integer.parseInt(a[0]));
+                    r.addProperty("token", a[1]);
+                    launcher.setRemote(r);
+                    launcher.stop();
+                    say("c", L.t("Удалённый мост: 127.0.0.1:") + a[0] + L.t(" (через SSH-туннель). Проверка: /cc doctor"));
+                } else {
+                    show(ChatStyle.line("c", ChatStyle.lit(L.t("Удалённый мост"), ChatStyle.GOLD).withStyle(s -> s.withBold(true))
+                        .append(ChatStyle.lit(launcher.remote() != null ? L.t("  включён: порт ") + launcher.remote().get("port").getAsInt()
+                            : L.t("  выключен"), ChatStyle.DIM))));
+                    show(ChatStyle.line("c", ChatStyle.lit(L.t("  1. На сервере: python bridge.py --game-dir ~/claudecraft (мост из этого мода)"), ChatStyle.TEXT)));
+                    show(ChatStyle.line("c", ChatStyle.lit(L.t("  2. На этом ПК: ssh -N -L 18751:127.0.0.1:18741 user@server"), ChatStyle.TEXT)));
+                    show(ChatStyle.line("c", ChatStyle.lit(L.t("  3. Токен — в ~/claudecraft/config/claude-chat/bridge-token на сервере"), ChatStyle.TEXT)));
+                    show(ChatStyle.line("c", Component.literal("  ").append(ChatStyle.button(L.t("подключить…"), "/claude remote 18751 ", true,
+                        ChatStyle.GREEN, L.t("/claude remote <порт туннеля> <токен>"))).append(" ")
+                        .append(ChatStyle.button(L.t("выключить"), "/claude remote off", false, ChatStyle.DIM, null))));
+                }
+            }
             case "hud", "toasts" -> {
                 // /claude hud|toasts|sound [on|off]: toggles without an argument.
                 String value = parts.length > 1 ? parts[1].strip() : "";
@@ -534,8 +560,13 @@ public final class ClaudeChat implements ClientModInitializer {
     }
 
     JsonObject request(String path, JsonObject body) throws Exception {
-        if (!Files.isRegularFile(connection)) throw new IllegalStateException(L.t("Мост ещё не запущен (нет connection.json)"));
-        JsonObject config = JsonParser.parseString(Files.readString(connection)).getAsJsonObject();
+        JsonObject config;
+        JsonObject remote = launcher.remote();
+        if (remote != null) config = remote;  // a bridge on another machine through an SSH tunnel (/claude remote)
+        else {
+            if (!Files.isRegularFile(connection)) throw new IllegalStateException(L.t("Мост ещё не запущен (нет connection.json)"));
+            config = JsonParser.parseString(Files.readString(connection)).getAsJsonObject();
+        }
         int port = config.get("port").getAsInt();
         if (port < 1024 || port > 65535) throw new IllegalArgumentException(L.t("Некорректный порт моста"));
         // The host is never taken from configuration or a server chat message.
@@ -638,6 +669,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude theme", L.t("тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода")},
             {"/claude osnotify", L.t("уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл")},
+            {"/claude remote", L.t("мост на VPS / другом ПК через SSH-туннель: remote <порт> <токен> · remote off")},
             {"/claude sound", L.t("звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},
             {"/cc project", L.t("проекты = рабочая папка Claude (open, here, new, add)")},

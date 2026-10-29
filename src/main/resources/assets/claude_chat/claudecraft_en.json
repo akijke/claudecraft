@@ -669,5 +669,18 @@
   "  нет моделей": "  no models",
   "  … ещё ": "  … more ",
   " токенов контекста": " context tokens",
-  "[модель] — локальная модель без интернета (Ollama / lmstudio) · /c new openrouter <модель> · /c models": "[model] — a local model without internet (Ollama / lmstudio) · /c new openrouter <model> · /c models"
+  "[модель] — локальная модель без интернета (Ollama / lmstudio) · /c new openrouter <модель> · /c models": "[model] — a local model without internet (Ollama / lmstudio) · /c new openrouter <model> · /c models",
+  "удалённый, порт ": "remote, port ",
+  "Удалённый мост выключен — снова локальный (перезапуск моста: /claude)": "Remote bridge off — local again (restart the bridge: /claude)",
+  "Удалённый мост: 127.0.0.1:": "Remote bridge: 127.0.0.1:",
+  " (через SSH-туннель). Проверка: /cc doctor": " (through an SSH tunnel). Check: /cc doctor",
+  "Удалённый мост": "Remote bridge",
+  "  включён: порт ": "  on: port ",
+  "  выключен": "  off",
+  "  1. На сервере: python bridge.py --game-dir ~/claudecraft (мост из этого мода)": "  1. On the server: python bridge.py --game-dir ~/claudecraft (the bridge from this mod)",
+  "  2. На этом ПК: ssh -N -L 18751:127.0.0.1:18741 user@server": "  2. On this PC: ssh -N -L 18751:127.0.0.1:18741 user@server",
+  "  3. Токен — в ~/claudecraft/config/claude-chat/bridge-token на сервере": "  3. The token is in ~/claudecraft/config/claude-chat/bridge-token on the server",
+  "подключить…": "connect…",
+  "/claude remote <порт туннеля> <токен>": "/claude remote <tunnel port> <token>",
+  "мост на VPS / другом ПК через SSH-туннель: remote <порт> <токен> · remote off": "bridge on a VPS / another PC through an SSH tunnel: remote <port> <token> · remote off"
 }

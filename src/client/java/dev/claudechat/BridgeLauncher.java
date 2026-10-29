@@ -86,6 +86,16 @@ final class BridgeLauncher {
         write();
     }
 
+    /** A bridge on another machine reached through an SSH tunnel: {port, token}, or null (local bridge). */
+    JsonObject remote() {
+        return settings.has("remote") && settings.get("remote").isJsonObject() ? settings.getAsJsonObject("remote") : null;
+    }
+
+    void setRemote(JsonObject value) {
+        if (value == null) settings.remove("remote"); else settings.add("remote", value);
+        write();
+    }
+
     /** Saves client.json after a direct change of `settings` (e.g. the "sounds" section). */
     void saveAll() { write(); }
 
@@ -135,6 +145,7 @@ final class BridgeLauncher {
 
     private void run() {
         try {
+            if (remote() != null) { set(State.EXTERNAL, L.t("удалённый, порт ") + remote().get("port").getAsInt()); return; }
             if (bridgeAnswers.getAsBoolean()) { set(State.EXTERNAL, ""); return; }
             set(State.INSTALLING, L.t("распаковка моста"));
             Path bridgeDir = extract();
