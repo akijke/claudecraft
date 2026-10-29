@@ -58,6 +58,13 @@ final class LiveTest {
 
     private Minecraft mc() { return Minecraft.getInstance(); }
     private Screen screen() { return mc().gui.screen(); }
+    private net.minecraft.client.gui.components.Button chatToggle() {
+        if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return null;
+        for (var child : chat.children())
+            if (child instanceof net.minecraft.client.gui.components.Button b
+                && (b.getMessage().getString().equals(L.t("Развернуть")) || b.getMessage().getString().equals(L.t("Свернуть")))) return b;
+        return null;
+    }
     private net.minecraft.client.gui.components.EditBox chatBox() {
         if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return null;
         for (var child : chat.children())
@@ -156,20 +163,18 @@ final class LiveTest {
             if (ok) { chatBox().setValue(""); mc().setScreenAndShow(null); }
             return ok;
         }, 10);
-        step("vanilla chat: Expand fills the screen, Collapse brings it back", () -> mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false)), () -> {
-            if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return false;
-            net.minecraft.client.gui.components.Button toggle = null;
-            for (var child : chat.children())
-                if (child instanceof net.minecraft.client.gui.components.Button b
-                    && (b.getMessage().getString().equals(L.t("Развернуть")) || b.getMessage().getString().equals(L.t("Свернуть")))) toggle = b;
+        step("vanilla chat: Expand fills the screen", () -> mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false)), () -> {
+            net.minecraft.client.gui.components.Button toggle = chatToggle();
             if (toggle == null) return false;
             if (waited == 10 && toggle.getMessage().getString().equals(L.t("Развернуть"))) toggle.onPress(null);
-            if (waited == 20) expandedWidth = ChatSize.width(true);
-            if (waited == 30) toggle.onPress(null);
-            boolean ok = waited > 30 && expandedWidth > 330 && ChatSize.width(true) < expandedWidth;
-            if (ok) mc().setScreenAndShow(null);
-            return ok;
+            expandedWidth = ChatSize.width(true);
+            return waited > 20 && expandedWidth > 330 && toggle.getMessage().getString().equals(L.t("Свернуть"));
         }, 10);
+        step("vanilla chat: Collapse brings the normal size back", () -> {
+            net.minecraft.client.gui.components.Button toggle = chatToggle();
+            if (toggle != null) toggle.onPress(null);
+        }, () -> waited > 10 && chatToggle() != null && ChatSize.width(true) < expandedWidth, 10);
+        quiet("close the chat", () -> mc().setScreenAndShow(null), () -> screen() == null, 5);
         step("/cc chats opens the chat picker with this mode's chats", () -> mod.runLine("cc", "/cc chats"),
             () -> screen() instanceof ChatPickerScreen p && p.modeForTest().equals("cc") && p.countForTest() > 0 && waited > 20, 10);
         quiet("close the picker", () -> { if (screen() != null) screen().onClose(); }, () -> screen() == null, 5);
