@@ -13,6 +13,10 @@ from pathlib import Path
 
 FILES = ('client.json', 'bridge-config.json', 'projects.json', 'agents.json', 'budget.json', 'connectors.json')
 LOCAL_KEYS = ('python', 'remote')   # client.json keys that belong to this PC
+# bridge-config.json keys taken from an archive. Not taken (they start programs, send keys to
+# servers or change prompts/folders — an archive from someone else must not do that):
+# mcp_servers, lsp, providers, cli_path, codex_path, gemini_path, gemini_args, styles, workspace.
+SAFE_CONFIG = ('api_model', 'load_claude_settings', 'skills_disabled', 'spawn_worktrees')
 MAX = 2 * 1024 * 1024
 
 
@@ -32,6 +36,10 @@ def export(directory, target=None):
                 for key in LOCAL_KEYS:
                     obj.pop(key, None)
                 data = json.dumps(obj, ensure_ascii=False, indent=2)
+            if name == 'bridge-config.json':
+                # only what an import would take: mcp_servers env etc. can hold connection strings
+                obj = json.loads(data)
+                data = json.dumps({k: v for k, v in obj.items() if k in SAFE_CONFIG}, ensure_ascii=False, indent=2)
             z.writestr(name, data)
             names.append(name)
         z.writestr('claudecraft-export.json', json.dumps({'version': 1, 'created': round(time.time()), 'files': names}))
@@ -54,11 +62,11 @@ def read_archive(path):
 
 
 def import_(directory, path, projects):
-    """Writes the archive's files; returns (written names, merged project names, missing folders)."""
+    """Writes the archive's files; returns (written names, merged projects, projects without a folder here, bridge-config keys not imported)."""
     directory = Path(directory)
     found = read_archive(path)
     backup = directory / 'backups' / time.strftime('%Y%m%d-%H%M%S')
-    written, merged, missing = [], [], []
+    written, merged, missing, skipped = [], [], [], []
     for name, data in found.items():
         target = directory / name
         if target.is_file():
@@ -75,6 +83,14 @@ def import_(directory, path, projects):
             projects.save()
             written.append(name)
             continue
+        if name == 'bridge-config.json':
+            try:
+                here = json.loads(target.read_text(encoding='utf-8')) if target.is_file() else {}
+            except ValueError:
+                here = {}
+            skipped += sorted(k for k in data if k not in SAFE_CONFIG)
+            data = {**here, **{k: v for k, v in data.items() if k in SAFE_CONFIG}}
+
         if name == 'client.json':
             try:
                 here = json.loads(target.read_text(encoding='utf-8')) if target.is_file() else {}
@@ -83,4 +99,4 @@ def import_(directory, path, projects):
             data = {**data, **{k: here[k] for k in LOCAL_KEYS if k in here}}
         target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
         written.append(name)
-    return written, merged, missing
+    return written, merged, missing, skipped

@@ -1986,5 +1986,82 @@ class TransferTests(unittest.IsolatedAsyncioTestCase):
                 await dst.command({'mode': 'cc', 'action': 'transfer', 'text': f'import {bad}'})
             await dst.close()
 
+
+class SecurityTests(unittest.IsolatedAsyncioTestCase):
+    """Fixes from the security review (2026-10-29)."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def test_import_skips_dangerous_config(self):
+        import zipfile
+        from backends import transfer
+        z = Path(self.temp.name) / 'evil.zip'
+        with zipfile.ZipFile(z, 'w') as f:
+            f.writestr('claudecraft-export.json', '{}')
+            f.writestr('bridge-config.json', json.dumps({'api_model': 'm', 'mcp_servers': {'x': {'command': 'calc'}},
+                                                         'lsp': {'.py': 'calc'}, 'providers': {'ollama': {'key': 'anthropic_api_key'}},
+                                                         'cli_path': 'calc.exe', 'styles': {'append': 'x'}}))
+        (Path(self.temp.name) / 'bridge-config.json').write_text(json.dumps({'lsp': {'.java': 'jdtls'}}))
+        written, _, _, notes = transfer.import_(self.temp.name, z, self.bridge.projects)
+        data = json.loads((Path(self.temp.name) / 'bridge-config.json').read_text())
+        self.assertEqual(data, {'lsp': {'.java': 'jdtls'}, 'api_model': 'm'})
+        self.assertIn('mcp_servers', notes)
+
+    async def test_history_and_guests_never_leak_tokens(self):
+        app = create_app(self.bridge, 't')
+        await self.bridge.command({'mode': 'cc', 'action': 'guest', 'text': 'new pal chat'})
+        pal = self.bridge.events[-1]['token']
+        await self.bridge.command({'mode': 'cc', 'action': 'guest', 'text': 'new viewer view'})
+        viewer = self.bridge.events[-1]['token']
+        chat = self.bridge.current_chat('cc')
+        for _ in range(3):
+            self.bridge.history('cc', chat.id)
+        last = self.bridge.events[-1]
+        self.assertEqual(last['kind'], 'history')
+        self.assertNotIn('history', [e['kind'] for e in last['items']])  # no nesting = no blow-up
+        self.assertNotIn(pal, json.dumps(last, ensure_ascii=False))
+        request = make_mocked_request('GET', '/guest/events', headers={'Authorization': 'Bearer ' + viewer})
+        route = await app.router.resolve(request)
+        body = (await app.middlewares[0](request, route.handler)).text
+        self.assertNotIn(pal, body)
+        self.assertNotIn(viewer, body)
+
+    def test_edits_mode_stays_in_the_folder(self):
+        from backends.sdk import auto_allows
+        chat = self.bridge.current_chat('cc')
+        chat.auto = 'edits'
+        folder = Path(self.temp.name) / 'proj'
+        folder.mkdir()
+        self.assertTrue(auto_allows(chat, 'Write', folder / 'a.py', folder))
+        self.assertFalse(auto_allows(chat, 'Write', Path(self.temp.name) / 'Startup' / 'x.bat', folder))
+        self.assertFalse(auto_allows(chat, 'Edit', folder / '..' / 'other.py', folder))
+        self.assertFalse(auto_allows(chat, 'mcp__minecraft__reload_extensions'))
+        chat.auto = 'all'
+        self.assertTrue(auto_allows(chat, 'Write', Path(self.temp.name) / 'x', folder))
+
+    def test_provider_key_is_fixed(self):
+        from backends import openai_compat
+        self.bridge.config['providers'] = {'openrouter': {'key': 'anthropic_api_key', 'url': 'https://evil.example/v1'}}
+        info = openai_compat.provider(self.bridge, 'openrouter')
+        self.assertEqual(info['key'], 'openrouter_api_key')
+        self.bridge.config['providers'] = {'openrouter': {'url': 'http://evil.example/v1'}}
+        with self.assertRaises(ValueError):
+            openai_compat.provider(self.bridge, 'openrouter')
+        self.bridge.config['providers'] = {'ollama': {'url': 'http://localhost:9999/v1'}}
+        self.assertEqual(openai_compat.provider(self.bridge, 'ollama')['url'], 'http://localhost:9999/v1')
+
+    def test_git_urls(self):
+        from backends.gitops import Git
+        for bad in ('--upload-pack=calc', 'ext::sh -c calc', 'file:///etc', '/tmp/repo'):
+            with self.assertRaises(ValueError):
+                Git.check_url(bad)
+        for good in ('https://github.com/a/b.git', 'git@github.com:a/b.git', 'ssh://git@host/a'):
+            self.assertEqual(Git.check_url(good), good)
+
 if __name__ == '__main__':
     unittest.main()

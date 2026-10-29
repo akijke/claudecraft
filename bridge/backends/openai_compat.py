@@ -25,7 +25,15 @@ def provider(bridge, name):
     if name not in PROVIDERS:
         raise ValueError('Провайдер: ' + ', '.join(PROVIDERS))
     info = dict(PROVIDERS[name])
-    info.update((bridge.config.get('providers') or {}).get(name, {}))
+    override = (bridge.config.get('providers') or {}).get(name, {})
+    url = override.get('url') if isinstance(override, dict) else None
+    if isinstance(url, str) and url:
+        local = url.startswith(('http://localhost', 'http://127.0.0.1', 'http://[::1]'))
+        if not (local or url.startswith('https://')):  # a key never goes over plain http to another host
+            raise ValueError(f'{name}: адрес — https:// или http://localhost')
+        info['url'] = url.rstrip('/')
+    if isinstance(override, dict) and override.get('default'):
+        info['default'] = str(override['default'])
     info['name'] = name
     return info
 

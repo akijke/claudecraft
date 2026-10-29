@@ -1119,10 +1119,10 @@ class Bridge:
                 out, names = await asyncio.to_thread(transfer.export, self.directory, rest.strip() or None)
                 self.emit(chat, f'Настройки экспортированы: {out}', kind='settings_exported', path=str(out), files=names)
             elif sub == 'import' and rest.strip():
-                written, merged, missing = await asyncio.to_thread(transfer.import_, self.directory, rest.strip(),
-                                                                   self.projects)
-                self.emit(chat, f'Импортировано: {", ".join(written) or "ничего"}', kind='settings_imported',
-                          files=written, projects=merged, missing=missing)
+                written, merged, missing, skipped = await asyncio.to_thread(
+                    transfer.import_, self.directory, rest.strip(), self.projects)
+                self.emit(chat, f'Импортировано: {", ".join(written) or "-"}', kind='settings_imported',
+                          files=written, projects=merged, missing=missing, skipped=skipped)
             else:
                 raise ValueError('export [файл.zip] | import <файл.zip>')
         elif action == 'guest':
@@ -1135,8 +1135,10 @@ class Bridge:
                 scope = args[1] if len(args) > 1 else 'view'
                 hours = max(1, min(72, int(args[2]))) if len(args) > 2 and args[2].isdigit() else 12
                 token = self.guests.create(args[0], chat.id, scope, hours)
-                self.emit(chat, f'Гость {args[0]}: {scope}, {hours} ч — этот чат', kind='guest_token',
-                          name=args[0], token=token, scope=scope, hours=hours)
+                shown = self.emit(chat, f'Гость {args[0]}: {scope}, {hours} ч — этот чат', kind='guest_token',
+                                  name=args[0], token=token, scope=scope, hours=hours)
+                # the token is shown once: after the mod has polled it, it leaves the event log
+                asyncio.get_running_loop().call_later(60, lambda: shown.pop('token', None))
             elif sub == 'revoke':
                 self.guests.revoke(rest.strip())
                 self.emit(chat, f'Гость {rest.strip()} отключён', kind='status')
@@ -1485,7 +1487,7 @@ class Bridge:
         chat = self.chats.get(chat_id)
         if not chat:
             raise ValueError('Unknown chat')
-        recent = [e for e in self.events if e['chat'] == chat_id][-200:]
+        recent = [e for e in self.events if e['chat'] == chat_id and e.get('kind') not in ('history', 'guest_token')][-200:]
         self.emit(chat, '', kind='history', items=recent)
 
     async def close(self):
@@ -1565,11 +1567,12 @@ def create_app(bridge, token):
         if request.path == '/guest/events' and request.method == 'GET':
             cursor = int(request.query.get('after', '0') or 0)
             batch = [e for e in bridge.events if e['seq'] > cursor and visible(e, chat.id)][:80]
+            batch = [{k: v for k, v in e.items() if k not in ('items', 'token')} for e in batch]
             return web.json_response({'events': batch, 'boot': bridge.boot, 'title': chat.title,
                                       'running': bool(chat.task), 'scope': row['scope'],
                                       'cursor': batch[-1]['seq'] if batch else max(cursor, 0)})
         if request.path == '/guest/say' and request.method == 'POST' and row['scope'] == 'chat':
-            text = str((await request.json()).get('text', '')).strip()[:4000]
+            text = images.MARK.sub('', str((await request.json()).get('text', ''))).strip()[:4000]
             if not text:
                 raise ValueError('empty message')
             async with bridge.lock:

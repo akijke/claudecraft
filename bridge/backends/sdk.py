@@ -291,13 +291,31 @@ class SdkTurn:
             raise ValueError(error)
 
 
-def auto_allows(chat, name):
-    """Auto-approval policy of the chat (/cc auto off|edits|all + "always" buttons)."""
+ASKS_IN_EDITS = {'mcp__minecraft__reload_extensions'}  # loads extension manifests = starts programs
+
+
+def inside(path, folder):
+    try:
+        Path(path).resolve().relative_to(Path(folder).resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def auto_allows(chat, name, path=None, folder=None):
+    """Auto-approval policy of the chat (/cc auto off|edits|all + "always" buttons).
+
+    "edits" covers file tools inside the chat's folder only: a write elsewhere (startup folder,
+    shell profile, another project) still asks, whatever text steered Claude there."""
     if name in chat.allowed:
         return True
     if chat.auto == 'all':
         return True
-    return chat.auto == 'edits' and (name in EDIT_TOOLS or name.startswith('mcp__minecraft__'))
+    if chat.auto != 'edits' or name in ASKS_IN_EDITS:
+        return False
+    if path is not None and folder is not None and not inside(path, folder):
+        return False
+    return name in EDIT_TOOLS or name.startswith('mcp__minecraft__')
 
 
 def read_game_logs(game_dir, kind, lines=300):
@@ -382,7 +400,7 @@ async def run(bridge, chat, text):
         if verdict == 'deny':
             bridge.emit(chat, f'{name} запрещён правилом {rule}', kind='status')
             return PermissionResultDeny(message=f'Denied by the permission rule {rule}')
-        if verdict == 'allow' or (verdict is None and auto_allows(chat, name)):
+        if verdict == 'allow' or (verdict is None and auto_allows(chat, name, path, effective)):
             if path:
                 bridge.checkpoints.remember(chat.id, path)
                 if changes:

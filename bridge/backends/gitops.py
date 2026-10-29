@@ -323,8 +323,16 @@ class Git:
         self.emit(mode, out.splitlines()[0] if out else 'stash: готово', kind='status')
         await self.status(mode)
 
+    @staticmethod
+    def check_url(url):
+        url = url.strip()
+        if url.startswith('-') or '::' in url.split('/')[0] or not re.match(r'^(https://|ssh://|git@[\w.-]+:|git://)', url):
+            raise ValueError('git: адрес — https://, ssh://, git@host: или git://')
+        return url
+
     async def remote(self, mode, url):
         if url:
+            url = self.check_url(url)
             code, _ = await self.run('remote', 'get-url', 'origin')
             await self.ok('remote', 'set-url' if code == 0 else 'add', 'origin', url)
             self.emit(mode, f'origin → {url}', kind='status')
@@ -357,6 +365,7 @@ class Git:
         url, _, name = rest.partition(' ')
         if not url:
             raise ValueError('Формат: git clone <url> [имя проекта]')
+        url = self.check_url(url)
         name = (name.strip() or re.sub(r'\.git$', '', url.rstrip('/').split('/')[-1].split(':')[-1]))
         self.bridge.projects.check_name(name)
         target = self.bridge.workspace / name
@@ -364,7 +373,7 @@ class Git:
             raise ValueError(f'Папка уже есть: {target}')
 
         async def go():
-            await self.ok('clone', url, str(target), cwd=self.bridge.workspace, timeout=600)
+            await self.ok('clone', '--', url, str(target), cwd=self.bridge.workspace, timeout=600)
             self.bridge.projects.add(name, target)
             self.bridge.open_project(name)
             self.emit(mode, f'Склонировано в {target}; проект «{name}» открыт.', kind='status')

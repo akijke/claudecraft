@@ -80,4 +80,4 @@ class Guests:
 
 def visible(event, chat_id):
     """Events a guest may see: only their chat, and never permission/secret-bearing kinds."""
-    return event.get('chat') == chat_id and event.get('kind') not in ('permission', 'question', 'account', 'url', 'guest_token')
+    return event.get('chat') == chat_id and event.get('kind') not in ('permission', 'question', 'account', 'url', 'guest_token', 'history', 'guests')

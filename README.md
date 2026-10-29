@@ -166,6 +166,14 @@ The bridge still listens only on 127.0.0.1 there; the game reaches it through an
 - API keys and connector tokens are stored in `config/claude-chat/secrets.json`
   (owner-only) and never appear in chat events. Do not share `connection.json`,
   `bridge-token`, `secrets.json` or `chats.json`.
+- The bridge token is full access: with it a program can read and write any file your account
+  can (the file manager and editor are not limited to a project). Treat it like a password.
+- `/cc auto edits` approves file tools only inside the chat's folder; writes elsewhere and
+  reloading extensions still ask. `/cc auto all` approves everything — keep it for trusted work.
+- `/claude import` takes only harmless keys of `bridge-config.json`; MCP servers, language
+  servers, provider URLs, CLI paths and styles from an archive are skipped (shown after import).
+- Guest tokens (`/cc guest`) see one chat, without permission prompts or other tokens; their
+  messages cannot attach local files.
 
 ## Codexcraft
 
