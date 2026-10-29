@@ -210,7 +210,7 @@ final class ConversationScreen extends Screen {
         input = new MultiLineEditBox.Builder()
             .setPlaceholder(Component.literal(mode.equals("cc") ? L.t("Задача для Claude Code… (Ctrl+Enter — отправить, /cc … — команда)")
                 : L.t("Сообщение Claude… (Ctrl+Enter — отправить)")))
-            .build(font, inputW, 52, Component.literal("input"));
+            .build(font, inputW, 42, Component.literal("input"));
         input.setX(mainX);
         input.setY(height - 58);
         input.setCharacterLimit(8000);
@@ -221,9 +221,9 @@ final class ConversationScreen extends Screen {
         int bx = mainX + inputW + 4;
         addRenderableWidget(Button.builder(Component.literal(L.t("Отправить")), b -> submit(""))
             .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal(L.t("В очередь (Ctrl+Enter)")))).build());
-        addRenderableWidget(Button.builder(Component.literal("f"), b -> submit("f "))
-            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Дописать в текущую работу, без отмены")))).build());
-        addRenderableWidget(Button.builder(Component.literal("⏹"), b -> mod.dispatch(mode, "cancel"))
+        addRenderableWidget(Button.builder(Component.literal("✚ " + L.t("сейчас")), b -> submit("f "))
+            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Добавить в работу, которая идёт сейчас, не останавливая её (f)")))).build());
+        addRenderableWidget(Button.builder(Component.literal("✖"), b -> mod.dispatch(mode, "cancel"))
             .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Остановить и очистить очередь")))).build());
         addRenderableWidget(Button.builder(Component.literal("◎ " + L.t("Скриншот")), b -> {
                 String question = input.getValue().strip();
@@ -411,7 +411,8 @@ final class ConversationScreen extends Screen {
         g.fill(0, 0, width, height, 0xB0101014);
         g.fill(mainX - 2, mainY - 2, mainX + mainW, mainY + mainH, 0x90000000);
         super.extractRenderState(g, mouseX, mouseY, delta);
-        g.text(font, Component.literal("✦ Claudecraft").withColor(ChatStyle.CLAUDE), left, 8, 0xFFFFFFFF);
+        if (mainX - left >= font.width("✦ Claudecraft") + 8)  // narrow (IDE) pane: the status line takes the row
+            g.text(font, Component.literal("✦ Claudecraft").withColor(ChatStyle.CLAUDE), left, 8, 0xFFFFFFFF);
         if (state != null && state.has("status") && state.getAsJsonObject("status").has(mode))
             g.text(font, statusLine(state.getAsJsonObject("status").getAsJsonObject(mode)), mainX, 8, 0xFFFFFFFF);
 
@@ -424,7 +425,10 @@ final class ConversationScreen extends Screen {
             g.centeredText(font, mode.equals("cc") ? L.t("Напиши задачу внизу или открой проект слева") : L.t("Напиши сообщение внизу"),
                 mainX + mainW / 2, mainY + mainH / 2, 0xFF707070);
         if (scroll > 0)
-            g.text(font, L.t("↓ ещё ") + scroll + L.t(" строк ниже (колесо мыши)"), mainX + mainW - 170, mainY + mainH - 11, 0xFFF2C14E);
+        {
+            String below = L.t("↓ ещё ") + scroll + L.t(" строк ниже (колесо мыши)");
+            g.text(font, below, mainX + mainW - font.width(below) - 6, mainY + mainH - 11, 0xFFF2C14E);
+        }
         // Hover text of buttons inside the log.
         if (mouseX >= mainX && mouseX < mainX + mainW && mouseY >= mainY && mouseY < mainY + mainH) {
             FormattedCharSequence line = lineAt(mouseY);

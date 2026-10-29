@@ -232,11 +232,11 @@ final class BridgeLauncher {
                 return List.of(exe.toString());
             } catch (Exception e) {
                 throw new IOException(L.t("Python не найден, и скачать его не удалось: ") + e.getMessage()
-                    + L.t(". Установи Python 3.11+ с python.org или укажи путь в /c settings"));
+                    + L.t(". Установи Python 3.11+ с python.org или укажи путь в /claude"));
             }
         }
         throw new IOException(L.t("не найден Python 3.11+. Установи его с python.org (галочка «Add to PATH») ")
-            + L.t("или укажи путь к python.exe в /c settings"));
+            + L.t("или укажи путь к python.exe в /claude"));
     }
 
     private Path venv(List<String> python) throws IOException, InterruptedException {

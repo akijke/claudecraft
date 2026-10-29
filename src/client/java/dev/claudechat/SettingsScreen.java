@@ -159,7 +159,7 @@ final class SettingsScreen extends Screen {
             open.active = true;
             addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> action("gh_cancel", ""))
                 .bounds(rightX + cw - 60, gy, 60, 20).build());
-        } else if (gh != null && !str(gh, "login").isEmpty()) {
+        } else if (gh != null && str(gh, "login") != null && !str(gh, "login").isEmpty()) {
             boolean on = gh.get("connector").getAsBoolean();
             addRenderableWidget(Button.builder(Component.literal("MCP: " + (on ? L.t("вкл") : L.t("выкл"))),
                     b -> action("gh_connector", on ? "off" : "on"))
@@ -180,8 +180,12 @@ final class SettingsScreen extends Screen {
                 .tooltip(Tooltip.create(Component.literal(L.t("Personal access token для коннектора (без gh)")))).build());
         }
 
+        int extra = errorLines().size() * 9;
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
-            .bounds(width / 2 - 100, top + 184, 200, 20).build());
+            .bounds(width / 2 - 100, top + 184 + extra, 200, 20).build());
+        if (extra > 0)
+            addRenderableWidget(Button.builder(Component.literal(L.t("Копировать ошибку")), b -> minecraft.keyboardHandler.setClipboard(mod.launcher.detail()))
+                .bounds(width / 2 + 104, top + 184 + extra, 110, 20).build());
         layoutKey = layoutKey();
     }
 
@@ -193,12 +197,19 @@ final class SettingsScreen extends Screen {
         return Component.literal(L.t("Автозапуск") + ": " + (autoStart ? L.t("вкл") : L.t("выкл")));
     }
 
+    /** The bridge failed: its error in full (Python missing, pip failed…), at most 4 lines. */
+    private java.util.List<net.minecraft.util.FormattedCharSequence> errorLines() {
+        if (preview || mod.launcher.state() != BridgeLauncher.State.FAILED || mod.launcher.detail().isEmpty()) return java.util.List.of();
+        var lines = font.split(Component.literal(mod.launcher.detail()), Math.max(100, width - 40));
+        return lines.subList(0, Math.min(4, lines.size()));
+    }
+
     private String layoutKey() {
         JsonObject login = status == null ? null : status.getAsJsonObject("login");
         JsonObject gh = github();
         String ghKey = gh == null ? "-" : str(gh, "login") + "/" + gh.get("connector").getAsBoolean() + "/"
             + str(gh.getAsJsonObject("flow"), "state") + "/" + gh.get("installed").getAsBoolean();
-        return loggedIn() + ":" + waitingForCode() + ":" + (str(login, "url") != null) + ":" + ghKey;
+        return loggedIn() + ":" + waitingForCode() + ":" + (str(login, "url") != null) + ":" + ghKey + ":" + errorLines().size();
     }
 
     private boolean githubWaiting() {
@@ -291,6 +302,8 @@ final class SettingsScreen extends Screen {
         g.text(font, "● " + state.text(), leftX, top + 12, color);
         String detail = preview ? "" : mod.launcher.detail();
         if (!detail.isEmpty()) g.text(font, fit(detail, cw), leftX, top + 22, DARK);
+        int ey = top + 166;
+        for (var errorLine : errorLines()) { g.text(font, errorLine, 20, ey, RED); ey += 9; }
 
         // left: API key
         g.text(font, L.t("API-ключ для /c new api"), leftX, top + 112, GOLD);
@@ -331,6 +344,6 @@ final class SettingsScreen extends Screen {
         else { ghLine = L.t("● нужен GitHub CLI (gh) или токен"); ghColor = DARK; }
         g.text(font, fit(ghLine, cw), rightX, top + 125, ghColor);
 
-        if (!message.isEmpty()) g.centeredText(font, fit(message, width - 20), width / 2, top + 170, messageColor);
+        if (!message.isEmpty()) g.centeredText(font, fit(message, width - 20), width / 2, top + 170 + errorLines().size() * 9, messageColor);
     }
 }

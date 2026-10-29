@@ -27,6 +27,18 @@ final class Theme {
 
     static String current() { return current; }
 
+    /** Shadows smear dark text on the light theme. */
+    static boolean shadow() { return !current.equals("light"); }
+
+    /** "…\\folder\\file.java": cut from the left so the end of a path stays visible. */
+    static String leftTrim(net.minecraft.client.gui.Font font, String text, int room) {
+        if (room <= 8) return "";
+        if (font.width(text) <= room) return text;
+        String s = text;
+        while (s.length() > 1 && font.width("…" + s) > room) s = s.substring(1);
+        return "…" + s;
+    }
+
     static void load() {
         ClaudeChat mod = ClaudeChat.instance();
         if (mod == null || !mod.launcher.settings.has("theme")) return;
@@ -45,8 +57,9 @@ final class Theme {
         // chat palette
         boolean contrast = current.equals("contrast");
         ChatStyle.TEXT = contrast ? 0xFFFFFF : 0xE8E8E8;
-        ChatStyle.DIM = contrast ? 0xD0D0D0 : 0x8A8A8A;
-        ChatStyle.FAINT = contrast ? 0xB0B0B0 : 0x5E5E5E;
+        // hints are drawn over the sky and terrain: keep them readable (≈4.5:1 on dark chat)
+        ChatStyle.DIM = contrast ? 0xE0E0E0 : 0xA8A8A8;
+        ChatStyle.FAINT = contrast ? 0xC8C8C8 : 0x8C8C8C;
         ChatStyle.GREEN = contrast ? 0x7CFF9E : 0x6BD08B;
         ChatStyle.RED = contrast ? 0xFF6B6B : 0xF0626A;
         ChatStyle.GOLD = contrast ? 0xFFD84D : 0xF2C14E;
@@ -54,7 +67,7 @@ final class Theme {
         // windows and syntax colours
         if (current.equals("light")) {
             SCREEN_BG = 0xF0F3F3F3; PANEL = 0xFFFFFFFF; GUTTER = 0xFFEDEDED; CURRENT_LINE = 0xFFF0F4FA;
-            LINE_NUMBER = 0xFF9A9A9A; LINE_NUMBER_ON = 0xFF303030; CARET = 0xFF000000; SELECTION = 0xFFB4D5FE;
+            LINE_NUMBER = 0xFF9A9A9A; LINE_NUMBER_ON = 0xFF6E7781; CARET = 0xFF000000; SELECTION = 0xFFB4D5FE;
             TERMINAL_BG = 0xF8FAFAFA; TERMINAL_FG = 0x202020; PALETTE_BG = 0xF8F5F5F5; PALETTE_SELECTED = 0xFFD6E4FA;
             WINDOW_TEXT = 0xFF202020; WINDOW_DIM = 0xFF707070;
             Highlighter.palette(0x24292F, 0xCF222E, 0x0A3069, 0x0550AE, 0x6E7781, 0x8250DF, 0x953800, 0x57606A, 0x0550AE, 0x9A6700);
@@ -84,9 +97,10 @@ final class Theme {
         mod.launcher.saveAll();
     }
 
-    private static boolean ours(Screen s) {
+    static boolean ours(Screen s) {
         return s instanceof ConversationScreen || s instanceof EditorScreen || s instanceof TerminalScreen
-            || s instanceof FileScreen || s instanceof PaletteScreen || s instanceof IdeScreen;
+            || s instanceof FileScreen || s instanceof PaletteScreen || s instanceof IdeScreen
+            || s instanceof DashboardScreen || s instanceof SettingsScreen || s instanceof KeyScreen;
     }
 
     /** Called every tick: our scale while our window is open, the game's scale otherwise. */

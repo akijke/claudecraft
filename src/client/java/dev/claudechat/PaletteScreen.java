@@ -215,7 +215,7 @@ final class PaletteScreen extends Screen {
         g.fill(0, 0, width, height, 0xC0101014);
         int w = Math.min(420, width - 40), x = (width - w) / 2;
         g.fill(x - 4, 12, x + w + 4, Math.min(height - 8, 58 + visible() * ROW), Theme.PALETTE_BG);
-        g.text(font, files ? L.t("Перейти к файлу") + "  Ctrl+P" : L.t("Команды") + "  Ctrl+Shift+P", x, 17, 0xFFD97757);
+        g.text(font, files ? L.t("Перейти к файлу") + "  Ctrl+P" : L.t("Команды") + "  Ctrl+Shift+P", x, 17, 0xFFD97757, Theme.shadow());
         super.extractRenderState(g, mouseX, mouseY, delta);
         for (int i = 0; i < visible() && scroll + i < shown.size(); i++) {
             Entry e = shown.get(scroll + i);
@@ -224,16 +224,16 @@ final class PaletteScreen extends Screen {
             if (files) {
                 int slash = e.label().lastIndexOf('/');
                 String name = e.label().substring(slash + 1), dir = slash < 0 ? "" : e.label().substring(0, slash);
-                g.text(font, "📄 " + name, x, y, Theme.WINDOW_TEXT);
-                g.text(font, font.plainSubstrByWidth(dir, w - font.width("📄 " + name) - 12), x + font.width("📄 " + name) + 8, y, Theme.WINDOW_DIM);
+                g.text(font, "📄 " + name, x, y, Theme.WINDOW_TEXT, Theme.shadow());
+                g.text(font, font.plainSubstrByWidth(dir, w - font.width("📄 " + name) - 12), x + font.width("📄 " + name) + 8, y, Theme.WINDOW_DIM, Theme.shadow());
             } else {
-                g.text(font, e.label(), x, y, Theme.WINDOW_TEXT);
+                g.text(font, e.label(), x, y, Theme.WINDOW_TEXT, Theme.shadow());
                 String right = e.hint().isEmpty() ? e.run() : e.hint();
                 right = font.plainSubstrByWidth(right, w / 2);
-                g.text(font, right, x + w - font.width(right), y, Theme.WINDOW_DIM);
+                g.text(font, right, x + w - font.width(right), y, Theme.WINDOW_DIM, Theme.shadow());
             }
         }
-        if (shown.isEmpty()) g.text(font, L.t("ничего не найдено"), x, 56, 0xFF8A8A8A);
-        if (!status.isEmpty()) g.text(font, font.plainSubstrByWidth(status, w), x, height - 14, 0xFF5E5E5E);
+        if (shown.isEmpty()) g.text(font, L.t("ничего не найдено"), x, 56, 0xFF8A8A8A, Theme.shadow());
+        if (!status.isEmpty()) g.text(font, font.plainSubstrByWidth(status, w), x, height - 14, 0xFF5E5E5E, Theme.shadow());
     }
 }

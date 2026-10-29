@@ -349,10 +349,11 @@ final class TerminalScreen extends Screen {
         boolean alive = snap == null || !snap.has("alive") || snap.get("alive").getAsBoolean();
         String status = (scroll > 0 ? L.t("история −") + scroll + " · " : "") + cols + "×" + rows
             + " · Ctrl+Shift+C/V · Shift+PgUp · Esc " + L.t("скрыть");
-        String head = font.plainSubstrByWidth("$ " + title, Math.max(40, width - font.width(status) - 16));
-        g.text(font, head, 4, height - 10, alive ? 0xFF6BD08B : 0xFF8A8A8A);
-        g.text(font, status, width - font.width(status) - 4, height - 10, 0xFF5E5E5E);
+        if (font.width(status) > width / 2) status = (scroll > 0 ? "−" + scroll + " · " : "") + cols + "×" + rows;
+        String head = font.plainSubstrByWidth("$ " + title, Math.max(0, width - font.width(status) - 16));
+        g.text(font, head, 4, height - 10, alive ? 0xFF6BD08B : 0xFF8A8A8A, Theme.shadow());
+        g.text(font, status, width - font.width(status) - 4, height - 10, 0xFF5E5E5E, Theme.shadow());
         if (!message.isEmpty()) g.centeredText(font, message, width / 2, height / 2, 0xFFF2C14E);
-        if (!alive) g.text(font, L.t("оболочка завершилась — ✕ закрыть, + новая"), width / 2 - font.width(L.t("оболочка завершилась — ✕ закрыть, + новая")) / 2, height - 22, 0xFF8A8A8A);
+        if (!alive) g.text(font, L.t("оболочка завершилась — ✕ закрыть, + новая"), width / 2 - font.width(L.t("оболочка завершилась — ✕ закрыть, + новая")) / 2, height - 22, 0xFF8A8A8A, Theme.shadow());
     }
 }

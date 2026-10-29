@@ -62,10 +62,11 @@ public final class ClaudeChat implements ClientModInitializer {
         SHORTCUTS.put("powershell", "sh ps");
         SHORTCUTS.put("cmd", "sh cmd");
         SHORTCUTS.put("bash", "sh bash");
-        SHORTCUTS.put("kill", "sh kill");
         SHORTCUTS.put("project", "project");
         SHORTCUTS.put("files", "files");
     }
+    private static final Set<String> VANILLA = Set.of("kill", "help", "list", "say", "me", "msg", "tell", "w", "tp",
+        "teleport", "give", "time", "weather", "gamemode", "clear", "effect", "seed", "locate", "reload", "stop", "op", "ban");
     private final Set<String> needsText = Set.of("q", "queue", "f", "force", "spawn", "run", "cat", "type",
         "find", "mkdir", "touch", "mv", "cp", "rm", "connect", "stop", "disconnect", "detach");
     private Path connection;
@@ -148,6 +149,7 @@ public final class ClaudeChat implements ClientModInitializer {
                 })));
             // Terminal-style shortcuts without /cc: /ls, /cd, /mkdir, /sh, /ps, /cmd, /bash, /git …
             for (Map.Entry<String, String> shortcut : SHORTCUTS.entrySet()) {
+                if (VANILLA.contains(shortcut.getKey())) continue;  // never shadow the game's own commands
                 String target = shortcut.getValue();
                 dispatcher.register(literal(shortcut.getKey()).requires(source -> source.attended())
                     .executes(c -> { dispatch("cc", target); return 1; })
@@ -217,6 +219,17 @@ public final class ClaudeChat implements ClientModInitializer {
                 } finally { polling.set(false); }
             });
         });
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> client.execute(() -> {
+            if (launcher.flag("welcomed", false)) return;
+            launcher.setFlag("welcomed", true);
+            show(ChatStyle.line("c", ChatStyle.lit("✦ Claudecraft", ChatStyle.CLAUDE).withStyle(st -> st.withBold(true))
+                .append(ChatStyle.lit(L.t("  Claude Chat и Claude Code в игре"), ChatStyle.DIM))));
+            show(ChatStyle.line("c", Component.literal("  ")
+                .append(ChatStyle.button(L.t("☰ Окно (K)"), "/cc ui", false, ChatStyle.CODE_MODE, L.t("Чат, проекты и файлы в отдельном окне")))
+                .append(" ").append(ChatStyle.button(L.t("⚙ Вход и настройки"), "/claude", false, ChatStyle.GOLD, L.t("Войти в аккаунт Claude")))
+                .append(" ").append(ChatStyle.button(L.t("☰ Все команды"), "/cc help", false, ChatStyle.AQUA, null))));
+            show(ChatStyle.line("c", ChatStyle.lit(L.t("  /c — разговор · /cc — работа с кодом · /claude — настройки мода"), ChatStyle.FAINT)));
+        }));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             epoch++;
             io.execute(() -> {
@@ -552,9 +565,9 @@ public final class ClaudeChat implements ClientModInitializer {
     private String bridgeProblem() {
         return switch (launcher.state()) {
             case INSTALLING, STARTING -> L.t("Мост запускается: ") + launcher.detail();
-            case FAILED -> L.t("Мост не запустился: ") + launcher.detail() + " — /c settings";
-            case OFF, STOPPED -> L.t("Мост выключен. Включи автозапуск или перезапусти в /c settings.");
-            default -> L.t("Мост не отвечает. /c settings — перезапуск и лог.");
+            case FAILED -> L.t("Мост не запустился: ") + launcher.detail() + " — /claude";
+            case OFF, STOPPED -> L.t("Мост выключен. Включи автозапуск или перезапусти в /claude.");
+            default -> L.t("Мост не отвечает. /claude — перезапуск и лог.");
         };
     }
 
@@ -715,7 +728,7 @@ public final class ClaudeChat implements ClientModInitializer {
                 .withColor(ChatStyle.AQUA).withClickEvent(new ClickEvent.SuggestCommand(row[0].split(" [<·|]")[0] + " "))))
                 .append(ChatStyle.lit("  " + row[1], ChatStyle.DIM))));
         show(ChatStyle.line(mode, Component.literal("  ")
-            .append(ChatStyle.button(L.t("▣ Окно (K)"), c + "ui", false, ChatStyle.CODE_MODE, L.t("Отдельный экран переписки"))).append(" ")
+            .append(ChatStyle.button(L.t("☰ Окно (K)"), c + "ui", false, ChatStyle.CODE_MODE, L.t("Отдельный экран переписки"))).append(" ")
             .append(ChatStyle.button(L.t("⚙ Настройки"), c + "settings", false, ChatStyle.GOLD, null)).append(" ")
             .append(ChatStyle.button(L.t("✦ Проекты"), "/cc project", false, ChatStyle.CODE_MODE, null)).append(" ")
             .append(ChatStyle.button("⇄ Git", "/cc git", false, ChatStyle.GREEN, null)).append(" ")

@@ -81,7 +81,9 @@ final class Notify {
 
     private static void alert(String head, String title, String sound) {
         Minecraft client = Minecraft.getInstance();
-        if (on("toasts"))
+        ClaudeChat mod = ClaudeChat.instance();
+        if (Theme.ours(client.gui.screen()) && mod != null) mod.notice = head + (title == null || title.isEmpty() ? "" : " — " + title);
+        else if (on("toasts"))
             SystemToast.addOrUpdate(client.gui.toastManager(), TOAST, Component.literal(head),
                 Component.literal(title == null ? "" : title));
         if (on("sound")) Sounds.play(sound);

@@ -51,7 +51,7 @@ final class WorkStyle {
                     .append(lit(L.t("  (иначе просто ничего не делай)"), FAINT))));
             }
             case "tree" -> {
-                out.add(line(mode, lit("≡ ", DIR).append(lit(s(e, "path"), TEXT))));
+                out.add(line(mode, lit("☰ ", DIR).append(lit(s(e, "path"), TEXT))));
                 for (JsonElement item : e.getAsJsonArray("rows")) {
                     JsonObject r = item.getAsJsonObject();
                     boolean dir = b(r, "dir");
@@ -115,7 +115,7 @@ final class WorkStyle {
             case "tasks" -> tasks(e, out);
             case "bg_task" -> out.add(line(mode, lit("▶ ", GREEN).append(lit(s(e, "text"), DIM)).append(sp())
                 .append(button(L.t("вывод"), cmd + "bg out " + s(e, "task"), false, AQUA, null)).append(sp())
-                .append(button(L.t("⏹ стоп"), cmd + "bg stop " + s(e, "task"), false, RED, null))));
+                .append(button(L.t("✖ стоп"), cmd + "bg stop " + s(e, "task"), false, RED, null))));
             case "spawned" -> out.add(line(mode, lit("◆ ", CODE_MODE).append(lit(s(e, "text"), TEXT)).append(lit("  ", TEXT))
                 .append(button(L.t("открыть"), "/cc select " + s(e, "target"), false, AQUA, L.t("Переключиться на этот чат")))
                 .append(sp()).append(button(L.t("задачи"), "/cc tasks", false, AQUA, null))
@@ -158,7 +158,7 @@ final class WorkStyle {
             }
             case "shell_start" -> out.add(line(mode, lit("$ ", GREEN).append(lit(s(e, "text"), TEXT).withStyle(st -> st.withBold(true)))
                 .append(lit("  " + s(e, "shell") + " · " + s(e, "cwd"), FAINT)).append(sp())
-                .append(button("⏹", "/kill " + s(e, "job"), false, RED, L.t("Остановить команду")))));
+                .append(button("✖", "/cc sh kill " + s(e, "job"), false, RED, L.t("Остановить команду")))));
             case "shell_out" -> {
                 for (String raw : clean(s(e, "text")).split("\\R", -1))
                     out.add(line(mode, lit("│ ", FAINT).append(PathLinks.linkify(raw, 0xD0D0D0, AQUA))));
@@ -167,11 +167,11 @@ final class WorkStyle {
                 boolean killed = b(e, "killed");
                 Integer code = e.has("code") && !e.get("code").isJsonNull() ? e.get("code").getAsInt() : null;
                 boolean ok = code != null && code == 0;
-                MutableComponent c = lit(killed ? "⏹ " + L.t("остановлено") : ok ? "✔ exit 0" : "✖ exit " + code,
+                MutableComponent c = lit(killed ? "✖ " + L.t("остановлено") : ok ? "✔ exit 0" : "✖ exit " + code,
                     killed ? GOLD : ok ? GREEN : RED);
                 if (e.has("seconds")) c.append(lit("  " + e.get("seconds").getAsDouble() + L.t(" с"), FAINT));
                 if (n(e, "cut") > 0) c.append(lit("  " + L.t("вывод обрезан: ещё ") + n(e, "cut"), DIM));
-                c.append(sp()).append(button("↻", "/sh " + s(e, "text"), true, AQUA, L.t("Повторить (можно изменить)")));
+                c.append(sp()).append(button("⟳", "/sh " + s(e, "text"), true, AQUA, L.t("Повторить (можно изменить)")));
                 out.add(line(mode, c));
             }
             case "terminal" -> {
@@ -354,6 +354,12 @@ final class WorkStyle {
                 if (!projects.isEmpty()) out.add(line(mode, lit(L.t("  новые проекты: ") + projects.size(), TEXT)));
                 for (JsonElement m : missing)
                     out.add(line(mode, lit("  ⚠ " + m.getAsString() + L.t(": папки нет на этом ПК — /cc project rm ") + m.getAsString() + L.t(", затем /cc project add ") + m.getAsString() + " <папка>", GOLD)));
+                JsonArray skipped = e.has("skipped") ? e.getAsJsonArray("skipped") : new JsonArray();
+                if (!skipped.isEmpty()) {
+                    StringBuilder keys = new StringBuilder();
+                    for (JsonElement k : skipped) keys.append(keys.isEmpty() ? "" : ", ").append(k.getAsString());
+                    out.add(line(mode, lit(L.t("  Не импортировано (запускают программы или шлют ключи): ") + keys, GOLD)));
+                }
                 out.add(line(mode, lit(L.t("  Старые файлы — в config/claude-chat/backups. Мост перезапускается."), DIM)));
             }
             case "guest_token" -> {
@@ -458,7 +464,7 @@ final class WorkStyle {
             case "git_conflicts" -> {
                 JsonArray files = e.getAsJsonArray("files");
                 out.add(line(mode, lit("⚠ " + L.t("Конфликты слияния"), files.isEmpty() ? GREEN : RED).withStyle(st -> st.withBold(true))
-                    .append(lit(files.isEmpty() ? L.t("  нет") : "  " + files.size() + L.t(" файл(ов)  "), FAINT))
+                    .append(lit(files.isEmpty() ? L.t("  нет") : "  " + files.size() + L.t(" файл(ов)") + "  ", FAINT))
                     .append(files.isEmpty() ? Component.literal("") : button("✦ " + L.t("Claude, разреши"), "/cc git resolve", false, CODE_MODE,
                         L.t("Claude поймёт обе стороны, уберёт маркеры, проверит сборку и сделает git add")))));
                 for (JsonElement fe : files) {
@@ -642,14 +648,21 @@ final class WorkStyle {
                     .append(lit(L.t("   новые сверху; откат идёт по одному запросу"), FAINT))));
                 JsonArray turns = e.getAsJsonArray("turns");
                 if (turns.isEmpty()) out.add(line(mode, lit(L.t("  пока ничего"), DIM)));
-                boolean first = true;
-                for (JsonElement t : turns) {
-                    JsonObject turn = t.getAsJsonObject();
-                    MutableComponent row = lit("  «" + s(turn, "prompt") + "»  ", TEXT)
-                        .append(lit(turn.getAsJsonArray("files").size() + L.t(" файл(ов)"), DIM));
-                    if (first) row.append(sp()).append(button("⟳", cmd + "undo", false, GOLD, L.t("Откатить этот запрос")));
+                int number = 0;
+                long now = System.currentTimeMillis() / 1000;
+                for (int i = 0; i < turns.size(); i++) {
+                    JsonObject turn = turns.get(i).getAsJsonObject();
+                    int same = 1;
+                    while (i + same < turns.size() && s(turns.get(i + same).getAsJsonObject(), "prompt").equals(s(turn, "prompt"))) same++;
+                    JsonArray files = turn.getAsJsonArray("files");
+                    String first = files.isEmpty() ? "" : new java.io.File(files.get(0).getAsString()).getName();
+                    long ago = turn.has("time") ? Math.max(0, now - (long) turn.get("time").getAsDouble()) : -1;
+                    MutableComponent row = lit("  " + (++number) + ". ", FAINT).append(lit("«" + s(turn, "prompt") + "»", TEXT))
+                        .append(lit((same > 1 ? "  ×" + same : "") + "  " + (ago < 0 ? "" : agoText(ago) + " · ") + first
+                            + (files.size() > 1 ? " +" + (files.size() - 1) : ""), DIM));
+                    if (number == 1) row.append(sp()).append(button(L.t("откатить"), cmd + "undo", false, GOLD, L.t("Откатить этот запрос")));
                     out.add(line(mode, row));
-                    first = false;
+                    i += same - 1;
                 }
             }
             case "model" -> {
@@ -797,11 +810,11 @@ final class WorkStyle {
             JsonObject r = item.getAsJsonObject();
             boolean on = b(r, "enabled");
             String name = s(r, "name");
-            out.add(line("cc", lit(on ? "  ● " : "  ○ ", on ? GREEN : FAINT)
+            out.add(line("cc", Component.literal("  ").append(button(on ? "☑" : "☐", "/cc agent " + (on ? "off " : "on ") + name, false,
+                    on ? GREEN : FAINT, on ? L.t("Выключить") : L.t("Включить"))).append(" ")
                 .append(button(name, "/cc agent " + name + " ", true, on ? AQUA : FAINT, s(r, "description")))
-                .append(lit("  " + s(r, "source"), FAINT)).append(sp())
-                .append(button(on ? L.t("выкл") : L.t("вкл"), "/cc agent " + (on ? "off " : "on ") + name, false, on ? DIM : GREEN, null))
-                .append(sp()).append(button("∥", "/cc spawn @" + name + " ", true, CODE_MODE, L.t("Запустить параллельно в отдельном чате")))
+                .append(lit("  " + s(r, "source"), FAINT))
+                .append(sp()).append(button("▶▶", "/cc spawn @" + name + " ", true, CODE_MODE, L.t("Запустить параллельно в отдельном чате")))
                 .append(sp()).append(button("✎", "/cc agent edit " + name, false, AQUA,
                     L.t("Править .claude/agents/") + name + L.t(".md в редакторе (встроенный сначала копируется в проект)")))));
         }
@@ -831,7 +844,7 @@ final class WorkStyle {
             out.add(line("cc", Component.literal("      ")
                 .append(button(L.t("открыть"), "/" + m + " select " + s(r, "id"), false, AQUA, null)).append(sp())
                 .append(button("f …", "/" + m + " select " + s(r, "id"), false, AQUA, L.t("Открой чат и напиши /") + m + L.t(" f <текст>"))).append(sp())
-                .append(button(L.t("⏹ стоп"), "/cc stop " + s(r, "id"), false, RED, L.t("Остановить и очистить очередь")))));
+                .append(button(L.t("✖ стоп"), "/cc stop " + s(r, "id"), false, RED, L.t("Остановить и очистить очередь")))));
         }
         JsonArray background = e.has("background") ? e.getAsJsonArray("background") : new JsonArray();
         if (!background.isEmpty()) out.add(line("cc", lit(L.t("  Фоновые процессы Claude"), DIM).withStyle(st -> st.withUnderlined(true))));
@@ -841,10 +854,10 @@ final class WorkStyle {
             MutableComponent row = lit(running ? "  ▶ " : "  ■ ", running ? GREEN : FAINT).append(lit(s(t, "description"), TEXT))
                 .append(lit("  " + s(t, "status") + "  ", running ? GREEN : FAINT))
                 .append(button(L.t("вывод"), "/cc bg out " + s(t, "id"), false, AQUA, null));
-            if (running && b(t, "live")) row.append(sp()).append(button(L.t("⏹ стоп"), "/cc bg stop " + s(t, "id"), false, RED, null));
+            if (running && b(t, "live")) row.append(sp()).append(button(L.t("✖ стоп"), "/cc bg stop " + s(t, "id"), false, RED, null));
             out.add(line("cc", row));
         }
-        out.add(line("cc", Component.literal("  ").append(button(L.t("∥ новая параллельная задача"), "/cc spawn ", true, CODE_MODE,
+        out.add(line("cc", Component.literal("  ").append(button(L.t("▶▶ новая параллельная задача"), "/cc spawn ", true, CODE_MODE,
             L.t("Отдельный чат в этом проекте; текущий не прерывается")))));
     }
 
@@ -880,5 +893,12 @@ final class WorkStyle {
             }
             out.add(line("cc", row));
         }
+    }
+
+    static String agoText(long seconds) {
+        if (seconds < 60) return L.t("только что");
+        if (seconds < 3600) return seconds / 60 + L.t(" мин назад");
+        if (seconds < 86400) return seconds / 3600 + L.t(" ч назад");
+        return seconds / 86400 + L.t(" дн. назад");
     }
 }

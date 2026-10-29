@@ -42,7 +42,7 @@ final class EditorScreen extends Screen {
     private String message = "";
     private int messageColor = 0xFF8A8A8A;
     private final Deque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
-    private int areaX, areaY, areaW, areaH, gutterW;
+    private int areaX, areaY, areaW, areaH, gutterW, buttonsLeft;
 
     private record State(List<String> lines, int row, int col) { }
 
@@ -535,8 +535,8 @@ final class EditorScreen extends Screen {
             ConversationScreen.prefill("cc", L.t("Посмотри ") + path + ": ");
             minecraft.setScreenAndShow(new ConversationScreen(mod));
         });
-        x = button(x, "💾 " + L.t("Сохранить"), "Ctrl+S", () -> save(confirmOverwrite));
-        button(x, "{ }", L.t("Форматировать (Ctrl+Shift+F)"), this::format);
+        x = button(x, "✔ " + L.t("Сохранить"), "Ctrl+S", () -> save(confirmOverwrite));
+        buttonsLeft = button(x, "{ }", L.t("Форматировать (Ctrl+Shift+F)"), this::format);
         if (goingTo) {
             gotoBox = new net.minecraft.client.gui.components.EditBox(font, 6, 29, 120, 18, Component.literal("line"));
             gotoBox.setHint(Component.literal(L.t("строка… (Enter)")));
@@ -929,8 +929,10 @@ final class EditorScreen extends Screen {
         g.fill(0, 0, width, height, Theme.SCREEN_BG);
         super.extractRenderState(g, mouseX, mouseY, delta);
         String title = "✎ " + new File(path).getName() + (dirty ? " ●" : "");
-        g.text(font, Component.literal(title).withColor(dirty ? 0xF2C14E : 0xD97757), 6, 10, 0xFFFFFFFF);
-        g.text(font, font.plainSubstrByWidth(path, width / 2 - font.width(title)), 14 + font.width(title), 10, 0xFF5E5E5E);
+        g.text(font, Component.literal(title).withColor(dirty ? 0xF2C14E : 0xD97757), 6, 10, 0xFFFFFFFF, Theme.shadow());
+        if (!path.equals(new File(path).getName()))
+            g.text(font, Theme.leftTrim(font, path, buttonsLeft - 20 - font.width(title)), 14 + font.width(title), 10,
+                Theme.WINDOW_DIM, Theme.shadow());
 
         gutterW = font.width(String.valueOf(lines.size())) + GUTTER_PAD * 2 + (showBlame && blame != null ? BLAME_W : 0);
         g.fill(areaX, areaY, areaX + areaW, areaY + areaH, Theme.PANEL);
@@ -961,7 +963,7 @@ final class EditorScreen extends Screen {
                     g.setTooltipForNextFrame(font, Component.literal(b.get("hash").getAsString() + " " + who + " — " + b.get("summary").getAsString()), mouseX, mouseY);
             }
             String number = String.valueOf(r + 1);
-            g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? Theme.LINE_NUMBER_ON : Theme.LINE_NUMBER);
+            g.text(font, number, areaX + gutterW - GUTTER_PAD - font.width(number), y, r == row ? Theme.LINE_NUMBER_ON : Theme.LINE_NUMBER, Theme.shadow());
             g.enableScissor(textX, areaY, areaX + areaW, areaY + areaH);
             for (int[] m : matches) {
                 if (m[0] != r || m[1] > text.length()) continue;
@@ -998,7 +1000,7 @@ final class EditorScreen extends Screen {
             Integer foldEnd = folds.get(r);
             if (foldEnd != null) {
                 int fx = textX - scrollX + font.width(text) + 6;
-                String marker = " ⋯ " + (foldEnd - r) + " ";
+                String marker = " … " + (foldEnd - r) + " ";
                 g.fill(fx - 2, y - 1, fx + font.width(marker) + 2, y + LINE - 1, 0x60808080);
                 g.text(font, marker, fx, y, 0xFFC8C8C8, false);
                 for (int skip = r + 1; skip <= foldEnd; skip++) Highlighter.line(lines.get(skip), lang, block);
@@ -1014,7 +1016,7 @@ final class EditorScreen extends Screen {
             }
             g.disableScissor();
         }
-        if (!loaded) g.text(font, L.t("Загрузка…"), textX, areaY + 4, 0xFF8A8A8A);
+        if (!loaded) g.text(font, L.t("Загрузка…"), textX, areaY + 4, 0xFF8A8A8A, Theme.shadow());
         if (!completions.isEmpty()) {
             int shownRows = 0;
             for (int rr = scrollRow; rr < row && rr < lines.size(); rr = stepVisible(rr, 1)) { shownRows++; if (stepVisible(rr, 1) == rr) break; }
@@ -1035,7 +1037,7 @@ final class EditorScreen extends Screen {
             + " · " + (eol.equals("\r\n") ? "CRLF" : "LF") + " · " + lines.size() + L.t(" строк")
             + (carets.isEmpty() ? "" : " · " + (carets.size() + 1) + L.t(" курсоров"))
             + (diagnostics.isEmpty() ? "" : " · ⚠ " + diagnostics.size() + " (F8)");
-        g.text(font, status, width - font.width(status) - 6, height - 13, Theme.WINDOW_DIM);
-        if (!message.isEmpty()) g.text(font, font.plainSubstrByWidth(message, width - font.width(status) - 20), 6, height - 13, messageColor);
+        g.text(font, status, width - font.width(status) - 6, height - 13, Theme.WINDOW_DIM, Theme.shadow());
+        if (!message.isEmpty()) g.text(font, font.plainSubstrByWidth(message, width - font.width(status) - 20), 6, height - 13, messageColor, Theme.shadow());
     }
 }

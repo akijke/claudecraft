@@ -214,7 +214,7 @@ final class FileScreen extends Screen {
             }
         }
         x = tool(x, y, "⟳", L.t("Обновить"), () -> load(path()));
-        x = tool(x, y, "📂 " + L.t("Папка на ПК…"), L.t("Системное окно выбора; папка станет проектом"), () -> FolderPicker.pick(mod));
+        x = tool(x, y, "📁 " + L.t("Папка на ПК…"), L.t("Системное окно выбора; папка станет проектом"), () -> FolderPicker.pick(mod));
         filter = new EditBox(font, listX, 54, Math.min(listW, 180), 14, Component.literal("filter"));
         filter.setHint(Component.literal(L.t("фильтр…")));
         filter.setValue(filterValue);
@@ -222,7 +222,7 @@ final class FileScreen extends Screen {
         filter.setResponder(v -> { if (!contentMode) { applyFilter(); selected = rows.isEmpty() ? -1 : 0; listScroll = 0; } });
         addRenderableWidget(filter);
         // ✖ clears the search box and shows the whole folder again.
-        addRenderableWidget(Button.builder(Component.literal(contentMode ? "≡ " + L.t("в файлах") : "Aa " + L.t("имена")), b -> {
+        addRenderableWidget(Button.builder(Component.literal(contentMode ? "☰ " + L.t("в файлах") : "Aa " + L.t("имена")), b -> {
                 contentMode = !contentMode;
                 matches = null;
                 selected = -1;
@@ -475,22 +475,41 @@ final class FileScreen extends Screen {
         String p = path();
         String sep = p.contains("\\") ? "\\" : "/";
         String[] parts = p.split(sep.equals("\\") ? "\\\\" : "/");
+        java.util.List<String> labels = new java.util.ArrayList<>(), targets = new java.util.ArrayList<>();
         StringBuilder acc = new StringBuilder();
-        int x = 6;
         for (int i = 0; i < parts.length; i++) {
             if (parts[i].isEmpty() && i > 0) continue;
             acc.append(parts[i]);
-            String target = acc.toString() + (i == 0 ? sep : "");
+            targets.add(acc.toString() + (i == 0 ? sep : ""));
             acc.append(sep);
-            String label = parts[i].isEmpty() ? sep : parts[i];
-            int w = font.width(label);
-            if (x + w > width - 10) { g.text(font, "…", x, 20, DIM); break; }
+            labels.add(parts[i].isEmpty() ? sep : parts[i]);
+        }
+        // from the end: the current folder and its parent always show; "…" (opens its parent) replaces the rest
+        int arrow = font.width(" › "), room = width - 16 - font.width("…") - arrow, used = 0, first = labels.size();
+        while (first > 0 && (labels.size() - first < 2 || used + font.width(labels.get(first - 1)) + arrow <= room)) {
+            used += font.width(labels.get(first - 1)) + arrow;
+            first--;
+        }
+        int x = 6;
+        if (first > 0) {
+            int w = font.width("…");
             boolean hover = mouseY >= 20 && mouseY < 30 && mouseX >= x && mouseX < x + w;
-            g.text(font, label, x, 20, i == parts.length - 1 ? TEXT : hover ? GOLD : DIR);
+            g.text(font, "…", x, 20, hover ? GOLD : DIR);
             crumbs.add(new int[]{x, x + w, crumbPaths.size()});
-            crumbPaths.add(target);
+            crumbPaths.add(targets.get(first - 1));
             x += w;
-            if (i < parts.length - 1) { g.text(font, " › ", x, 20, FAINT); x += font.width(" › "); }
+            g.text(font, " › ", x, 20, FAINT);
+            x += arrow;
+        }
+        for (int i = first; i < labels.size(); i++) {
+            String label = labels.get(i);
+            int w = font.width(label);
+            boolean hover = mouseY >= 20 && mouseY < 30 && mouseX >= x && mouseX < x + w;
+            g.text(font, font.plainSubstrByWidth(label, Math.max(8, width - 10 - x)), x, 20, i == labels.size() - 1 ? TEXT : hover ? GOLD : DIR);
+            crumbs.add(new int[]{x, x + w, crumbPaths.size()});
+            crumbPaths.add(targets.get(i));
+            x += w;
+            if (i < labels.size() - 1) { g.text(font, " › ", x, 20, FAINT); x += arrow; }
         }
     }
 

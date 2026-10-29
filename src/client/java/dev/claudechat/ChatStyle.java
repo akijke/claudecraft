@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 /** Turns bridge events into styled chat lines (colours, icons, buttons, light markdown). */
 final class ChatStyle {
     // not final: Theme switches them
-    static int CLAUDE = 0xD97757, CODE_MODE = 0xB48EF0, TEXT = 0xE8E8E8, DIM = 0x8A8A8A, FAINT = 0x5E5E5E,
+    static int CLAUDE = 0xD97757, CODE_MODE = 0xB48EF0, TEXT = 0xE8E8E8, DIM = 0xA8A8A8, FAINT = 0x8C8C8C,
         GREEN = 0x6BD08B, RED = 0xF0626A, GOLD = 0xF2C14E, AQUA = 0x5CC8E6, CODE = 0xE5C07B, BLOCK = 0x9CDCFE,
         DIR = 0x6CA8FF;
     private static final Pattern INLINE = Pattern.compile("\\*\\*(.+?)\\*\\*|`([^`]+)`|\\[([^\\]]+)]\\((https?://[^)\\s]+)\\)");
@@ -310,8 +310,8 @@ final class ChatStyle {
         out.add(line(mode, head));
         MutableComponent tools = Component.literal("  ");
         if (!str(e, "parent").isEmpty()) tools.append(button("..", cmd + "cd ..", false, AQUA, L.t("Вверх"))).append(" ");
-        tools.append(button("▣ " + L.t("окно"), cmd + "files", false, GOLD, L.t("Открыть окно файлового менеджера"))).append(" ");
-        tools.append(button("≡ tree", cmd + "tree", false, AQUA, L.t("Дерево папок"))).append(" ");
+        tools.append(button("☰ " + L.t("окно"), cmd + "files", false, GOLD, L.t("Открыть окно файлового менеджера"))).append(" ");
+        tools.append(button("☰ tree", cmd + "tree", false, AQUA, L.t("Дерево папок"))).append(" ");
         if (str(e, "project").isEmpty())
             tools.append(button(L.t("✦ Сделать проектом"), "/cc project here", false, CODE_MODE,
                 L.t("Claude будет работать в этой папке (новый проект)"))).append(" ");
@@ -353,9 +353,9 @@ final class ChatStyle {
         if (used <= 0 || window <= 0) return;
         int pct = (int) Math.min(100, Math.round(100.0 * used / window));
         int color = pct >= 80 ? RED : pct >= 60 ? GOLD : GREEN;
-        int filled = Math.round(pct / 10f);
-        c.append(lit("  ◎ ", DIM)).append(lit("■".repeat(filled), color)).append(lit("■".repeat(10 - filled), FAINT))
-            .append(button(" " + pct + "%", "/" + mode + " compact ", true, color,
+        int filled = Math.round(pct / 20f);  // 5 cells: keeps the "done" line on one chat row
+        c.append(lit("  ◎ ", DIM)).append(lit("■".repeat(filled), color)).append(lit("■".repeat(5 - filled), 0x4A4A4A))
+            .append(lit(" ", DIM)).append(button(pct + "%", "/" + mode + " compact ", true, color,
                 human(used) + " / " + human(window) + L.t(" токенов в контексте · клик — /compact")));
     }
 

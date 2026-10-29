@@ -41,14 +41,17 @@ final class DashboardScreen extends Screen {
         }));
     }
 
+    private int buttonsLeft;
+
     @Override protected void init() {
         int x = width - 6;
         x = button(x, "✕", this::onClose);
-        x = button(x, tokens ? L.t("токены") : "$", () -> { tokens = !tokens; rebuildWidgets(); });
+        x = button(x, tokens ? "$ | ● Σ" : "● $ | Σ", () -> { tokens = !tokens; rebuildWidgets(); });
         for (int d : new int[]{30, 14, 7}) {
             int value = d;
             x = button(x, (days == d ? "● " : "") + d + L.t(" дн."), () -> { days = value; data = null; load(); rebuildWidgets(); });
         }
+        buttonsLeft = x;
         if (data == null || !data.has("days") || data.getAsJsonArray("days").size() != days) load();
     }
 
@@ -64,7 +67,7 @@ final class DashboardScreen extends Screen {
     private double value(JsonObject o) { return tokens ? o.get("tokens").getAsDouble() : o.get("cost").getAsDouble(); }
 
     private String fmt(double v) {
-        return tokens ? ChatStyle.human((long) v) : String.format(Locale.ROOT, v >= 10 ? "$%.0f" : "$%.2f", v);
+        return tokens ? ChatStyle.human((long) v) : String.format(Locale.ROOT, "$%.2f", v);
     }
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
@@ -76,7 +79,7 @@ final class DashboardScreen extends Screen {
         String summary = String.format(Locale.ROOT, L.t("за %d дн.: %s · %s токенов · %d ходов"), days,
             String.format(Locale.ROOT, "$%.2f", total.get("cost").getAsDouble()), ChatStyle.human(total.get("tokens").getAsLong()),
             total.get("turns").getAsInt());
-        g.text(font, font.plainSubstrByWidth(summary, width - 70 - 200), 70, 9, 0xFF8A8A8A);
+        g.text(font, font.plainSubstrByWidth(summary, Math.max(0, buttonsLeft - 76)), 70, 9, 0xFF8A8A8A);
 
         // per day: vertical bars
         JsonArray perDay = data.getAsJsonArray("days");
