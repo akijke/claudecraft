@@ -1,0 +1,103 @@
+{
+  "manifest_version": 3,
+  "name": "Overlaycraft",
+  "version": "0.3.0",
+  "description": "Minecraft overlay (Overlaycraft): your tabs, Yandex Eda order and music controls. Talks only to 127.0.0.1.",
+  "permissions": [
+    "tabs",
+    "alarms",
+    "storage",
+    "scripting",
+    "cookies"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:18745/*",
+    "https://eda.yandex.ru/*",
+    "https://eda.yandex.kz/*",
+    "https://eda.yandex.by/*",
+    "https://market-delivery.yandex.ru/*",
+    "https://*.youtube.com/*",
+    "https://soundcloud.com/*",
+    "https://*.soundcloud.com/*",
+    "https://vk.com/*",
+    "https://*.vk.com/*",
+    "https://vk.ru/*",
+    "https://*.vk.ru/*",
+    "https://huevo.su/*",
+    "https://*.huevo.su/*",
+    "https://music.yandex.ru/*",
+    "https://web.telegram.org/*",
+    "https://open.spotify.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://eda.yandex.ru/*",
+        "https://eda.yandex.kz/*",
+        "https://eda.yandex.by/*",
+        "https://market-delivery.yandex.ru/*"
+      ],
+      "js": [
+        "eda-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://eda.yandex.ru/*",
+        "https://eda.yandex.kz/*",
+        "https://eda.yandex.by/*",
+        "https://market-delivery.yandex.ru/*"
+      ],
+      "js": [
+        "eda-relay.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://soundcloud.com/*",
+        "https://*.soundcloud.com/*",
+        "https://vk.com/*",
+        "https://*.vk.com/*",
+        "https://vk.ru/*",
+        "https://*.vk.ru/*",
+        "https://huevo.su/*",
+        "https://*.huevo.su/*",
+        "https://music.yandex.ru/*",
+        "https://web.telegram.org/*",
+        "https://open.spotify.com/*"
+      ],
+      "js": [
+        "media-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://soundcloud.com/*",
+        "https://*.soundcloud.com/*",
+        "https://vk.com/*",
+        "https://*.vk.com/*",
+        "https://vk.ru/*",
+        "https://*.vk.ru/*",
+        "https://huevo.su/*",
+        "https://*.huevo.su/*",
+        "https://music.yandex.ru/*",
+        "https://web.telegram.org/*",
+        "https://open.spotify.com/*"
+      ],
+      "js": [
+        "media-relay.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

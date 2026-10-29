@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "overlaycraft",
+  "version": "${version}",
+  "name": "Overlaycraft",
+  "description": "Claudecraft addon: a translucent HUD with music (YouTube, SoundCloud, VK, huevo.su, Telegram), your Yandex Eda order and browser tabs. Drag the widgets in chat; Claude can control them.",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.overlaycraft.Overlaycraft"]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "claude_chat": "*"
+  }
+}

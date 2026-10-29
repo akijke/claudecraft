@@ -233,3 +233,25 @@ HTTP middleware тестируется в памяти, без реальног�
 
 Репозиторий: akijke/claudecraft (private). Не отправляй .env, ключи, connection.json,
 bridge-token, chats.json, bridge-config.json, рабочие каталоги или историю Claude.
+
+## Overlaycraft (2026-10-29): аддон overlaycraft/
+
+Отдельный мод (НЕ копирует код основного, работает и без Claudecraft), id overlaycraft,
+пакет dev.overlaycraft, порт 18745. Полупрозрачные карточки HUD: музыка (медиасессии Windows
+через media.ps1 — WinRT; Console.In.ReadLineAsync в .NET Framework блокирует, поэтому StreamReader
+над OpenStandardInput), Яндекс Еда и вкладки браузера (browser-extension/, MV3, заказ ловится из
+fetch/XHR страницы и переспрашивается фоном). Видно в игре и в чате (перетаскивание, ПКМ —
+свернуть, ✖ — скрыть), в других экранах скрыто или приглушено (/ov screens). Claude управляет
+через claude-extension/server.py (MCP без зависимостей), аддон ставит его в workspace сам.
+В 26.3 нет Util.getPlatform().openUri/openPath (открываем через rundll32), F1 = gui.hud.isHidden().
+Проверка: `gradlew :overlaycraft:runShots`, `gradlew :overlaycraft:runLiveTest` (15/15).
+Не проверено: настоящее расширение в браузере и реальный ответ Яндекс Еды; кнопки
+play/pause на живой музыке (не трогали музыку пользователя).
+Overlaycraft 0.2.0: справка для разработки — overlaycraft/DEVELOPMENT.md (раздел на каждую версию,
+пользователь просил давать её с каждой версией). Запуск вместе с Claudecraft:
+`gradlew :overlaycraft:installToClaudecraft` (jar в run/mods), потом `gradlew runClient`.
+Подозрение: ChatSize (уголок размера чата) не получает mouseDragged после отменённого клика — см. DEVELOPMENT.md.
+Overlaycraft 0.3.0: Яндекс Еда через API сайта (eats-orders-tracking/v1/tracking-for-mobile/check →
+tracking-for-desktop, Bearer из cookie webapitoken). Запускать игру ТОЛЬКО `gradlew :runClient`
+(без двоеточия стартуют все подпроекты, и порт 18745 занимает лишняя игра). ChatSize тянется в afterExtract
+(LiveTest-шаг с настоящей мышью). Подробности — overlaycraft/DEVELOPMENT.md.
