@@ -25,7 +25,8 @@ loom {
 }
 repositories { maven { url = 'https://maven.terraformersmc.com/releases/' } }
 dependencies {
-    runtimeOnly files(rootProject.tasks.named('jar').flatMap { it.archiveFile })
+    // Claudecraft for this addon's own dev runs; bareJar = without the nested addons (no duplicates)
+    runtimeOnly files(rootProject.tasks.named('bareJar').flatMap { it.archiveFile })
     minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"

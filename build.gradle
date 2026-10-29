@@ -5,6 +5,9 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 
+// Addon subprojects bundled into this mod (see dependencies and the run tasks below).
+ext.ADDONS = ['codexcraft', 'geminicraft', 'overlaycraft']
+
 loom {
     splitEnvironmentSourceSets()
     runs {
@@ -36,6 +39,18 @@ repositories {
     maven { url = 'https://maven.terraformersmc.com/releases/' }
 }
 
+// The main mod without the nested addons: the addons' own dev runs (:codexcraft:runShots…)
+// load it, because the full jar would bring a second copy of the addon itself.
+tasks.register('bareJar', Jar) {
+    archiveClassifier = 'bare'
+    destinationDirectory = layout.buildDirectory.dir('bare')
+    from sourceSets.main.output
+    from sourceSets.client.output
+}
+// The addons' tasks must exist before the dependencies below refer to their jars
+// (and they refer back to bareJar, registered above).
+ADDONS.each { evaluationDependsOn(":${it}") }
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
@@ -46,6 +61,29 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // One jar, one game: the addons ship inside claude-chat-<version>.jar (Fabric jar-in-jar,
+    // META-INF/jars), and the dev runs (:runClient, :runShots, :runLiveTest) load their jars too.
+    // No more `:overlaycraft:installToClaudecraft` or copying jars into run/mods.
+    for (String addon : ADDONS) {
+        include project(":${addon}")
+        localRuntime files(rootProject.project(":${addon}").tasks.named('jar').flatMap { it.archiveFile })
+    }
+}
+
+// The addons now come from the classpath (dev) or from inside the jar (release). A copy left in
+// run/mods by the old installToClaudecraft (or a hand-copied addon jar) would load the same mod
+// id twice, and Fabric refuses to start with duplicate mods: remove such copies before a run.
+def runMods = file('run/mods')
+def addonNames = ADDONS
+tasks.withType(JavaExec).configureEach {
+    doFirst {
+        if (!runMods.isDirectory()) return
+        runMods.listFiles().findAll { f -> addonNames.any { f.name.startsWith("${it}-") && f.name.endsWith('.jar') } }.each {
+            logger.lifecycle("Claudecraft: removing run/mods/${it.name} (the addon is built in now)")
+            it.delete()
+        }
+    }
 }
 
 sourceSets {

@@ -768,6 +768,23 @@ public final class ClaudeChat implements ClientModInitializer {
         }
         if (!topic.isEmpty() && shown == 0) show(ChatStyle.line(mode, ChatStyle.lit(L.t("  нет такого раздела"), ChatStyle.DIM)));
         show(ChatStyle.line(mode, topics));
+        // The addons built into this jar (Codexcraft, Geminicraft, Overlaycraft): a click opens each
+        // one's help. Only the main mod shows this line (the Codex/Gemini copies compile it too).
+        if (getClass().getPackageName().equals("dev.claude" + "chat")
+                && (topic.isEmpty() || topic.equals("settings") || topic.equals("all"))) {
+            net.minecraft.network.chat.MutableComponent addons = Component.literal("  ").append(ChatStyle.lit(L.t("В комплекте: "), ChatStyle.FAINT));
+            String[][] list = {
+                {"codexcraft", "Codex (J)", "/gpt", L.t("Codex: /gpt — разговор, /codex — код")},
+                {"geminicraft", "Gemini (G)", "/gem", L.t("Gemini CLI: /gem — разговор, /gemini — код")},
+                {"overlaycraft", L.t("Оверлей"), "/ov", L.t("Overlaycraft: музыка, Яндекс Еда и вкладки браузера поверх игры")}};
+            int count = 0;
+            for (String[] a : list) {
+                if (!FabricLoader.getInstance().isModLoaded(a[0])) continue;
+                addons.append(ChatStyle.button(a[1] + " " + a[2], a[2], false, ChatStyle.AQUA, a[3])).append(" ");
+                count++;
+            }
+            if (count > 0) show(ChatStyle.line(mode, addons));
+        }
         if (!topic.isEmpty()) return;
         show(ChatStyle.line(mode, Component.literal("  ")
             .append(ChatStyle.button(L.t("☰ Окно (K)"), c + "ui", false, ChatStyle.CODE_MODE, L.t("Отдельный экран переписки"))).append(" ")

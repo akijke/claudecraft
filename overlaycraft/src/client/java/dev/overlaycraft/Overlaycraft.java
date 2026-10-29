@@ -34,7 +34,7 @@ public final class Overlaycraft implements ClientModInitializer {
             Installer.unpackBrowserExtension();
             Installer.installClaudeExtension();
         }
-        ClientTickEvents.END_CLIENT_TICK.register(client -> { Media.tick(); DevShots.tick(client); LiveTest.tick(client); });
+        ClientTickEvents.END_CLIENT_TICK.register(client -> { Palette.tick(); Media.tick(); DevShots.tick(client); LiveTest.tick(client); });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { Media.stop(); Server.stop(); });
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> dispatcher.register(literal("ov")
             .requires(source -> source.attended())

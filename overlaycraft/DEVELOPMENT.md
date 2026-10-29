@@ -6,6 +6,43 @@
 
 ---
 
+## 0.4.0 — 2026-10-29: вшит в Claudecraft
+
+### Что изменилось
+- **Один jar, одна игра.** Корневой build.gradle: `include project(':overlaycraft')` (и так же
+  `:codexcraft`, `:geminicraft`) — `build/libs/claude-chat-1.1.0.jar` содержит
+  `META-INF/jars/overlaycraft-0.4.0.jar`, `codexcraft-1.1.0.jar`, `geminicraft-1.1.0.jar`, а
+  `fabric.mod.json` — их записи `"jars"`. В профиль игрока кладётся только claude-chat.
+- **Dev-запуск:** `gradlew :runClient` / `:runShots` / `:runLiveTest` грузят все четыре мода
+  (jar аддонов в `localRuntime`). `installToClaudecraft` больше не нужен: задача оставлена
+  безвредной (только удаляет старую копию из `run/mods` и пишет подсказку). Каждый запуск
+  корня перед стартом сам удаляет `run/mods/{overlaycraft,codexcraft,geminicraft}-*.jar` —
+  иначе Fabric падает на повторном id мода.
+- Аддоны Codex/Gemini для своих отдельных запусков (`:codexcraft:runShots`) берут
+  `claude-chat-…-bare.jar` (задача `bareJar`, без вложенных аддонов) — без дублей.
+- **Палитра Claudecraft:** `Palette.java` раз в 2 с читает (рефлексией, без зависимости)
+  `dev.claudechat.ChatStyle` (TEXT, DIM, FAINT, GOLD, CLAUDE) и фон окон `Theme.SCREEN_BG`;
+  карточки следуют `/claude theme`. На теме light фон карточек остаётся тёмным (текст чата
+  Claudecraft светлый во всех темах). Без Claudecraft — те же значения тёмной темы по умолчанию
+  (фон 0x151518 вместо 0x0B0B0E, DIM 0xA8A8A8, FAINT 0x8C8C8C).
+- Справка `/c`, `/cc` Claudecraft: строка «В комплекте:» с кнопками Codex (J) /gpt, Gemini (G) /gem,
+  Оверлей /ov (только для загруженных аддонов).
+- HUD-панель задач (Notify): у Geminicraft своя строка (y=168), раньше она лежала на панели Codexcraft.
+
+### Проверено
+- `gradlew build` — ок, jar содержит три вложенных аддона.
+- `gradlew :runShots` в worktree: «Loading 55 mods» — claude_chat 1.1.0, codexcraft 1.1.0,
+  geminicraft 1.1.0, overlaycraft 0.4.0; подложенный `run/mods/overlaycraft-0.3.0.jar` удалён
+  перед стартом; без крэша. Порт 18745 был занят открытой игрой пользователя
+  («Address already in use») — ожидаемо, на загрузку модов не влияет.
+- `gradlew :overlaycraft:runShots` (отдельно, без Claudecraft) — карточки рисуются.
+
+### Не проверено
+- Цвета карточек при живом Claudecraft (рефлексия) на скриншоте: в `:runShots` корня карточки
+  пусты (нет музыки/заказа). Строка «В комплекте:» в справке в игре не открывалась.
+
+---
+
 ## 0.3.0 — 2026-10-29
 
 ### Что изменилось

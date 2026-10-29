@@ -98,10 +98,12 @@ final class Notify {
         Minecraft client = Minecraft.getInstance();
         var font = client.font;
         int width = client.getWindow().getGuiScaledWidth();
-        // Codexcraft generates a copy of this class (package renamed): put its panel lower, so both fit.
-        boolean main = Notify.class.getPackageName().equals("dev.claude" + "chat");
+        // Codexcraft and Geminicraft generate copies of this class (package renamed) and run in the
+        // same game: each gets its own row, so the three panels never cover each other.
+        String pkg = Notify.class.getPackageName();
+        boolean main = pkg.equals("dev.claude" + "chat");
         // Top-left: toasts and status effects already use the top-right corner.
-        int w = 150, x = 6, y = main ? 4 : 86, shown = 0;
+        int w = 150, x = 6, y = main ? 4 : pkg.endsWith("gemini" + "craft") ? 168 : 86, shown = 0;
         for (Task t : TASKS.values()) {
             if (shown++ == 3) break;
             long s = (System.currentTimeMillis() - t.started) / 1000;

@@ -27,7 +27,8 @@ no way to add to a running turn).
 
 ## Setup
 
-1. Install Claudecraft and Geminicraft (both JARs) into the same Fabric 26.3 profile.
+1. Install Claudecraft (`claude-chat-1.1.0.jar`) into a Fabric 26.3 profile: Geminicraft ships
+   inside it (jar-in-jar). Don't add a separate `geminicraft-*.jar` (a duplicate mod id stops Fabric).
 2. `/geminicraft` → **Install Gemini CLI** (runs `npm install -g @google/gemini-cli`; needs Node.js).
 3. **Sign in with Google** — Gemini CLI opens the browser on this PC — or paste an
    API key from aistudio.google.com/apikey.

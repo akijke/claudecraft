@@ -23,7 +23,10 @@ import java.util.List;
  */
 final class Hud {
     static final int W = 176;
-    static final int TEXT = 0xFFE8E8E8, DIM = 0xFF8A8A8A, FAINT = 0xFF5E5E5E, GOLD = 0xFFF2C14E;
+    // Claudecraft's palette (dark theme); Palette.tick() follows its current theme when it is loaded
+    static int TEXT = 0xFFE8E8E8, DIM = 0xFFA8A8A8, FAINT = 0xFF8C8C8C, GOLD = 0xFFF2C14E;
+    /** Card background, RGB: Claudecraft's window background; the alpha comes from /ov opacity. */
+    static int CARD = 0x151518;
 
     private record Hit(int x1, int y1, int x2, int y2, Runnable action) {
         boolean in(double x, double y) { return x >= x1 && x < x2 && y >= y1 && y < y2; }
@@ -113,7 +116,7 @@ final class Hud {
             int x = c.x(), y = c.y(), full = c.h();
             Painter p = painter(name);
             boolean hot = chat && (name.equals(dragging) || (mouseX >= x && mouseX < x + W && mouseY >= y && mouseY < y + full));
-            g.fill(x, y, x + W, y + full, (Math.round(Config.opacity * 2.55f) << 24) | 0x0B0B0E);
+            g.fill(x, y, x + W, y + full, (Math.round(Config.opacity * 2.55f) << 24) | CARD);
             if (hot) outline(g, x, y, W, full, name.equals(dragging) ? GOLD : 0x50FFFFFF);
             p.paint(g, mc.font, x, y, w.compact, chat);
             if (faded) g.fill(x, y, x + W, y + full, 0xA8000000);

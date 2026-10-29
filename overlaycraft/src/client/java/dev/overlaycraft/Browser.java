@@ -186,7 +186,7 @@ final class Browser {
 
     record Source(String name, int color) { }
 
-    static final int ACCENT = 0xFFD97757;
+    static int ACCENT = 0xFFD97757;  // Claudecraft orange (Palette follows its theme)
 
     /** Names the service of a media session, by its app and the browser tab that plays it. */
     static Source source(Media.Session s) {

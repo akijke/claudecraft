@@ -771,5 +771,10 @@
   "Обычный размер чата": "Default chat size",
   "Тяните, чтобы изменить высоту": "Drag to change the height",
   "Тяните, чтобы изменить ширину": "Drag to change the width",
-  "Тяните, чтобы изменить размер; двойной клик — обычный размер": "Drag to resize; double click for the default size"
+  "Тяните, чтобы изменить размер; двойной клик — обычный размер": "Drag to resize; double click for the default size",
+  "В комплекте: ": "Built in: ",
+  "Codex: /gpt — разговор, /codex — код": "Codex: /gpt — conversation, /codex — code",
+  "Gemini CLI: /gem — разговор, /gemini — код": "Gemini CLI: /gem — conversation, /gemini — code",
+  "Оверлей": "Overlay",
+  "Overlaycraft: музыка, Яндекс Еда и вкладки браузера поверх игры": "Overlaycraft: music, Yandex Eda and browser tabs over the game"
 }

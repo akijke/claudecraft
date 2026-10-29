@@ -5,7 +5,7 @@ plugins {
 // Overlaycraft: a translucent HUD overlay (music, Yandex Eda order, browser tabs).
 // A standalone addon: unlike Codexcraft/Geminicraft it copies no code from the main mod
 // and runs with or without Claudecraft installed.
-version = '0.3.0'
+version = '0.4.0'
 group = 'dev.overlaycraft'
 base { archivesName = 'overlaycraft' }
 
@@ -62,11 +62,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
 }
 
-// gradlew :overlaycraft:installToClaudecraft — puts the jar into the main mod's run/mods,
-// so `gradlew runClient` starts Claudecraft together with Overlaycraft.
-tasks.register('installToClaudecraft', Copy) {
-    dependsOn tasks.named('jar')
-    from tasks.named('jar').flatMap { it.archiveFile }
-    into rootProject.file('run/mods')
-    doFirst { rootProject.fileTree('run/mods') { include 'overlaycraft-*.jar' }.each { it.delete() } }
+// Overlaycraft is built into Claudecraft now (jar-in-jar; `gradlew :runClient` loads it).
+// The old installToClaudecraft task only cleans up: a copy in the main run/mods would load the
+// mod twice, and Fabric refuses to start with a duplicate mod id.
+tasks.register('installToClaudecraft') {
+    def mods = rootProject.file('run/mods')
+    doLast {
+        if (mods.isDirectory())
+            mods.listFiles().findAll { it.name.startsWith('overlaycraft-') && it.name.endsWith('.jar') }.each { it.delete() }
+        logger.lifecycle('Overlaycraft is part of Claudecraft now: just run `gradlew :runClient`.')
+    }
 }

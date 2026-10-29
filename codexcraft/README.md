@@ -16,7 +16,9 @@ HTTP port, settings and chats.
 
 ## Install
 
-1. Put `claude-chat-1.1.0.jar` and `codexcraft-1.1.0.jar` into the profile's `mods` folder.
+1. Put `claude-chat-1.1.0.jar` into the profile's `mods` folder: Codexcraft ships inside it
+   (Fabric jar-in-jar, together with Geminicraft and Overlaycraft). Don't add a separate
+   `codexcraft-*.jar` next to it — Fabric refuses to start with the same mod twice.
 2. Install Python 3.11+ and the official Codex CLI. Check `codex --version`.
 3. Start Minecraft. The Python bridge unpacks and starts automatically.
 4. `/codex settings` or `/codexcraft` → **Sign in with ChatGPT** → open the sign-in

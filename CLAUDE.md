@@ -249,9 +249,20 @@ fetch/XHR страницы и переспрашивается фоном). Ви
 play/pause на живой музыке (не трогали музыку пользователя).
 Overlaycraft 0.2.0: справка для разработки — overlaycraft/DEVELOPMENT.md (раздел на каждую версию,
 пользователь просил давать её с каждой версией). Запуск вместе с Claudecraft:
-`gradlew :overlaycraft:installToClaudecraft` (jar в run/mods), потом `gradlew runClient`.
+(устарело, см. «Всё в одном jar») `gradlew :overlaycraft:installToClaudecraft`, потом `gradlew runClient`.
 Подозрение: ChatSize (уголок размера чата) не получает mouseDragged после отменённого клика — см. DEVELOPMENT.md.
 Overlaycraft 0.3.0: Яндекс Еда через API сайта (eats-orders-tracking/v1/tracking-for-mobile/check →
 tracking-for-desktop, Bearer из cookie webapitoken). Запускать игру ТОЛЬКО `gradlew :runClient`
 (без двоеточия стартуют все подпроекты, и порт 18745 занимает лишняя игра). ChatSize тянется в afterExtract
 (LiveTest-шаг с настоящей мышью). Подробности — overlaycraft/DEVELOPMENT.md.
+
+## Всё в одном jar (2026-10-29, #6)
+
+Пользователь: «кодекс отвалился», «пришей всё обратно». Теперь корневой build.gradle
+(`ext.ADDONS`) делает `include project(':codexcraft' | ':geminicraft' | ':overlaycraft')` —
+jar-in-jar в claude-chat-<версия>.jar (META-INF/jars) — и `localRuntime` их jar для dev-запусков.
+`gradlew :runClient` (с двоеточием!) = все четыре мода в одной игре. installToClaudecraft больше не
+нужен (оставлен безвредным); любой JavaExec корня удаляет run/mods/<аддон>-*.jar (дубль id = Fabric не
+стартует). Аддоны Codex/Gemini для своих запусков берут root `bareJar` (без вложенных аддонов).
+Порты: 18741 Claude, 18742 Codex, 18743 Gemini, 18745 оверлей; клавиши K/J/G; панели задач Notify
+на y=4/86/168. Overlaycraft 0.4.0 берёт палитру Claudecraft рефлексией (Palette.java).
