@@ -471,6 +471,41 @@ class Bridge:
         result.pop('hashes')
         self.emit(chat, 'Замена', kind='replace_preview', **result)
 
+    def peer_directory(self):
+        """Config folder of the other mod's bridge (Claudecraft <-> Codexcraft) in the same game."""
+        # Names are built from parts: Codexcraft's generated copy of this file replaces the literal words.
+        claude_dir, codex_dir = 'claude' + '-chat', 'codex' + 'craft'
+        return self.directory.parent / (codex_dir if self.directory.name == claude_dir else claude_dir)
+
+    async def cross_review(self, chat, focus=''):
+        """/cc crossreview — the other assistant reviews this project's uncommitted changes."""
+        import aiohttp
+        folder = self.chat_cwd(chat)
+        is_codex = self.directory.name == 'codex' + 'craft'
+        me = 'Codex' if is_codex else 'Clau' + 'de'
+        prompt = (f'Cross-review: {me} changed files in the project at {folder}. Review the uncommitted changes there '
+                  f'(run `git -C "{folder}" diff` and `git -C "{folder}" status`; read files as needed). Report bugs, '
+                  'risks and missed edge cases ranked by severity with file:line; do not edit any files.'
+                  + (f' Focus: {focus}' if focus else ''))
+        peer = self.peer_directory() / 'connection.json'
+        if peer.is_file():
+            try:
+                info = json.loads(peer.read_text(encoding='utf-8'))
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as http:
+                    async with http.post(f"http://127.0.0.1:{int(info['port'])}/command",
+                                         json={'mode': 'cc', 'action': 'q', 'text': prompt},
+                                         headers={'Authorization': 'Bearer ' + info['token']}) as r:
+                        if r.status == 200:
+                            slash = '/'
+                            other = ('Clau' + 'decraft (' + slash + 'cc)') if is_codex else ('Codex' + 'craft (' + slash + 'codex)')
+                            self.emit(chat, f'Изменения отправлены на ревью в {other} — ответ появится там',
+                                      kind='status')
+                            return
+            except Exception:
+                pass  # the other bridge is not running: review here
+        await self.enqueue(chat, 'Use the code-reviewer subagent for an independent review. ' + prompt)
+        self.emit(chat, 'Второго мода нет — ревью делает отдельный агент code-reviewer', kind='status')
+
     def session_dir(self, chat):
         return chat.session_cwd or self.chat_cwd(chat)
 
@@ -973,6 +1008,8 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action in ('crossreview', 'xreview'):
+            await self.cross_review(chat, text.strip())
         elif action == 'watch':
             from backends import watch
             folder = self.chat_cwd(chat)

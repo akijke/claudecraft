@@ -78,6 +78,7 @@ final class PaletteScreen extends Screen {
             {L.t("Индикатор задач вкл/выкл"), "/claude hud", ""}, {L.t("Справка"), "/cc help", ""},
             {L.t("Экспорт чата в Markdown"), "/cc export", ""}, {L.t("Экспорт чата в HTML"), "/cc export html", ""},
             {L.t("Поиск по истории чатов…"), "/cc search ", ""},
+            {L.t("Кросс-ревью изменений"), "/cc crossreview", "Codex ↔ Claude"},
         };
         for (String[] t : table) e.add(new Entry(t[0], t[1], t[2], t[1].endsWith(" ")));
         for (String[] c : ClaudeChat.slashCommands)

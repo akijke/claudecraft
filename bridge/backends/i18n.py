@@ -157,6 +157,8 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Изменения отправлены на ревью в {} — ответ появится там': 'The changes were sent for review to {} — the answer appears there',
+    'Второго мода нет — ревью делает отдельный агент code-reviewer': 'The other mod is not running — a separate code-reviewer agent reviews',
     'Наблюдение остановлено': 'Watching stopped', 'Сейчас ничего не падает': 'Nothing is failing right now',
     'Слежу за проектом: при изменениях запускаю «{}»': 'Watching the project: running “{}” on changes',
     'Наблюдение': 'Watch mode',

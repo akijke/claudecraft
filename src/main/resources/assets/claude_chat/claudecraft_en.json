@@ -654,5 +654,7 @@
   "Наблюдение выключено — /cc watch <команда>": "Watch mode is off — /cc watch <command>",
   "Слежу: ": "Watching: ",
   " запусков · ": " runs · ",
-  "<команда> — при изменениях файлов запускать тесты/сборку, при падении — кнопка «Claude, почини» · watch stop": "<command> — rerun tests/build when files change; on failure a “Claude, fix it” button · watch stop"
+  "<команда> — при изменениях файлов запускать тесты/сборку, при падении — кнопка «Claude, почини» · watch stop": "<command> — rerun tests/build when files change; on failure a “Claude, fix it” button · watch stop",
+  "Кросс-ревью изменений": "Cross-review of the changes",
+  "[фокус] — ревью изменений другим ИИ: Codexcraft ↔ Claudecraft (или агент code-reviewer)": "[focus] — another AI reviews the changes: Codexcraft ↔ Claudecraft (or the code-reviewer agent)"
 }

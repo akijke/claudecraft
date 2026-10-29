@@ -1269,6 +1269,42 @@ class PullRequestTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Closes #3', prompt)
 
 
+class CrossReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_review_goes_to_the_other_bridge_or_a_subagent(self):
+        from aiohttp.test_utils import TestServer
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        config = Path(temp.name) / 'config'
+        claude = Bridge(config / 'claude-chat', AsyncMock())
+        self.addAsyncCleanup(claude.close)
+        # no peer yet: an independent subagent review in the same chat
+        await claude.command({'mode': 'cc', 'action': 'crossreview', 'text': 'security'})
+        for _ in range(50):
+            if claude.runner.await_count:
+                break
+            await asyncio.sleep(0.02)
+        self.assertIn('code-reviewer subagent', claude.runner.await_args.args[1])
+        self.assertIn('Focus: security', claude.runner.await_args.args[1])
+        # the other mod's bridge is running next to it
+        codex = Bridge(config / 'codexcraft', AsyncMock())
+        self.addAsyncCleanup(codex.close)
+        server = TestServer(create_app(codex, 'peer-token'), host='127.0.0.1')
+        await server.start_server()
+        self.addAsyncCleanup(server.close)
+        (config / 'codexcraft' / 'connection.json').write_text(json.dumps({'port': server.port, 'token': 'peer-token'}),
+                                                               encoding='utf-8')
+        await claude.command({'mode': 'cc', 'action': 'crossreview', 'text': ''})
+        for _ in range(100):
+            if codex.runner.await_count:
+                break
+            await asyncio.sleep(0.02)
+        prompt = codex.runner.await_args.args[1]
+        self.assertIn('Cross-review: Claude changed files', prompt)
+        self.assertIn(str(claude.chat_cwd(claude.current_chat('cc'))), prompt)
+        self.assertEqual(claude.runner.await_count, 1)               # not reviewed locally this time
+        self.assertTrue(any('Codexcraft (/codex)' in e['text'] for e in claude.events if e['kind'] == 'status'))
+
+
 class WatchTests(unittest.IsolatedAsyncioTestCase):
     async def test_rerun_on_change_failure_card_fix_button_and_recovery(self):
         from backends import watch
