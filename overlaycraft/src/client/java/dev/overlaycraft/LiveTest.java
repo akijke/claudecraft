@@ -112,8 +112,12 @@ final class LiveTest {
                 if (waited == 20) {
                     check("dragging the music card with the mouse moves it left (fx " + String.format("%.2f", before) + " → "
                         + String.format("%.2f", Config.widget("music").fx) + ")", Config.widget("music").fx < 0.5);
+                }
+                // aim at the tabs card twice: the cards move up after the drag, and the
+                // first aim can still see where they stood the frame before
+                if (waited == 18 || waited == 21) {
                     int[] t = Hud.cardRect("tabs");
-                    if (t != null) mouse.onMove(window, (t[0] + 40) * k, (t[1] + 4) * k, 0, 0);
+                    if (t != null) mouse.onMove(window, (t[0] + 40) * k, (t[1] + t[3] / 2.0) * k, 0, 0);
                 }
                 if (waited == 22) mouse.onButton(window, new MouseButtonInfo(1, 0), 1);
                 if (waited == 23) mouse.onButton(window, new MouseButtonInfo(1, 0), 0);

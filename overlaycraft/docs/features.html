@@ -1,0 +1,234 @@
+<title>Overlaycraft 0.4</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; screenshots break out wider; reference tables at the end */
+:root {
+  --bg: #eef0f3; --paper: #ffffff; --fg: #1b1d22; --dim: #5d6370; --line: #d9dce3;
+  --accent: #c8623f; --music: #e2753c; --food: #c99a16; --tabs: #c8623f; --ok: #2f9a59;
+  --code-bg: #f3f4f7;
+  --display: "Unbounded", "Segoe UI", system-ui, sans-serif;
+  --body: "Onest", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141519; --paper: #1c1e24; --fg: #e8e8ea; --dim: #9aa0ad; --line: #2e313a;
+  --accent: #e08a68; --music: #ff9a5c; --food: #f2c14e; --tabs: #e08a68; --ok: #5fd38b; --code-bg: #23262d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141519; --paper: #1c1e24; --fg: #e8e8ea; --dim: #9aa0ad; --line: #2e313a;
+  --accent: #e08a68; --music: #ff9a5c; --food: #f2c14e; --tabs: #e08a68; --ok: #5fd38b; --code-bg: #23262d; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 64px; }
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 56px; }
+header { display: grid; gap: 14px; }
+.kicker { font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(30px, 6vw, 52px)/1.05 var(--display); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+h2 { font: 600 clamp(20px, 3.4vw, 26px)/1.2 var(--display); margin: 0; text-wrap: balance; }
+h3 { font: 600 17px/1.3 var(--body); margin: 0; }
+p, li { max-width: 68ch; margin: 0; }
+.lead { font-size: 18px; color: var(--dim); }
+section { display: grid; gap: 18px; }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+code, kbd { font: 13.5px var(--mono); background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 8px; font: 600 13px var(--mono); }
+.chip::before { content: ""; width: 4px; height: 16px; background: currentColor; }
+.music { color: var(--music); } .food { color: var(--food); } .tabs { color: var(--tabs); }
+
+figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
+figure img { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); image-rendering: auto; }
+figcaption { font-size: 14px; color: var(--dim); }
+figcaption b { color: var(--fg); font-weight: 600; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 720px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: grid; gap: 12px; min-width: 0; }
+.stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font: 12px var(--mono); color: var(--dim); }
+.stages span { border-top: 3px solid var(--food); padding-top: 6px; }
+.stages span.done { border-color: var(--ok); }
+
+.table { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.note { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--dim); }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="kicker">Мод для Minecraft 26.3 · Fabric · рядом с Claudecraft</div>
+  <h1>Overlaycraft 0.4</h1>
+  <p class="lead">Полупрозрачные карточки поверх игры: что сейчас играет, где заказ из Яндекс Еды и какие вкладки открыты в браузере. Управлять можно мышью в чате, командой <code>/ov</code> или попросить Claude.</p>
+</header>
+
+<section>
+  <h2>Как это выглядит в игре</h2>
+  <figure>
+    <img src="screens/10-world-ingame.png" alt="Три карточки справа в игре и тост о курьере сверху">
+    <figcaption><b>Обычная игра.</b> Справа три карточки: музыка, заказ, браузер. Сверху тост «Курьер в пути», он появляется при каждой смене этапа заказа вместе с коротким звуком. Кнопок нет, карточки ничего не перехватывают.</figcaption>
+  </figure>
+  <div class="grid2">
+    <figure>
+      <img src="screens/11-world-chat-hover.png" alt="Чат открыт, у карточки музыки появились кнопки">
+      <figcaption><b>Открыт чат (T).</b> У карточек появляются кнопки, у карточки под мышью рамка и ✖.</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/12-world-chat-dragged.png" alt="Карточка музыки перетащена влево, вкладки свернуты">
+      <figcaption><b>Перетащили и свернули.</b> Музыку утащили влево мышью, «Браузер» свернули правым кликом в одну строку «Вкладок: 2».</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/13-world-inventory-hidden.png" alt="Инвентарь без карточек">
+      <figcaption><b>Инвентарь, режим hide</b> (по умолчанию). В инвентаре, меню и любых других окнах карточек нет.</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/14-world-inventory-behind.png" alt="Инвентарь, карточки приглушены за ним">
+      <figcaption><b>Инвентарь, режим behind.</b> Карточки остаются, но уходят назад под затемнение и не мешают.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2><span class="chip music">Музыка</span></h2>
+  <p>Берёт всё, что Windows знает как медиасессию: браузер (YouTube, YouTube Music, SoundCloud, VK, huevo.su, Яндекс Музыка, Spotify, Telegram Web), Telegram Desktop, Spotify и любые плееры. Если подключено расширение, источник подписывается по сайту вкладки и красится в его цвет; без расширения подписано приложение («Opera»).</p>
+  <div class="grid2">
+    <figure>
+      <img src="screens/01-ingame.png" alt="Карточки в игре без кнопок">
+      <figcaption><b>В игре:</b> название, исполнитель, источник, время и полоска прогресса.</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/02-chat-hover.png" alt="Карточки в чате с кнопками">
+      <figcaption><b>В чате:</b> ⏮ ⏯ ⏭, переключатель «1/2» между несколькими плеерами, ✖ спрятать карточку.</figcaption>
+    </figure>
+  </div>
+  <ul>
+    <li><b>⏯</b> пауза и продолжение через Windows, работает для любого плеера.</li>
+    <li><b>⏮ ⏭</b> для вкладок браузера идут через расширение: на YouTube следующий трек включает сам плеер YouTube, на остальных сайтах нажимаются их кнопки. Без расширения команда уходит в Windows.</li>
+    <li><b>1/2</b>: клик переключает, какой из играющих плееров показывать.</li>
+    <li>Серые ⏮ ⏭ значат, что плеер сам говорит: «переключать некуда».</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="chip food">Яндекс Еда</span></h2>
+  <p>Расширение раз в 30 секунд спрашивает сайт Еды о текущем заказе, используя твой вход в браузере. Вкладку Еды держать открытой не нужно. Если она открыта, статус обновляется сразу, как только меняется на странице. Токен входа уходит только на eda.yandex.ru, в игру он не попадает.</p>
+  <div class="card">
+    <div class="stages"><span>принят</span><span>готовят</span><span>в пути</span><span class="done">доставлен</span></div>
+    <p>Четыре сегмента под статусом показывают этап. Справа «~N мин», если сайт его знает. Доставленный или отменённый заказ висит 15 минут и исчезает.</p>
+  </div>
+  <div class="grid3">
+    <figure><img src="screens/04-order-accepted.png" alt="Заказ принят"><figcaption><b>Принят</b>, ~35 мин</figcaption></figure>
+    <figure><img src="screens/05-order-cooking.png" alt="Ресторан готовит"><figcaption><b>Готовят</b>, ~24 мин</figcaption></figure>
+    <figure><img src="screens/06-order-delivered.png" alt="Заказ доставлен, зелёные сегменты"><figcaption><b>Доставлен:</b> сегменты зелёные</figcaption></figure>
+  </div>
+  <ul>
+    <li><b>Открыть</b> переводит браузер на страницу отслеживания, <b>Убрать</b> прячет заказ с карточки.</li>
+    <li>При смене этапа приходит тост и звук: колокольчик, когда курьер выехал или привёз, тихий звон на остальных этапах.</li>
+    <li>Если сайт не видит заказ, его можно поставить вручную: <code>/ov food 25 Готовят</code>. Этап угадывается по словам («в пути», «готовят»…).</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="chip tabs">Браузер</span></h2>
+  <p>Показывает вкладки, которые играют звук (они отмечены ▶ и стоят первыми), и текущую вкладку каждого окна. Вкладки инкогнито не передаются. Клик по вкладке в чате выводит её на передний план в браузере.</p>
+  <div class="grid3">
+    <figure><img src="screens/03-compact.png" alt="Все карточки свернуты"><figcaption><b>Свёрнуто:</b> ПКМ превращает любую карточку в одну строку</figcaption></figure>
+    <figure><img src="screens/07-eda-login.png" alt="Еда просит войти"><figcaption><b>Не вошёл в Еду:</b> кнопка «Войти» откроет eda.yandex.ru</figcaption></figure>
+    <figure><img src="screens/08-not-connected.png" alt="Браузер не подключён"><figcaption><b>Расширения нет:</b> кнопка «Подключить»</figcaption></figure>
+  </div>
+  <figure>
+    <img src="screens/09-behind-screen.png" alt="Карточки приглушены">
+    <figcaption><b>Приглушённый вид</b> (режим behind): так карточки выглядят под любым открытым окном игры.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Управление мышью в чате</h2>
+  <div class="table"><table>
+    <tr><th>Действие</th><th>Что делает</th></tr>
+    <tr><td>Тянуть ЛКМ</td><td>Переносит карточку. У краёв экрана примагничивается, карточки не налезают друг на друга. Место запоминается.</td></tr>
+    <tr><td>ПКМ по карточке</td><td>Свернуть в строку или развернуть обратно.</td></tr>
+    <tr><td>✖ (при наведении)</td><td>Спрятать карточку. Вернуть: <code>/ov show music</code> или <code>/ov show all</code>.</td></tr>
+    <tr><td>Кнопки</td><td>⏮ ⏯ ⏭, 1/2, Открыть, Убрать, Войти, Подключить, клик по вкладке.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Команды /ov</h2>
+  <div class="table"><table>
+    <tr><th>Команда</th><th>Что делает</th></tr>
+    <tr><td><code>/ov</code></td><td>Короткая справка в чат.</td></tr>
+    <tr><td><code>/ov on</code> · <code>off</code></td><td>Включить или выключить весь оверлей.</td></tr>
+    <tr><td><code>/ov show|hide|compact music|food|tabs</code></td><td>Показать, спрятать или свернуть одну карточку. <code>/ov show all</code> вернёт все.</td></tr>
+    <tr><td><code>/ov screens hide|behind</code></td><td>Что делать в инвентаре и меню: прятать или приглушать.</td></tr>
+    <tr><td><code>/ov opacity 0..100</code></td><td>Плотность фона карточек (по умолчанию 55%).</td></tr>
+    <tr><td><code>/ov reset</code></td><td>Вернуть карточки на места по умолчанию.</td></tr>
+    <tr><td><code>/ov toggle|play|pause|next|prev|stop</code></td><td>Управление музыкой, той, что показана на карточке.</td></tr>
+    <tr><td><code>/ov food [мин] &lt;статус&gt;</code></td><td>Заказ вручную. <code>/ov food clear</code> убирает.</td></tr>
+    <tr><td><code>/ov ext</code></td><td>Подключить браузер: открывает страницу расширений и копирует путь к папке.</td></tr>
+    <tr><td><code>/ov claude</code></td><td>Переустановить инструменты для Claude.</td></tr>
+    <tr><td><code>/ov status</code></td><td>Что сейчас видит оверлей: музыка, браузер, Еда.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Управление через Claude</h2>
+  <p>Мод сам ставит Claude расширение <code>overlaycraft</code> в рабочую папку Claudecraft. Если инструменты не появились, выполни <code>/cc reload</code>. После этого можно писать обычными словами: «поставь на паузу», «следующий трек», «где мой заказ», «убери вкладки влево».</p>
+  <div class="table"><table>
+    <tr><th>Инструмент</th><th>Что умеет</th></tr>
+    <tr><td><code>overlay_status</code></td><td>Всё, что знает оверлей: плееры, заказ, вкладки, состояние Еды, раскладка.</td></tr>
+    <tr><td><code>overlay_media</code></td><td>Пауза, плей, следующий, предыдущий, стоп, какой плеер показывать.</td></tr>
+    <tr><td><code>overlay_browser</code></td><td>Вывести вкладку вперёд или открыть страницу.</td></tr>
+    <tr><td><code>overlay_food</code></td><td>Поставить заказ вручную или убрать.</td></tr>
+    <tr><td><code>overlay_layout</code></td><td>Двигать, прятать, сворачивать карточки, менять прозрачность.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Подключение браузера</h2>
+  <ol class="steps">
+    <li>В чате нажми «Подключить» на карточке «Браузер» или набери <code>/ov ext</code>. Откроется страница расширений Opera (или Chrome, Edge, Яндекс Браузера), а путь к папке уже будет скопирован.</li>
+    <li>Включи «Режим разработчика», нажми «Загрузить распакованное» и вставь путь (Ctrl+V).</li>
+    <li>Если Overlaycraft там уже есть, нажми у него ⟳ и проверь, что переключатель включён. После обновления браузер иногда выключает расширение сам.</li>
+    <li>Войди на eda.yandex.ru в этом же браузере. Карточки оживут сами, вкладки перезагружать не нужно.</li>
+  </ol>
+  <p class="note">Расширение общается только с игрой на 127.0.0.1 (порт 18745). Сайты к этому порту не допускаются, Claude ходит туда по токену из <code>~/.overlaycraft/connection.json</code>.</p>
+</section>
+
+<section>
+  <h2>Вместе с Claudecraft</h2>
+  <ul>
+    <li>Overlaycraft лежит внутри jar Claudecraft. Одна команда <code>gradlew :runClient</code> запускает одну игру со всеми модами.</li>
+    <li>Цвета карточек берутся из темы Claudecraft (<code>/claude theme</code>) и меняются сами через пару секунд.</li>
+    <li>Работает и отдельно, без Claudecraft: тогда без инструментов Claude, с теми же цветами по умолчанию.</li>
+    <li>Настройки хранятся в <code>config/overlaycraft/overlay.json</code>.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Что проверено, а что нет</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>Проверено</h3>
+      <ul>
+        <li>Живой тест в мире: настоящая мышь тащит и сворачивает карточки, чат не закрывается, инвентарь в обоих режимах (6/6).</li>
+        <li>Пауза и продолжение на настоящей музыке.</li>
+        <li>Расширение подключается к игре, и настоящий запрос к Еде доходит до сайта (без входа сайт отвечает «нужно войти»).</li>
+        <li>Уголок размера чата Claudecraft тянется мышью.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Не проверено</h3>
+      <ul>
+        <li>Ответ Еды с настоящим активным заказом. Его можно увидеть только при твоём входе и реальном заказе.</li>
+        <li>⏮ ⏭ на SoundCloud, VK и huevo.su (на YouTube работает).</li>
+        <li>Версия расширения 0.3+ в твоей собственной Opera.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">Скриншоты 01–09 сделаны в режиме превью с примерами данных. 10–14 сняты в настоящем тестовом мире, музыка на них твоя (стояла на паузе), заказ тестовый.</p>
+</section>
+</div>
