@@ -157,6 +157,7 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Чат: {}': 'Chat: {}',
     'perms [allow|deny|ask <правило> | rm <правило> | trust | untrust]': 'perms [allow|deny|ask <rule> | rm <rule> | trust | untrust]',
     'Совпадение через несколько строк в {} — замена работает в пределах строки': 'A match spans several lines in {} — replace works within a line',
     'Это папка, не файл: {}': 'This is a folder, not a file: {}',

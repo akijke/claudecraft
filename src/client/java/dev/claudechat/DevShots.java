@@ -83,6 +83,8 @@ final class DevShots {
             case 572 -> Screenshot.grab(client, true);
             case 576 -> client.setScreenAndShow(new DashboardScreen(mod, null).withData(parse(USAGE)));
             case 590 -> Screenshot.grab(client, true);
+            case 594 -> client.setScreenAndShow(ChatPickerScreen.preview(mod, parse(PICKER)));
+            case 604 -> Screenshot.grab(client, true);
             case 610 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
             case 620 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
             case 700 -> Screenshot.grab(client, true);
@@ -102,6 +104,11 @@ final class DevShots {
             + "\"flow\":{\"state\":\"idle\",\"code\":null,\"url\":null,\"error\":null}}}");
     }
 
+    private static final String PICKER = "{\"selected\":{\"cc\":\"a\",\"c\":\"x\"},\"project\":\"my-mod\",\"chats\":["
+        + "{\"id\":\"a\",\"mode\":\"cc\",\"title\":\"Fix the Gradle build\",\"project\":\"my-mod\",\"backend\":\"local\",\"model\":\"opus\",\"cost\":0.42,\"running\":true,\"queue\":1,\"updated\":" + (System.currentTimeMillis() / 1000 - 40) + ",\"preview\":\"Running gradlew build — 2 tests failed in ChatStyleTest, fixing the colour constant\",\"who\":\"claude\"},"
+        + "{\"id\":\"b\",\"mode\":\"cc\",\"title\":\"Add a config screen\",\"project\":\"my-mod\",\"backend\":\"local\",\"cost\":1.87,\"running\":false,\"queue\":0,\"updated\":" + (System.currentTimeMillis() / 1000 - 3 * 3600) + ",\"preview\":\"add a slider for the render distance and save it to config/my-mod.json\",\"who\":\"you\"},"
+        + "{\"id\":\"d\",\"mode\":\"cc\",\"title\":\"Port to 26.3\",\"project\":\"other-mod\",\"backend\":\"local\",\"origin\":\"pc\",\"cost\":0.0,\"running\":false,\"queue\":0,\"updated\":" + (System.currentTimeMillis() / 1000 - 4 * 86400) + ",\"preview\":\"Done: all mixins updated, the build passes.\",\"who\":\"claude\"},"
+        + "{\"id\":\"x\",\"mode\":\"c\",\"title\":\"Explain mixins\",\"backend\":\"local\",\"cost\":0.05,\"running\":false,\"queue\":0,\"updated\":" + (System.currentTimeMillis() / 1000 - 600) + ",\"preview\":\"A mixin rewrites the bytecode of a class when it loads\",\"who\":\"claude\"}]}";
     private static final String STATE = "{\"selected\":{\"cc\":\"demo\",\"c\":\"x\"},\"project\":\"my-mod\","
         + "\"project_path\":\"C:/dev/my-mod\",\"projects\":[],\"chats\":["
         + "{\"id\":\"demo\",\"mode\":\"cc\",\"title\":\"Fix the build\",\"project\":\"my-mod\",\"running\":true,\"queue\":0,\"updated\":3},"

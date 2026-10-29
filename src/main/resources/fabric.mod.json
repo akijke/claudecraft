@@ -9,6 +9,7 @@
     "client": ["dev.claudechat.ClaudeChat"],
     "modmenu": ["dev.claudechat.ModMenuEntry"]
   },
+  "mixins": [{"config": "claude_chat.client.mixins.json", "environment": "client"}],
   "depends": {
     "fabricloader": ">=0.20.1",
     "minecraft": "26.3",

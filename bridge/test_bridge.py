@@ -199,6 +199,21 @@ class FeatureTests(unittest.IsolatedAsyncioTestCase):
         await self.bridge.command({'mode': 'cc', 'action': action, 'text': text})
         return self.last()
 
+    async def test_chat_picker_preview_and_quiet_select(self):
+        self.assertEqual(self.bridge.preview(self.chat.id), {})
+        self.bridge.emit(self.chat, 'Думаю…', kind='thinking', prompt='fix  the\nbuild [[image:a.png]]')
+        self.assertEqual(self.bridge.preview(self.chat.id), {'preview': 'fix the build [[image:a.png]]', 'who': 'you'})
+        self.bridge.emit(self.chat, 'Done, the build passes.', kind='text')
+        self.assertEqual(self.bridge.preview(self.chat.id)['who'], 'claude')
+        other = self.bridge.new_chat('cc', 'local')
+        before = len(self.bridge.events)
+        await self.cmd('select', self.chat.id + ' quiet')
+        self.assertEqual(self.bridge.selected['cc'], self.chat.id)
+        kinds = [e.get('kind') for e in list(self.bridge.events)[before:]]
+        self.assertNotIn('chats', kinds)  # the picker window shows the list itself
+        await self.cmd('select', other.id)
+        self.assertEqual(self.last()['kind'], 'chats')
+
     async def test_file_manager_does_not_move_claude(self):
         listing = await self.cmd('ls')
         self.assertEqual(listing['kind'], 'listing')

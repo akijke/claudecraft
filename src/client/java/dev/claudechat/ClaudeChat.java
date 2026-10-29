@@ -105,7 +105,7 @@ public final class ClaudeChat implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> launcher.stop());
         Notify.register();
         // addons copy this class; only the main mod keeps the vanilla chat draft
-        if (getClass().getPackageName().equals("dev.claude" + "chat")) ChatDraft.register();
+        if (getClass().getPackageName().equals("dev.claude" + "chat")) { ChatDraft.register(); ChatSize.register(); }
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("claude_chat", "main"));
         openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.claude_chat.open",
             InputConstants.KEY_K, category));
@@ -517,6 +517,12 @@ public final class ClaudeChat implements ClientModInitializer {
         if (action.equals("help")) { helpTopic = text.strip(); help(mode); return; }
         if (action.startsWith("/") && action.length() > 1) { send(mode, command(mode, "slash", input.strip().substring(1))); return; }
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
+        if ((action.equals("c") || action.equals("chats") || action.equals("chat")) && text.isBlank()) {
+            // a window with search instead of a list in the chat; "/c chats list" prints the old list
+            Screen from = Minecraft.getInstance().gui.screen();
+            open(() -> new ChatPickerScreen(this, from instanceof ConversationScreen ? from : null, mode));
+            return;
+        }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
         if (action.equals("files") || action.equals("fm")) { open(() -> new FileScreen(this, null)); return; }
         if (action.equals("shot") || action.equals("screenshot")) { screenshot(mode, text); return; }

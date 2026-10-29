@@ -219,6 +219,16 @@ class Bridge:
         self.events.append(event)
         return event
 
+    def preview(self, chat_id):
+        """Last line of the chat for the chat picker: {'preview', 'who'} ('you' = the prompt), or {}."""
+        for e in reversed(self.events):
+            if e['chat'] != chat_id or e.get('kind') not in ('text', 'text_part', 'thinking'):
+                continue
+            text = ' '.join(str(e.get('prompt' if e['kind'] == 'thinking' else 'text', '')).split())
+            if text:
+                return {'preview': text[:160], 'who': 'you' if e['kind'] == 'thinking' else 'claude'}
+        return {}
+
     def language(self):
         return language(self.directory)
 
@@ -338,7 +348,8 @@ class Bridge:
                     self.pause_for_budget(chat, hit)
                     break
                 question = chat.queue.popleft()
-                self.emit(chat, 'Думаю…', kind='thinking', queued=len(chat.queue))
+                self.emit(chat, 'Думаю…', kind='thinking', queued=len(chat.queue),
+                          prompt=re.sub(r'\[\[image:[^\]]*\]\]', '', str(question))[:160])
                 chat.run_usage = {}
                 chat.live_tokens = 0
                 chat.budget_hit = None
@@ -1404,6 +1415,8 @@ class Bridge:
             self.emit(chat, 'Новый чат создан.', kind='status')
             self.chat_menu(mode)
         elif action == 'select':
+            # "<id> quiet" comes from the chat picker window: no chat list printed after it
+            text, _, flag = text.strip().partition(' ')
             target = self.chats.get(text)
             if not target or target.mode != mode:
                 raise ValueError('Unknown chat')
@@ -1412,7 +1425,10 @@ class Bridge:
                 self.projects.save()
             self.selected[mode] = target.id
             self.persist()
-            self.chat_menu(mode)
+            if flag == 'quiet':
+                self.emit(target, f'Чат: {target.title}', kind='status')
+            else:
+                self.chat_menu(mode)
         elif action == 'chat':
             if mode == 'cc':
                 await self.sync_sessions()
@@ -1637,8 +1653,8 @@ def create_app(bridge, token):
     async def state(request):
         """Snapshot for the conversation screen: chats, projects, selection."""
         chats = [{'id': c.id, 'mode': c.mode, 'title': bridge.tr(c.title), 'project': c.project, 'backend': c.backend,
-                  'origin': c.origin,
-                  'running': bool(c.task), 'queue': len(c.queue), 'updated': c.updated}
+                  'origin': c.origin, 'model': c.model or '', 'cost': round(c.usage.get('cost_usd', 0.0), 4),
+                  'running': bool(c.task), 'queue': len(c.queue), 'updated': c.updated, **bridge.preview(c.id)}
                  for c in bridge.chats.values()]
         return web.json_response({'chats': chats, 'selected': bridge.selected,
                                   'status': {m: await bridge.status_line(m) for m in ('c', 'cc')},

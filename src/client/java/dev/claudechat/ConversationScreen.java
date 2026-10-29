@@ -283,6 +283,7 @@ final class ConversationScreen extends Screen {
         if (PaletteScreen.handleKey(mod, this, event, true)) return true;  // Ctrl+Shift+P / Ctrl+P
         boolean ctrl = (event.modifiers() & 2) != 0, shift = (event.modifiers() & 1) != 0;
         boolean enter = event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER;
+        if (ctrl && event.key() == InputConstants.KEY_TAB) { minecraft.setScreenAndShow(new ChatPickerScreen(mod, this, mode)); return true; }
         // Enter sends (like the game's chat), Shift+Enter is a new line, Ctrl+Enter still sends,
         // Ctrl+Shift+Enter adds to the running work (the "✚ now" button, f)
         if (enter && ctrl && shift) { submit("f "); return true; }

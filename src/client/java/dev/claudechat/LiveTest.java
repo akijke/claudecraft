@@ -81,6 +81,7 @@ final class LiveTest {
     }
 
     private long mark;  // only events after the step started count
+    private int expandedWidth;
 
     private void markEvents() {
         mark = 0;
@@ -155,6 +156,23 @@ final class LiveTest {
             if (ok) { chatBox().setValue(""); mc().setScreenAndShow(null); }
             return ok;
         }, 10);
+        step("vanilla chat: Expand fills the screen, Collapse brings it back", () -> mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false)), () -> {
+            if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return false;
+            net.minecraft.client.gui.components.Button toggle = null;
+            for (var child : chat.children())
+                if (child instanceof net.minecraft.client.gui.components.Button b
+                    && (b.getMessage().getString().equals(L.t("Развернуть")) || b.getMessage().getString().equals(L.t("Свернуть")))) toggle = b;
+            if (toggle == null) return false;
+            if (waited == 10 && toggle.getMessage().getString().equals(L.t("Развернуть"))) toggle.onPress(null);
+            if (waited == 20) expandedWidth = ChatSize.width(true);
+            if (waited == 30) toggle.onPress(null);
+            boolean ok = waited > 30 && expandedWidth > 330 && ChatSize.width(true) < expandedWidth;
+            if (ok) mc().setScreenAndShow(null);
+            return ok;
+        }, 10);
+        step("/cc chats opens the chat picker with this mode's chats", () -> mod.runLine("cc", "/cc chats"),
+            () -> screen() instanceof ChatPickerScreen p && p.modeForTest().equals("cc") && p.countForTest() > 0 && waited > 20, 10);
+        quiet("close the picker", () -> { if (screen() != null) screen().onClose(); }, () -> screen() == null, 5);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {
