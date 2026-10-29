@@ -682,5 +682,14 @@
   "  3. Токен — в ~/claudecraft/config/claude-chat/bridge-token на сервере": "  3. The token is in ~/claudecraft/config/claude-chat/bridge-token on the server",
   "подключить…": "connect…",
   "/claude remote <порт туннеля> <токен>": "/claude remote <tunnel port> <token>",
-  "мост на VPS / другом ПК через SSH-туннель: remote <порт> <токен> · remote off": "bridge on a VPS / another PC through an SSH tunnel: remote <port> <token> · remote off"
+  "мост на VPS / другом ПК через SSH-туннель: remote <порт> <токен> · remote off": "bridge on a VPS / another PC through an SSH tunnel: remote <port> <token> · remote off",
+  "Гость ": "Guest ",
+  " ч · только этот чат": " h · this chat only",
+  "копировать токен": "copy token",
+  "Токен показывается один раз. Передай гостю лично.": "The token is shown once. Give it to the guest privately.",
+  "отключить": "revoke",
+  "  Гость видит ответы и инструменты этого чата, не видит запросы разрешений; отвечать на них можешь только ты": "  The guest sees this chat's answers and tools, not permission prompts; only you can answer those",
+  "Гости": "Guests",
+  "  нет — ": "  none — ",
+  "парное программирование: guest new <имя> [view|chat] [часов] · guest list · guest revoke <имя>": "pair programming: guest new <name> [view|chat] [hours] · guest list · guest revoke <name>"
 }

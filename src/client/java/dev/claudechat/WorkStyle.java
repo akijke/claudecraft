@@ -341,6 +341,28 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "guest_token" -> {
+                // shown once: the bridge stores only its hash
+                String token = s(e, "token");
+                out.add(line(mode, lit("◆ " + L.t("Гость ") + s(e, "name"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + s(e, "scope") + " · " + n(e, "hours") + L.t(" ч · только этот чат"), FAINT))));
+                out.add(line(mode, Component.literal("  ").append(lit("[⧉ " + L.t("копировать токен") + "]", AQUA).withStyle(st -> st
+                    .withClickEvent(new net.minecraft.network.chat.ClickEvent.CopyToClipboard(token))
+                    .withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(lit(L.t("Токен показывается один раз. Передай гостю лично."), TEXT)))))
+                    .append(" ").append(button(L.t("отключить"), cmd + "guest revoke " + s(e, "name"), false, RED, null))));
+                out.add(line(mode, lit(L.t("  Гость видит ответы и инструменты этого чата, не видит запросы разрешений; отвечать на них можешь только ты"), DIM)));
+            }
+            case "guests" -> {
+                JsonArray rows = e.getAsJsonArray("rows");
+                out.add(line(mode, lit("◆ " + L.t("Гости"), GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit(rows.isEmpty() ? L.t("  нет — ") + cmd + "guest new <имя> [view|chat] [часов]" : "  " + rows.size(), FAINT))));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    out.add(line(mode, Component.literal("  ").append(lit(s(r, "name"), TEXT)).append(lit("  " + s(r, "scope") + " · "
+                        + n(r, "left_min") + L.t(" мин"), DIM)).append(" ").append(button(L.t("отключить"), cmd + "guest revoke " + s(r, "name"), false, RED, null))));
+                }
+            }
+            case "guest_message" -> out.add(line(mode, lit("✦ " + s(e, "guest") + ": ", AQUA).append(lit(s(e, "text"), TEXT))));
             case "models" -> {
                 String provider = s(e, "provider");
                 JsonArray rows = e.getAsJsonArray("rows");

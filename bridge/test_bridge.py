@@ -1890,5 +1890,55 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.chat.sdk_id, 'resume-me')
 
 
+
+class GuestTests(unittest.IsolatedAsyncioTestCase):
+    """#69: guest tokens see one chat and may only queue messages into it."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.app = create_app(self.bridge, 't')
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def call(self, method, path, token, body=None):
+        request = make_mocked_request(method, path, headers={'Authorization': 'Bearer ' + token})
+        request.json = AsyncMock(return_value=body or {})
+        route = await self.app.router.resolve(request)
+        response = await self.app.middlewares[0](request, route.handler)
+        return response.status, json.loads(response.text)
+
+    async def test_guest_scopes(self):
+        await self.bridge.command({'mode': 'cc', 'action': 'guest', 'text': 'new anna view 2'})
+        event = self.bridge.events[-1]
+        self.assertEqual(event['kind'], 'guest_token')
+        viewer = event['token']
+        self.assertNotIn(viewer, (Path(self.temp.name) / 'guests.json').read_text())  # only the hash is stored
+        chat = self.bridge.current_chat('cc')
+        self.bridge.emit(chat, 'hello', kind='text')
+        self.bridge.emit(chat, 'Allow?', kind='permission')
+        other = self.bridge.new_chat('cc', 'local', select=False)
+        self.bridge.emit(other, 'secret', kind='text')
+        status, data = await self.call('GET', '/guest/events', viewer)
+        self.assertEqual(status, 200)
+        kinds = [e['kind'] for e in data['events']]
+        self.assertIn('text', kinds)
+        self.assertNotIn('permission', kinds)
+        self.assertNotIn('guest_token', kinds)
+        self.assertNotIn('secret', [e['text'] for e in data['events']])
+        # view cannot write, and no owner endpoint accepts a guest token
+        self.assertEqual((await self.call('POST', '/guest/say', viewer, {'text': 'hi'}))[0], 403)
+        self.assertEqual((await self.call('POST', '/command', viewer, {'mode': 'cc', 'action': 'q', 'text': 'x'}))[0], 401)
+        self.assertEqual((await self.call('GET', '/state', viewer))[0], 401)
+        await self.bridge.command({'mode': 'cc', 'action': 'guest', 'text': 'new bob chat'})
+        writer = self.bridge.events[-1]['token']
+        self.bridge.enqueue = AsyncMock()
+        status, _ = await self.call('POST', '/guest/say', writer, {'text': 'try a hashmap'})
+        self.assertEqual(status, 200)
+        self.bridge.enqueue.assert_awaited_once_with(chat, '[guest bob]: try a hashmap')
+        await self.bridge.command({'mode': 'cc', 'action': 'guest', 'text': 'revoke bob'})
+        self.assertEqual((await self.call('POST', '/guest/say', writer, {'text': 'x'}))[0], 401)
+
 if __name__ == '__main__':
     unittest.main()

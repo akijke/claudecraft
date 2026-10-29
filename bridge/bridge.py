@@ -106,6 +106,8 @@ class Bridge:
         self.budget = Budget(self)
         from backends.ledger import Ledger
         self.ledger = Ledger(self.directory)
+        from backends.guests import Guests
+        self.guests = Guests(self.directory)
         from backends.lsp import Lsp
         self.lsp = Lsp(self)
         from backends.pulls import Pulls
@@ -1109,6 +1111,23 @@ class Bridge:
             name, _, key = (text if action == 'provider_key' else 'openrouter ' + text).partition(' ')
             openai_compat.set_key(self, name.strip(), key)
             self.emit(chat, f'Ключ {name.strip()} сохранён', kind='status')
+        elif action == 'guest':
+            # pair programming: /cc guest new <name> [view|chat] [hours] · list · revoke <name>
+            sub, _, rest = text.strip().partition(' ')
+            if sub == 'new':
+                args = rest.split()
+                if not args:
+                    raise ValueError('guest new <имя> [view|chat] [часов]')
+                scope = args[1] if len(args) > 1 else 'view'
+                hours = max(1, min(72, int(args[2]))) if len(args) > 2 and args[2].isdigit() else 12
+                token = self.guests.create(args[0], chat.id, scope, hours)
+                self.emit(chat, f'Гость {args[0]}: {scope}, {hours} ч — этот чат', kind='guest_token',
+                          name=args[0], token=token, scope=scope, hours=hours)
+            elif sub == 'revoke':
+                self.guests.revoke(rest.strip())
+                self.emit(chat, f'Гость {rest.strip()} отключён', kind='status')
+            else:
+                self.emit(chat, 'Гости', kind='guests', rows=self.guests.list())
         elif action == 'budget':
             sub, _, rest = text.strip().partition(' ')
             if sub == 'resume':
@@ -1472,7 +1491,7 @@ class Bridge:
 
 
 # Short and legacy command names → canonical actions (full names keep working).
-ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls', 'type': 'cat',
+ALIASES = {'queue': 'q', 'guests': 'guest', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls', 'type': 'cat',
            'usage': 'tokens', 'cq': 'clearqueue', 'p': 'project', 'projects': 'project', 'g': 'git',
            'ps': 'tasks', 'jobs': 'tasks', 'mcp': 'connectors', 'unconnect': 'disconnect_connector',
            'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn',
@@ -1508,6 +1527,12 @@ def create_app(bridge, token):
         if request.path == '/oauth/callback' and request.method == 'GET':
             return await oauth_callback(request)  # the browser has no bridge token; `state` protects it
         if not secrets.compare_digest(request.headers.get('Authorization', ''), 'Bearer ' + token):
+            guest = bridge.guests.find(request.headers.get('Authorization', ''))
+            if guest and request.path.startswith('/guest/') and not request.headers.get('Origin'):
+                try:
+                    return await guest_request(request, *guest)
+                except (ValueError, KeyError, TypeError) as e:
+                    return web.json_response({'error': bridge.tr(str(e))}, status=400)
             return web.json_response({'error': 'Unauthorized'}, status=401)
         if request.headers.get('Origin'):
             return web.json_response({'error': 'Browser origins are not accepted'}, status=403)
@@ -1517,6 +1542,27 @@ def create_app(bridge, token):
             return web.json_response({'error': bridge.tr(str(e))}, status=400)
         except Exception as e:
             return web.json_response({'error': str(e)[:1000]}, status=500)
+    async def guest_request(request, name, row):
+        """The only things a guest token can do (backends/guests.py)."""
+        from backends.guests import visible
+        chat = bridge.chats.get(row['chat'])
+        if not chat:
+            return web.json_response({'error': 'chat is gone'}, status=410)
+        if request.path == '/guest/events' and request.method == 'GET':
+            cursor = int(request.query.get('after', '0') or 0)
+            batch = [e for e in bridge.events if e['seq'] > cursor and visible(e, chat.id)][:80]
+            return web.json_response({'events': batch, 'boot': bridge.boot, 'title': chat.title,
+                                      'running': bool(chat.task), 'scope': row['scope'],
+                                      'cursor': batch[-1]['seq'] if batch else max(cursor, 0)})
+        if request.path == '/guest/say' and request.method == 'POST' and row['scope'] == 'chat':
+            text = str((await request.json()).get('text', '')).strip()[:4000]
+            if not text:
+                raise ValueError('empty message')
+            async with bridge.lock:
+                bridge.emit(chat, text, kind='guest_message', guest=name)
+                await bridge.enqueue(chat, f'[guest {name}]: {text}')
+            return web.json_response({'ok': True})
+        return web.json_response({'error': 'Not allowed for guests'}, status=403)
     # 4 MB: the in-game editor saves whole files (loopback only, token required).
     app = web.Application(middlewares=[authenticate], client_max_size=4 * 1024 * 1024)
     async def command(request):
