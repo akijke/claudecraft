@@ -42,7 +42,7 @@ jobs:
         run: python -m unittest -v test_bridge test_cli_fake_api
 
   mods:
-    name: Build both mods + JUnit + Codexcraft tests
+    name: Build all mods + JUnit + addon tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,10 +57,11 @@ jobs:
       - run: chmod +x gradlew
       - name: gradlew build (Claudecraft + Codexcraft, runs JUnit)
         run: ./gradlew build --stacktrace
-      - name: Codexcraft payload tests
+      - name: Codexcraft and Geminicraft payload tests
         run: |
           python -m pip install -r bridge/requirements.txt
           python -m unittest discover -s codexcraft/tests -v
+          python -m unittest discover -s geminicraft/tests -v
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,6 +69,7 @@ jobs:
           path: |
             build/libs/*.jar
             codexcraft/build/libs/*.jar
+            geminicraft/build/libs/*.jar
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

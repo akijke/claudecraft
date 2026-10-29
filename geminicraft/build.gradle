@@ -1,0 +1,146 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+version = rootProject.mod_version
+group = 'dev.geminicraft'
+base { archivesName = 'geminicraft' }
+
+loom {
+    splitEnvironmentSourceSets()
+    runs {
+        shots {
+            client()
+            name = 'Geminicraft screenshots'
+            vmArg '-Dgeminicraft.devshots=true'
+            runDir 'run'
+        }
+    }
+    mods {
+        geminicraft {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+repositories { maven { url = 'https://maven.terraformersmc.com/releases/' } }
+dependencies {
+    runtimeOnly files(rootProject.tasks.named('jar').flatMap { it.archiveFile })
+    minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+    compileOnly "com.terraformersmc:modmenu:${rootProject.modmenu_version}"
+}
+
+// Reuse the tested UI and workspace implementation without maintaining a fork.
+// Generated copies have private packages, config, resources and commands; they
+// never register Claudecraft's shortcuts or share its session store.
+def branded = { String s ->
+    s.replace('ClaudeChat', '__SharedClient__').replace('dev.claudechat', 'dev.geminicraft')
+        .replace('claude_chat', 'geminicraft').replace('claude-chat', 'geminicraft')
+        .replace('claudecraft', 'geminicraft').replace('Claudecraft', 'Geminicraft')
+        .replace('Claude Code', 'Gemini CLI').replace('Claude', 'Gemini')
+        .replaceAll('/cc\\b', '/gemini').replaceAll('/c\\b', '/gem')
+        .replace('/claude', '/geminicraft')
+        .replace('(K)', '(G)')
+        .replace('__SharedClient__', 'ClaudeChat')
+}
+def generated = layout.buildDirectory.dir('generated/shared')
+// Applied only to generated addon Java; the shared Claude UI keeps its palette.
+def geminiColours = { String s ->
+    def palette = [
+        'D97757': '8AB4F8', 'B48EF0': 'C58AF9', 'E8E8E8': 'E8EAED',
+        '8A8A8A': '9AA0A6', '5E5E5E': '5F6368', '6BD08B': '81C995',
+        'F0626A': 'F28B82', 'F2C14E': 'FDD663', '5CC8E6': '78D9EC',
+        'E5C07B': 'AECBFA', '9CDCFE': 'D2E3FC', '6CA8FF': '8AB4F8'
+    ]
+    palette.each { before, after ->
+        s = s.replace("0x${before}", "0x${after}").replace("0xFF${before}", "0xFF${after}")
+    }
+    s
+}
+tasks.register('generateShared') {
+    inputs.dir rootProject.file('src/client/java/dev/claudechat')
+    inputs.dir rootProject.file('src/main/resources/assets/claude_chat')
+    inputs.dir rootProject.file('bridge')
+    outputs.dir generated
+    doLast {
+        def out = generated.get().asFile
+        rootProject.fileTree('src/client/java/dev/claudechat').matching {
+            include '*.java'; exclude 'SettingsScreen.java'
+        }.each { source ->
+            def target = new File(out, "java/dev/geminicraft/${source.name}")
+            target.parentFile.mkdirs()
+            def code = geminiColours(branded(source.getText('UTF-8')))
+                .replace('"/" + mode', '"/" + (mode.equals("c") ? "gem" : "gemini")')
+            if (source.name == 'ClaudeChat.java') {
+                code = code.replace('literal(mode)', 'literal(mode.equals("c") ? "gem" : "gemini")')
+                    .replace('literal("claude")', 'literal("geminicraft")')
+                    .replace('SHORTCUTS.entrySet()', 'java.util.Collections.<String, String>emptyMap().entrySet()')
+                    .replace('case "c", "cc" ->', 'case "gem", "gemini" ->')
+                    .replace('help(parts[0]); else dispatch(parts[0], rest);',
+                        'help(parts[0].equals("gem") ? "c" : "cc"); else dispatch(parts[0].equals("gem") ? "c" : "cc", rest);')
+                    .replace('case "claude" ->', 'case "geminicraft" ->')
+                    .replace('InputConstants.KEY_K', 'InputConstants.KEY_G')
+                    .replace('{"/gemini agents", L.t("агенты · agent <имя> <задача> · spawn — параллельно · tasks")}',
+                        '{"/gemini spawn", L.t("параллельная задача · tasks — список задач")}')
+                    .replace('настройки, вход в аккаунт, API-ключ', 'настройки и вход через Google')
+            }
+            if (source.name == 'ConversationScreen.java') {
+                code = code.replace('tab("Gemini",', 'tab("Gemini",').replace('tab("Code",', 'tab("Gemini CLI",')
+                    .replace('"/" + mode + " ls"', '"/" + (mode.equals("c") ? "gem" : "gemini") + " ls"')
+                    .replace('small(L.t("Агенты"), "/gemini agents", L.t("Агенты-помощники")',
+                        'small("Model", "/gemini model", "Gemini model"')
+                    .replace('g.fill(0, 0, width, height, 0xB0101014);',
+                        'g.fill(0, 0, width, height, GeminiTheme.BACKDROP);\n' +
+                        '        GeminiTheme.panel(g, left - 2, 19, mainX - left - 4, height - 23, GeminiTheme.GPT);')
+                    .replace('g.fill(mainX - 2, mainY - 2, mainX + mainW, mainY + mainH, 0x90000000);',
+                        'GeminiTheme.panel(g, mainX - 2, mainY - 2, mainW + 2, mainH + 2, mode.equals("cc") ? GeminiTheme.CODEX : GeminiTheme.GPT);')
+                    .replace('Button.builder(Component.literal(label), b -> mod.runLine',
+                        'Button.builder(Component.literal(label).withColor(GeminiTheme.LINK), b -> mod.runLine')
+            }
+            if (source.name == 'ChatStyle.java') {
+                code = code.replace('lit("✦ Gemini", CLAUDE)',
+                    'lit(mode.equals("cc") ? "✦ Gemini CLI" : "✦ Gemini", mode.equals("cc") ? CODE_MODE : CLAUDE)')
+            }
+            target.setText(code, 'UTF-8')
+        }
+        rootProject.fileTree('src/main/resources/assets/claude_chat').each { source ->
+            def rel = rootProject.file('src/main/resources/assets/claude_chat').toPath().relativize(source.toPath())
+            def target = new File(out, "resources/assets/geminicraft/${rel.toString().replace('claudecraft_en', 'geminicraft_en')}")
+            target.parentFile.mkdirs()
+            target.setText(branded(source.getText('UTF-8')), 'UTF-8')
+        }
+        def core = new File(out, 'resources/geminicraft/bridge/core.py')
+        core.parentFile.mkdirs()
+        core.setText(branded(rootProject.file('bridge/bridge.py').getText('UTF-8'))
+            .replace("default=18741", "default=18743"), 'UTF-8')
+        rootProject.fileTree('bridge/backends').matching { include '*.py'; exclude 'account.py' }.each { source ->
+            def target = new File(core.parentFile, "backends/${source.name}")
+            target.parentFile.mkdirs()
+            // Keep SDK protocol identifiers intact: this module only supplies TurnClosed.
+            target.setText(source.getText('UTF-8'), 'UTF-8')
+        }
+    }
+}
+sourceSets.client.java.srcDir(generated.map { it.dir('java') })
+sourceSets.main.resources.srcDir(generated.map { it.dir('resources') })
+tasks.named('compileClientJava') { dependsOn 'generateShared' }
+processResources {
+    dependsOn 'generateShared'
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
+    from('bridge') {
+        into 'geminicraft/bridge'
+        include '*.py', 'requirements.txt', 'backends/*.py'
+    }
+}
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
+tasks.named('sourcesJar') { dependsOn 'generateShared' }
+tasks.withType(Jar).configureEach {
+    exclude '**/__pycache__/**', '**/*.pyc'
+}

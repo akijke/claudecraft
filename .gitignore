@@ -16,3 +16,4 @@ client.json
 .claude/
 .idea/
 *.iml
+fake_sessions.json
