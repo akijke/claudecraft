@@ -96,7 +96,7 @@ connectors.py (каталог MCP из npm с проверенными env; се
 события text_part построчно (AssistantMessage-текст тогда не дублируется),
 субагенты по parent_tool_use_id (поле agent), RateLimitEvent → /c tokens,
 инструмент minecraft_logs. Bridge: tasks/spawn/stop, /state для окна, history.
-Мод: ConversationScreen (клавиша K, свой hit-test стилей, Ctrl+Enter), KeyScreen
+Мод: ConversationScreen (клавиша K, свой hit-test стилей; Enter — отправить, Shift+Enter — новая строка), KeyScreen
 (ключи коннекторов, не через чат), WorkStyle (новые kind'ы), Mod Menu (compileOnly
 21.0.0, entrypoint modmenu). Игровые п.2–3 (Claude видит/действует в игре) отложены.
 

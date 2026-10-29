@@ -604,7 +604,7 @@
   "⏸ пауза": "⏸ paused",
   "токены": "tokens",
   " дн.": " d",
-  "Расходы": "Spending",
+  "Расходы": "Costs",
   "за %d дн.: %s · %s токенов · %d ходов": "%d days: %s · %s tokens · %d turns",
   "Модели": "Models",
   "Оценка Claude Code по ценам API; на подписке тратится лимит, а не деньги": "Claude Code's estimate at API prices; on a subscription it is your limit, not money",
@@ -742,5 +742,12 @@
   "папка не доверенная: её allow-правила, хуки и CLAUDE.md не применяются": "untrusted folder: its allow rules, hooks and CLAUDE.md are not used",
   "не доверять": "untrust",
   "доверять": "trust",
-  "Как вопрос Claude Code «доверяешь файлам в этой папке?»": "Like Claude Code's \"Do you trust the files in this folder?\""
+  "Как вопрос Claude Code «доверяешь файлам в этой папке?»": "Like Claude Code's \"Do you trust the files in this folder?\"",
+  "Задача для Claude Code… Enter — отправить · Shift+Enter — новая строка · /cc … — команда": "Task for Claude Code… Enter — send · Shift+Enter — new line · /cc … — command",
+  "Сообщение Claude… Enter — отправить · Shift+Enter — новая строка": "Message to Claude… Enter — send · Shift+Enter — new line",
+  "В очередь (Enter)": "Queue it (Enter)",
+  "Добавить в работу, которая идёт сейчас, не останавливая её (Ctrl+Shift+Enter)": "Add to the running task without stopping it (Ctrl+Shift+Enter)",
+  "Ещё: ": "More: ",
+  "Всё": "All",
+  "  нет такого раздела": "  no such topic"
 }

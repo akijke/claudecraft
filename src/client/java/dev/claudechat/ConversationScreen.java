@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Full-screen conversation window (key K): chat list per mode and project on the left,
  * the selected chat's log with scrolling, clickable buttons and copy (right click) in the
- * middle, and a multi-line input at the bottom (Ctrl+Enter sends, lines starting with
+ * middle, and a multi-line input at the bottom (Enter sends, Shift+Enter is a new line, lines starting with
  * "/" run commands). The game chat keeps receiving the same messages.
  */
 final class ConversationScreen extends Screen {
@@ -208,8 +208,8 @@ final class ConversationScreen extends Screen {
         }
         int inputW = mainW - 92;
         input = new MultiLineEditBox.Builder()
-            .setPlaceholder(Component.literal(mode.equals("cc") ? L.t("Задача для Claude Code… (Ctrl+Enter — отправить, /cc … — команда)")
-                : L.t("Сообщение Claude… (Ctrl+Enter — отправить)")))
+            .setPlaceholder(Component.literal(mode.equals("cc") ? L.t("Задача для Claude Code… Enter — отправить · Shift+Enter — новая строка · /cc … — команда")
+                : L.t("Сообщение Claude… Enter — отправить · Shift+Enter — новая строка")))
             .build(font, inputW, 42, Component.literal("input"));
         input.setX(mainX);
         input.setY(height - 58);
@@ -220,9 +220,9 @@ final class ConversationScreen extends Screen {
         addRenderableWidget(input);
         int bx = mainX + inputW + 4;
         addRenderableWidget(Button.builder(Component.literal(L.t("Отправить")), b -> submit(""))
-            .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal(L.t("В очередь (Ctrl+Enter)")))).build());
+            .bounds(bx, height - 58, 88, 20).tooltip(Tooltip.create(Component.literal(L.t("В очередь (Enter)")))).build());
         addRenderableWidget(Button.builder(Component.literal("✚ " + L.t("сейчас")), b -> submit("f "))
-            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Добавить в работу, которая идёт сейчас, не останавливая её (f)")))).build());
+            .bounds(bx, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Добавить в работу, которая идёт сейчас, не останавливая её (Ctrl+Shift+Enter)")))).build());
         addRenderableWidget(Button.builder(Component.literal("✖"), b -> mod.dispatch(mode, "cancel"))
             .bounds(bx + 46, height - 36, 42, 16).tooltip(Tooltip.create(Component.literal(L.t("Остановить и очистить очередь")))).build());
         addRenderableWidget(Button.builder(Component.literal("◎ " + L.t("Скриншот")), b -> {
@@ -264,11 +264,31 @@ final class ConversationScreen extends Screen {
         scroll = 0;
     }
 
+    /** Shift+Enter: a line break at the cursor (the box's own text field does the insert). */
+    private void newLine() {
+        try {
+            for (Class<?> c = input.getClass(); c != null; c = c.getSuperclass())
+                for (java.lang.reflect.Field f : c.getDeclaredFields())
+                    if (f.getType() == net.minecraft.client.gui.components.MultilineTextField.class) {
+                        f.setAccessible(true);
+                        ((net.minecraft.client.gui.components.MultilineTextField) f.get(input)).insertText("\n");
+                        return;
+                    }
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        input.setValue(input.getValue() + "\n");  // fallback: at the end
+    }
+
     // ---- input -----------------------------------------------------------------
     @Override public boolean keyPressed(KeyEvent event) {
         if (PaletteScreen.handleKey(mod, this, event, true)) return true;  // Ctrl+Shift+P / Ctrl+P
-        boolean ctrl = (event.modifiers() & 2) != 0;  // GLFW_MOD_CONTROL
-        if (event.key() == InputConstants.KEY_RETURN && ctrl) { submit(""); return true; }
+        boolean ctrl = (event.modifiers() & 2) != 0, shift = (event.modifiers() & 1) != 0;
+        boolean enter = event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER;
+        // Enter sends (like the game's chat), Shift+Enter is a new line, Ctrl+Enter still sends,
+        // Ctrl+Shift+Enter adds to the running work (the "✚ now" button, f)
+        if (enter && ctrl && shift) { submit("f "); return true; }
+        if (enter && ctrl) { submit(""); return true; }
+        if (enter && !shift && getFocused() == input) { submit(""); return true; }
+        if (enter && shift && getFocused() == input) { newLine(); return true; }
         // Tab after "@part": complete a project file path (Claude Code attaches @files to the prompt)
         if (getFocused() == input && event.key() == InputConstants.KEY_TAB) {
             String value = input.getValue();

@@ -113,7 +113,8 @@ final class LiveTest {
             return mc().player != null && mc().level != null && screen() == null;
         }, 240);
         step("world is loaded", () -> { }, () -> waited > 100, 20);
-        step("/cc help prints the help", () -> mod.runLine("cc", "/cc help"), () -> waited > 10, 5);
+        step("/cc help prints the short help", () -> mod.runLine("cc", "/cc help"), () -> waited > 10, 5);
+        step("/cc help git shows one topic", () -> mod.runLine("cc", "/cc help git"), () -> waited > 10, 5);
         step("/cc pwd answers from the bridge", () -> { markEvents(); mod.runLine("cc", "/cc pwd"); }, () -> event("cwd"), 20);
         step("/ls lists files", () -> { markEvents(); mod.runLine("cc", "/ls"); }, () -> event("listing"), 20);
         step("/cc undo list (Claude's edits history)", () -> { markEvents(); mod.runLine("cc", "/cc undo list"); },
@@ -155,6 +156,16 @@ final class LiveTest {
             if (waited == 30) { k.inputForTest("/rev"); k.keyPressed(new KeyEvent(InputConstants.KEY_TAB, 0, 0)); }
             return waited > 30 && k.inputValue().equals("/review ");
         }, 10);
+        step("Shift+Enter adds a line, Enter sends", () -> markEvents(), () -> {
+            if (!(screen() instanceof ConversationScreen k)) return false;
+            if (waited == 10) { k.inputForTest("/cc pwd"); k.keyPressed(new KeyEvent(InputConstants.KEY_RETURN, 0, 1)); }
+            if (waited == 15) {
+                if (!k.inputValue().contains("\n")) return false;
+                k.inputForTest("/cc pwd");
+                k.keyPressed(new KeyEvent(InputConstants.KEY_RETURN, 0, 0));
+            }
+            return waited > 15 && k.inputValue().isEmpty() && event("cwd");
+        }, 20);
         step("Ctrl+Shift+P opens the palette, 'doct' finds Diagnostics", () -> {
             if (screen() instanceof ConversationScreen k) k.keyPressed(new KeyEvent(InputConstants.KEY_P, 0, 3));
         }, () -> {

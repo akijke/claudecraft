@@ -512,7 +512,7 @@ public final class ClaudeChat implements ClientModInitializer {
         String[] split = input.strip().split("\\s+", 2);
         String action = split[0];
         String text = split.length == 2 ? split[1] : "";
-        if (action.equals("help")) { help(mode); return; }
+        if (action.equals("help")) { helpTopic = text.strip(); help(mode); return; }
         if (action.startsWith("/") && action.length() > 1) { send(mode, command(mode, "slash", input.strip().substring(1))); return; }
         if (action.equals("settings")) { open(() -> new SettingsScreen(this, null)); return; }
         if (action.equals("ui") || action.equals("window")) { open(() -> new ConversationScreen(this)); return; }
@@ -669,6 +669,24 @@ public final class ClaudeChat implements ClientModInitializer {
         if (client.player != null) client.gui.chatListener().handleSystemMessage(text, false);
     }
 
+    /** help topic for the next help(mode) call: "" = the short list, code, git, settings, costs, all. */
+    private String helpTopic = "";
+
+    /** Topics a help row belongs to, by its command ("/cc pr" → "pr"). */
+    static Set<String> helpTopicOf(String command) {
+        String k = command.replaceFirst("^/(cc|c|codex|gpt|gemini|gem) ", "").replaceFirst("^/", "");
+        Set<String> topics = new HashSet<>();
+        if (k.startsWith("<") || Set.of("c", "project", "ls", "git", "ide", "palette", "undo", "doctor").contains(k)
+                || k.equals("claude") || k.endsWith("craft")) topics.add("basic");
+        if (Set.of("compact", "model", "/review", "perms", "plan", "replace", "rewind", "fork", "memory", "skills", "hooks",
+                "style", "shot", "pty", "edit", "agents", "spawn", "connectors", "crash", "watch", "search", "export", "guest",
+                "undo", "ide", "palette", "worktree", "doctor").contains(k)) topics.add("code");
+        if (Set.of("git", "pr", "issues", "worktree", "crossreview", "watch").contains(k)) topics.add("git");
+        if (k.startsWith("claude") || k.contains("craft") || k.startsWith("new ollama")) topics.add("settings");
+        if (Set.of("dashboard", "budget", "model", "compact").contains(k)) topics.add("costs");
+        return topics;
+    }
+
     private void help(String mode) {
         String c = "/" + mode + " ";
         int accent = mode.equals("cc") ? ChatStyle.CODE_MODE : ChatStyle.CLAUDE;
@@ -723,10 +741,26 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/cc crash", L.t("разобрать последний крэш / latest.log Minecraft")},
             {"/claude", L.t("настройки, вход в аккаунт, API-ключ")},
         };
-        for (String[] row : rows)
+        String topic = helpTopic;
+        helpTopic = "";
+        int shown = 0;
+        for (String[] row : rows) {
+            if (!helpTopicOf(row[0]).contains(topic.isEmpty() ? "basic" : topic) && !topic.equals("all")) continue;
+            shown++;
             show(ChatStyle.line(mode, Component.literal("  ").append(Component.literal(row[0]).withStyle(s -> s
                 .withColor(ChatStyle.AQUA).withClickEvent(new ClickEvent.SuggestCommand(row[0].split(" [<·|]")[0] + " "))))
                 .append(ChatStyle.lit("  " + row[1], ChatStyle.DIM))));
+        }
+        // topics: a short list first, the rest one click away
+        net.minecraft.network.chat.MutableComponent topics = Component.literal("  ").append(ChatStyle.lit(L.t("Ещё: "), ChatStyle.FAINT));
+        for (String[] t : new String[][]{{"code", L.t("Код")}, {"git", "Git"}, {"settings", L.t("Настройки")},
+                {"costs", L.t("Расходы")}, {"all", L.t("Всё")}}) {
+            boolean on = t[0].equals(topic);
+            topics.append(ChatStyle.button((on ? "● " : "") + t[1], c + "help " + t[0], false, on ? ChatStyle.GOLD : ChatStyle.AQUA, null)).append(" ");
+        }
+        if (!topic.isEmpty() && shown == 0) show(ChatStyle.line(mode, ChatStyle.lit(L.t("  нет такого раздела"), ChatStyle.DIM)));
+        show(ChatStyle.line(mode, topics));
+        if (!topic.isEmpty()) return;
         show(ChatStyle.line(mode, Component.literal("  ")
             .append(ChatStyle.button(L.t("☰ Окно (K)"), c + "ui", false, ChatStyle.CODE_MODE, L.t("Отдельный экран переписки"))).append(" ")
             .append(ChatStyle.button(L.t("⚙ Настройки"), c + "settings", false, ChatStyle.GOLD, null)).append(" ")
