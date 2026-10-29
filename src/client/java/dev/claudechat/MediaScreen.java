@@ -61,10 +61,10 @@ final class MediaScreen extends Screen {
         areaX = 8; areaY = 22; areaW = width - 16; areaH = height - 22 - 30;
         MediaStore.Entry e = current();
         int y = height - 25, x = 8;
-        addRenderableWidget(Button.builder(Component.literal("◀"), b -> step(-1)).bounds(x, y, 20, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Предыдущий (←)")))).build());
-        addRenderableWidget(Button.builder(Component.literal("▶"), b -> step(1)).bounds(x + 22, y, 20, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Следующий (→)")))).build());
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal("◀"), b -> step(-1)).bounds(x, y, 20, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("Предыдущий (←)")))).build()));
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal("▶"), b -> step(1)).bounds(x + 22, y, 20, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("Следующий (→)")))).build()));
         x += 48;
         if (e != null) {
             x = button(x, y, L.t("Открыть на ПК"), L.t("Программой по умолчанию (видео — в плеере)"), () -> bridge("open"));
@@ -85,7 +85,7 @@ final class MediaScreen extends Screen {
             }
         }
         button(x, y, L.t("Галерея"), null, () -> minecraft.setScreenAndShow(new MediaGalleryScreen(mod, parent, mode)));
-        addRenderableWidget(Button.builder(Component.literal("✖"), b -> onClose()).bounds(width - 28, y, 20, 20).build());
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal("✖"), b -> onClose()).bounds(width - 28, y, 20, 20).build()));
     }
 
     private int button(int x, int y, String label, String tip, Runnable action) {
@@ -93,7 +93,7 @@ final class MediaScreen extends Screen {
         if (x + w > width - 32) return x;  // narrow window: drop what does not fit
         Button.Builder b = Button.builder(Component.literal(label), btn -> action.run()).bounds(x, y, w, 20);
         if (tip != null) b.tooltip(Tooltip.create(Component.literal(tip)));
-        addRenderableWidget(b.build());
+        addRenderableWidget(Ui.flat(b.build()));
         return x + w + 2;
     }
 

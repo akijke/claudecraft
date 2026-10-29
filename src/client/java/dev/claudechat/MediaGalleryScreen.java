@@ -40,23 +40,23 @@ final class MediaGalleryScreen extends Screen {
     @Override public void onClose() { minecraft.setScreenAndShow(parent); }
 
     @Override protected void init() {
-        int boxW = Math.max(120, width - 16 - 230);
+        int boxW = Math.max(120, width - 16 - 250);
         String keep = prompt == null ? "" : prompt.getValue();
-        prompt = new EditBox(font, 8, 22, boxW, 20, Component.literal("prompt"));
+        prompt = new Ui.Field(font, 8, 22, boxW, 20, Component.literal("prompt"));
         prompt.setMaxLength(4000);
         prompt.setHint(Component.literal(L.t("Опиши картинку или видео…")));
         prompt.setValue(keep);
         addRenderableWidget(prompt);
         int x = 8 + boxW + 4;
-        addRenderableWidget(Button.builder(Component.literal(L.t("Картинка")), b -> generate("draw")).bounds(x, 22, 64, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("OpenAI gpt-image-1 или Gemini, ≈ $0.04 (Enter)")))).build());
-        addRenderableWidget(Button.builder(Component.literal(L.t("Видео")), b -> generate("video")).bounds(x + 66, 22, 56, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Sora или Veo, 4 с, ≈ $0.40–0.60; минуты ожидания")))).build());
-        addRenderableWidget(Button.builder(Component.literal("🔑"), b -> mod.runLine(mode, "/cc media key")).bounds(x + 124, 22, 20, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Ключи OpenAI / Gemini для генерации")))).build());
-        addRenderableWidget(Button.builder(Component.literal(L.t("Папка")), b -> mod.runLine(mode, "/cc media folder last")).bounds(x + 146, 22, 52, 20)
-            .tooltip(Tooltip.create(Component.literal(L.t("Папка с файлами на ПК")))).build());
-        addRenderableWidget(Button.builder(Component.literal("✖"), b -> onClose()).bounds(width - 28, 22, 20, 20).build());
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal(L.t("Картинка")), b -> generate("draw")).bounds(x, 22, 64, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("OpenAI gpt-image-1 или Gemini, ≈ $0.04 (Enter)")))).build()));
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal(L.t("Видео")), b -> generate("video")).bounds(x + 66, 22, 56, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("Sora или Veo, 4 с, ≈ $0.40–0.60; минуты ожидания")))).build()));
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal(L.t("Ключи")), b -> mod.runLine(mode, "/cc media key")).bounds(x + 124, 22, 40, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("Ключи OpenAI / Gemini для генерации")))).build()));
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal(L.t("Папка")), b -> mod.runLine(mode, "/cc media folder last")).bounds(x + 166, 22, 52, 20)
+            .tooltip(Tooltip.create(Component.literal(L.t("Папка с файлами на ПК")))).build()));
+        addRenderableWidget(Ui.flat(Button.builder(Component.literal("✖"), b -> onClose()).bounds(width - 28, 22, 20, 20).build()));
         gridX = 8; gridY = 50; gridH = height - gridY - 6;
         cols = Math.max(1, (width - 16 + GAP) / (CELL + GAP));
         setInitialFocus(prompt);
