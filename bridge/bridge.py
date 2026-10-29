@@ -972,6 +972,22 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action in ('issues', 'issue'):
+            from backends import pulls
+            folder = self.chat_cwd(chat)
+            sub, _, rest = text.strip().partition(' ')
+            if sub in ('', 'list', 'ls'):
+                self.emit(chat, 'Issues', kind='issue_list', rows=await self.pulls.list_issues(folder))
+            elif sub == 'do' or sub.lstrip('#').isdigit():
+                number = int((rest if sub == 'do' else sub).strip().lstrip('#'))
+                issue = await self.pulls.view_issue(folder, number)
+                if sub == 'do':
+                    await self.enqueue(chat, pulls.issue_prompt(issue))
+                    self.emit(chat, f"Claude берётся за issue #{number}: ветка, работа, черновик PR", kind='status')
+                else:
+                    self.emit(chat, f'Issue #{number}', kind='issue_view', **issue)
+            else:
+                raise ValueError('issues [list | <номер> | do <номер>]')
         elif action in ('pr', 'prs'):
             from backends import pulls
             folder = self.chat_cwd(chat)

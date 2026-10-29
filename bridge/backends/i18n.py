@@ -157,6 +157,8 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'Claude берётся за issue #{}: ветка, работа, черновик PR': 'Claude takes issue #{}: branch, work, draft PR',
+    'issues [list | <номер> | do <номер>]': 'issues [list | <number> | do <number>]',
     'Нужен GitHub CLI (gh): cli.github.com, затем вход — /claude → GitHub': 'GitHub CLI (gh) is needed: cli.github.com, then sign in — /claude → GitHub',
     'gh вернул не JSON: {}': 'gh returned no JSON: {}',
     'Claude готовит PR (черновик): описание, push, gh pr create — каждую команду подтверждаешь ты':

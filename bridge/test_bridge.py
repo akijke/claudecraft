@@ -1254,7 +1254,6 @@ class PullRequestTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('gh pr comment', prompts[0])
         self.assertIn('gh pr create --draft', prompts[1])
 
-    @unittest.skip("#56")
     async def test_issue_list_and_do(self):
         await self.bridge.command({'mode': 'cc', 'action': 'issues', 'text': ''})
         rows = [e for e in self.bridge.events if e['kind'] == 'issue_list'][-1]['rows']

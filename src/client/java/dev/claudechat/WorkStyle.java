@@ -341,6 +341,26 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "issue_list" -> {
+                JsonArray rows = e.getAsJsonArray("rows");
+                out.add(line(mode, lit("☰ Issues", GOLD).withStyle(st -> st.withBold(true)).append(lit("  " + rows.size() + L.t(" открыто"), FAINT))));
+                if (rows.isEmpty()) out.add(line(mode, lit(L.t("  открытых issues нет"), FAINT)));
+                for (JsonElement item : rows) {
+                    JsonObject r = item.getAsJsonObject();
+                    MutableComponent row = Component.literal("  ").append(button("#" + n(r, "number"), cmd + "issue " + n(r, "number"), false, AQUA, null))
+                        .append(lit(" " + s(r, "title"), TEXT));
+                    for (JsonElement l : r.getAsJsonArray("labels")) row.append(lit(" [" + l.getAsString() + "]", GOLD));
+                    row.append(sp()).append(button("✦ " + L.t("сделай"), cmd + "issue do " + n(r, "number"), false, CODE_MODE,
+                        L.t("Claude: ветка issue-N, реализация, тесты, черновик PR с «Closes #N»")));
+                    out.add(line(mode, row));
+                }
+            }
+            case "issue_view" -> {
+                out.add(line(mode, lit("☰ #" + n(e, "number") + " " + s(e, "title"), GOLD).withStyle(st -> st.withBold(true)).append(sp())
+                    .append(button("✦ " + L.t("сделай"), cmd + "issue do " + n(e, "number"), false, CODE_MODE, null))));
+                markdown(mode, s(e, "body"), out);
+                for (JsonElement c : e.getAsJsonArray("comments")) out.add(line(mode, lit("  " + firstLine(c.getAsString()), DIM)));
+            }
             case "pr_list" -> {
                 JsonArray rows = e.getAsJsonArray("rows");
                 out.add(line(mode, lit("⇄ Pull requests", GOLD).withStyle(st -> st.withBold(true))
