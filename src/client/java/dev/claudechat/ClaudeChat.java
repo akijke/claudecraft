@@ -368,6 +368,23 @@ public final class ClaudeChat implements ClientModInitializer {
                 say("c", "osnotify: " + (on ? L.t("вкл") : L.t("выкл")) + L.t(" — системные уведомления, когда игра свёрнута"));
                 if (value.equals("test")) OsNotify.show("Claudecraft", L.t("Проверка уведомления"));
             }
+            case "achievements", "ach" -> {
+                String v = parts.length > 1 ? parts[1].strip() : "";
+                if (v.equals("on") || v.equals("off")) launcher.setFlag("achievements", v.equals("on"));
+                int got = 0;
+                for (String[] a : Achievements.ALL) if (Achievements.has(launcher, a[0])) got++;
+                show(ChatStyle.line("c", ChatStyle.lit("✦ " + L.t("Достижения"), ChatStyle.GOLD).withStyle(st -> st.withBold(true))
+                    .append(ChatStyle.lit("  " + got + "/" + Achievements.ALL.length, ChatStyle.DIM)).append(" ")
+                    .append(launcher.flag("achievements", true)
+                        ? ChatStyle.button(L.t("тосты выкл"), "/claude achievements off", false, ChatStyle.DIM, null)
+                        : ChatStyle.button(L.t("тосты вкл"), "/claude achievements on", false, ChatStyle.GREEN, null))));
+                for (String[] a : Achievements.ALL) {
+                    boolean has = Achievements.has(launcher, a[0]);
+                    show(ChatStyle.line("c", ChatStyle.lit(has ? "  ✔ " : "  ☐ ", has ? ChatStyle.GREEN : ChatStyle.FAINT)
+                        .append(ChatStyle.lit(L.t(a[1]), has ? ChatStyle.TEXT : ChatStyle.DIM))
+                        .append(ChatStyle.lit(" — " + L.t(a[2]), ChatStyle.FAINT))));
+                }
+            }
             case "export", "import" -> {
                 String arg = parts.length > 1 ? parts[1].strip() : "";
                 if (parts[0].equals("import") && arg.isEmpty()) say("c", L.t("/claude import <файл.zip> — архив из /claude export"));
@@ -602,7 +619,7 @@ public final class ClaudeChat implements ClientModInitializer {
         }
         if (kind.equals("need_key") && event.has("connector"))
             keyFields.put(event.get("connector").getAsString(), event.getAsJsonArray("fields"));
-        if (!kind.equals("history")) Notify.onEvent(event);
+        if (!kind.equals("history")) { Notify.onEvent(event); Achievements.onEvent(launcher, event); }
         if (kind.equals("history")) {
             // Conversation screen asked for older events of this chat after a reconnect.
             Deque<JsonObject> items = log.computeIfAbsent(chat, k -> new ArrayDeque<>());
@@ -680,6 +697,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude theme", L.t("тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода")},
             {"/claude osnotify", L.t("уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл")},
+            {"/claude achievements", L.t("достижения: первый коммит, ночная смена, 100 запусков тестов… · achievements off — без тостов")},
             {"/claude export", L.t("настройки и проекты в zip (без ключей и чатов) · /claude import <zip> — на другом ПК")},
             {"/claude remote", L.t("мост на VPS / другом ПК через SSH-туннель: remote <порт> <токен> · remote off")},
             {"/claude sound", L.t("звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка")},
