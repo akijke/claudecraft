@@ -266,3 +266,17 @@ jar-in-jar в claude-chat-<версия>.jar (META-INF/jars) — и `localRuntim
 стартует). Аддоны Codex/Gemini для своих запусков берут root `bareJar` (без вложенных аддонов).
 Порты: 18741 Claude, 18742 Codex, 18743 Gemini, 18745 оверлей; клавиши K/J/G; панели задач Notify
 на y=4/86/168. Overlaycraft 0.4.0 берёт палитру Claudecraft рефлексией (Palette.java).
+
+## Картинки и видео нейросетей (#7, 2026-10-29)
+
+bridge/backends/media.py (только urllib): картинки — OpenAI Images (gpt-image-1) / Gemini
+(gemini-2.5-flash-image), видео — OpenAI /v1/videos (Sora, опрос) / Veo (predictLongRunning, опрос).
+Ключи: secrets.json openai_api_key / gemini_api_key (`/claude key media` → KeyScreen → action media_key),
+затем OPENAI_API_KEY / GEMINI_API_KEY / GOOGLE_API_KEY, ~/.codex/auth.json, config/geminicraft/secrets.json.
+Модели — bridge-config.json "media". Файлы: config/claude-chat/media/*.png|mp4 + .json, index.json (галерея;
+мод читает его сам — MediaStore.java). Команды: /cc draw, /cc video, /cc img gen, /cc media [gen|list|cancel|
+open|folder|frames|add|key|view]. Bridge.emit → media.observe: свежий файл картинки/видео, названный агентом
+(текст или Write-инструмент, проверка на done), попадает в галерею и чат (событие media). Мод: миниатюры в окне K
+(ConversationScreen.addThumb), MediaScreen (зум/пан, ←/→, «Открыть на ПК» через мост, «Отправить в чат» =
+[[image:…]] в поле ввода), MediaGalleryScreen (/cc media). Видео: ffmpeg → media/frames/<id>/*.jpg + frames.json,
+играет без звука одной текстурой. ffmpeg на этом ПК нет; реальные API не вызывались (тесты с FakeHttp).

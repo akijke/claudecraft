@@ -185,6 +185,42 @@ final class WorkStyle {
             case "image" -> out.add(line(mode, lit("◎ ", AQUA).append(lit(s(e, "text"), TEXT)).append(sp())
                 .append(button("⧉", cmd + "open " + s(e, "path"), false, AQUA, L.t("Открыть программой по умолчанию")))
                 .append(lit(s(e, "question").isEmpty() ? "" : "  «" + s(e, "question") + "»", DIM))));
+            case "media" -> {  // a generated or agent-made picture / video (bridge/backends/media.py)
+                String id = s(e, "id");
+                boolean video = s(e, "media").equals("video");
+                String still = video ? s(e, "poster") : s(e, "path");
+                MutableComponent row = lit(video ? "▶ " : "◎ ", CLAUDE).append(lit(s(e, "text"), TEXT)).append(sp())
+                    .append(button(L.t("смотреть"), cmd + "media view " + id, false, AQUA, L.t("Во весь экран: масштаб, листание, видео без звука")))
+                    .append(sp()).append(button(L.t("на ПК"), cmd + "media open " + id, false, AQUA, L.t("Открыть программой по умолчанию")));
+                if (!still.isEmpty()) row.append(sp()).append(button(L.t("→ Claude"), cmd + "img \"" + still + "\" ", true, AQUA,
+                    L.t("Показать Claude с вопросом")));
+                out.add(line(mode, row));
+                if (!s(e, "prompt").isEmpty()) out.add(line(mode, lit("  «" + s(e, "prompt") + "»  " + s(e, "provider"), DIM)));
+            }
+            case "media_progress" -> {
+                if (!b(e, "finished"))
+                    out.add(line(mode, lit("… " + s(e, "text") + "  ", GOLD)
+                        .append(button(L.t("отмена"), cmd + "media cancel " + s(e, "job"), false, DIM, L.t("Остановить ожидание")))));
+            }
+            case "media_frames" -> out.add(line(mode, lit("✔ " + s(e, "text") + "  ", GREEN)
+                .append(button(L.t("смотреть"), cmd + "media view " + s(e, "id"), false, AQUA, null))));
+            case "media_list" -> {
+                JsonArray rows = e.has("rows") ? e.getAsJsonArray("rows") : new JsonArray();
+                out.add(line(mode, lit("◎ " + s(e, "text") + "  ", GOLD).withStyle(st -> st.withBold(true))
+                    .append(button(L.t("открыть"), cmd + "media", false, AQUA, L.t("Сетка картинок и видео в игре"))).append(sp())
+                    .append(button(L.t("🔑 ключи"), cmd + "media key", false, GOLD, L.t("OpenAI или Gemini")))));
+                if (!e.has("providers") || e.getAsJsonArray("providers").isEmpty())
+                    out.add(line(mode, lit(L.t("  Нет ключа для генерации — нажми «ключи» (OpenAI: картинки + Sora, Gemini: картинки + Veo)"), DIM)));
+                if (!b(e, "ffmpeg"))
+                    out.add(line(mode, lit(L.t("  Без ffmpeg видео открываются только в плеере на ПК"), FAINT)));
+                for (JsonElement r : rows) {
+                    JsonObject row = r.getAsJsonObject();
+                    String label = s(row, "prompt").isEmpty() ? s(row, "path").replaceAll(".*[\\\\/]", "") : s(row, "prompt");
+                    out.add(line(mode, lit(s(row, "kind").equals("video") ? "  ▶ " : "  ◎ ", AQUA).append(lit(label, TEXT)).append(sp())
+                        .append(button(L.t("смотреть"), cmd + "media view " + s(row, "id"), false, AQUA, null))));
+                }
+                out.add(line(mode, lit(L.t("  /cc draw <описание> — картинка · /cc video <описание> — видео"), FAINT)));
+            }
             case "styles" -> {
                 String current = s(e, "current");
                 out.add(line(mode, lit("✦ " + L.t("Стиль ответов"), GOLD).withStyle(st -> st.withBold(true))

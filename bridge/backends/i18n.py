@@ -434,6 +434,37 @@ EN = {
     'Вход не запущен: нажми «Войти»': 'Sign-in is not running: press “Sign in”', 'Выход не удался: {}': 'Sign-out failed: {}',
     'Нет API-ключа: добавь его в /c settings (или ANTHROPIC_API_KEY в окружении моста)':
         'No API key: add it in /c settings (or ANTHROPIC_API_KEY in the bridge environment)',
+    # --- media generation (backends/media.py) ---------------------------------
+    'Сеть недоступна: {}': 'Network unavailable: {}', '{}: непонятный ответ': '{}: unexpected answer',
+    'Нет ключа {}: /claude key media': 'No {} key: /claude key media', 'Провайдер: openai или gemini': 'Provider: openai or gemini',
+    'Нет ключа для генерации: /claude key media (OpenAI или Gemini)':
+        'No key for generation: /claude key media (OpenAI or Gemini)',
+    'openai: в ответе нет картинки': 'openai: no image in the answer', 'gemini: картинки нет в ответе': 'gemini: no image in the answer',
+    'gemini: картинки нет в ответе ({})': 'gemini: no image in the answer ({})',
+    'Генерация дольше 20 минут — остановлена': 'Generation took over 20 minutes — stopped',
+    'Видео: {} {}%': 'Video: {} {}%', 'openai: нет id видео': 'openai: no video id',
+    'gemini: нет операции Veo': 'gemini: no Veo operation', 'Видео: Veo работает… {} с': 'Video: Veo is working… {} s',
+    'gemini: Veo не вернул видео (возможно, запрос отклонён фильтром)':
+        'gemini: Veo returned no video (the prompt may have been blocked by a filter)',
+    'Файл больше 300 МБ — не сохранён': 'File over 300 MB — not saved', 'Нет такого файла в галерее: {}': 'Not in the gallery: {}',
+    'Для просмотра видео в игре нужен ffmpeg в PATH — или открой его в плеере':
+        'Playing video in the game needs ffmpeg on PATH — or open it in a player',
+    'ffmpeg не смог разобрать видео: {}': 'ffmpeg could not read the video: {}',
+    'Видео: {}': 'Video: {}', 'Картинка: {}': 'Image: {}',
+    'Опиши, что нарисовать: /cc draw <описание>': 'Describe what to draw: /cc draw <description>',
+    'Опиши видео: /cc video <описание>': 'Describe the video: /cc video <description>',
+    'Описание длиннее 4000 символов': 'The description is longer than 4000 characters',
+    'Генерация отменена (уже начатую провайдер может посчитать)': 'Generation cancelled (the provider may still bill a started one)',
+    'Генерация не удалась: {}': 'Generation failed: {}', 'Генерирую {} через {} ({}): {}': 'Generating {} with {} ({}): {}',
+    'картинку': 'an image', 'видео': 'a video', '≈ $0.10 за секунду': '≈ $0.10 per second', '≈ $0.15 за секунду': '≈ $0.15 per second',
+    'Неизвестный параметр --{}': 'Unknown option --{}', 'Ключи генерации сохранены: {}': 'Generation keys saved: {}',
+    'media: ключи': 'media: keys', 'Отменено генераций: {}': 'Generations cancelled: {}', 'Это не видео': 'This is not a video',
+    'Кадры видео готовы: {}': 'Video frames ready: {}', 'media add <картинка или видео>': 'media add <image or video>',
+    'Галерея': 'Gallery',
+    'media gen|list|cancel|open|folder|frames|add|key · /cc draw <описание> · /cc video <описание>':
+        'media gen|list|cancel|open|folder|frames|add|key · /cc draw <description> · /cc video <description>',
+    'platform.openai.com/api-keys — картинки gpt-image-1, видео Sora': 'platform.openai.com/api-keys — gpt-image-1 images, Sora video',
+    'aistudio.google.com/apikey — картинки Gemini, видео Veo': 'aistudio.google.com/apikey — Gemini images, Veo video',
 }
 
 # Codexcraft/Geminicraft rename "Claude" in the bridge they copy (their build.gradle sets BRAND):

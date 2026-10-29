@@ -2156,5 +2156,192 @@ class VerifierFixTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             self.bridge.files.save('cc', str(self.bridge.workspace / 'x.txt'), 123)
 
+class FakeHttp:
+    """Scripted provider API: (method, url substring) -> list of (status, body) answers; records calls."""
+    def __init__(self, script):
+        self.script = {k: list(v) for k, v in script.items()}
+        self.calls = []
+
+    def __call__(self, method, url, headers=None, body=None, timeout=0):
+        self.calls.append((method, url, dict(headers or {}), body))
+        for (m, part), answers in self.script.items():
+            if m == method and part in url and answers:
+                status, data = answers[0] if len(answers) == 1 else answers.pop(0)
+                raw = data if isinstance(data, bytes) else json.dumps(data).encode('utf-8')
+                return status, {}, raw
+        raise AssertionError(f'unexpected request {method} {url}')
+
+
+class MediaTests(unittest.IsolatedAsyncioTestCase):
+    """backends/media.py with a fake HTTP layer: no network, no real keys."""
+    PNG = b'\x89PNG\r\n\x1a\nfake'
+
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(os.environ, {'CODEX_HOME': self.temp.name})
+        self.env.start()
+        for name in ('OPENAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'):
+            os.environ.pop(name, None)
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+        self.chat = self.bridge.current_chat('cc')
+        self.media = self.bridge.media
+        self.media.sleep = lambda s: None
+        self.media.ffmpeg = None
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.env.stop()
+        self.temp.cleanup()
+
+    def kinds(self, kind):
+        return [e for e in self.bridge.events if e.get('kind') == kind]
+
+    def test_no_key_is_a_clear_error_and_keys_stay_secret(self):
+        with self.assertRaisesRegex(ValueError, '/claude key media'):
+            self.media.pick()
+        self.media.set_keys({'OPENAI_API_KEY': 'sk-test-123'})
+        self.assertEqual(self.media.pick(), 'openai')
+        with self.assertRaises(ValueError):
+            self.media.pick('gemini')
+        with self.assertRaises(ValueError):
+            self.media.set_keys({'EVIL': 'x'})
+        fields = {f['var']: f['set'] for f in self.media.key_fields()}
+        self.assertEqual(fields, {'OPENAI_API_KEY': True, 'GEMINI_API_KEY': False})
+        os.environ['GEMINI_API_KEY'] = 'env-gemini'
+        self.assertEqual(self.media.providers(), ['openai', 'gemini'])
+        self.assertNotIn('sk-test-123', json.dumps(list(self.bridge.events)))
+
+    async def test_key_screen_flow(self):
+        await self.bridge.command({'mode': 'cc', 'action': 'key', 'text': 'media'})
+        need = self.kinds('need_key')[-1]
+        self.assertEqual(need['connector'], 'media')
+        await self.bridge.command({'mode': 'cc', 'action': 'media_key', 'text': 'media',
+                                   'secret': {'GEMINI_API_KEY': 'g-secret'}})
+        self.assertEqual(self.media.providers(), ['gemini'])
+        self.assertNotIn('g-secret', json.dumps(list(self.bridge.events)))
+
+    def test_openai_image_request_and_save(self):
+        self.media.set_keys({'OPENAI_API_KEY': 'sk-test'})
+        import base64
+        http = FakeHttp({('POST', '/v1/images/generations'): [(200, {'data': [{'b64_json': base64.b64encode(self.PNG).decode()}]})]})
+        self.media.http = http
+        job = {'kind': 'image', 'prompt': 'a red fox', 'provider': 'openai', 'cancel': mock.Mock(is_set=lambda: False)}
+        data, ext, model = self.media.produce(job, lambda *a, **k: None)
+        method, url, headers, body = http.calls[0]
+        self.assertEqual(headers['Authorization'], 'Bearer sk-test')
+        sent = json.loads(body)
+        self.assertEqual((sent['model'], sent['prompt'], sent['size']), ('gpt-image-1', 'a red fox', '1024x1024'))
+        entry = self.media.save(data, ext, 'image', 'a red fox', 'openai', model, self.chat.id)
+        path = Path(entry['path'])
+        self.assertEqual(path.read_bytes(), self.PNG)
+        self.assertTrue(path.name.endswith('-a-red-fox.png'))
+        self.assertEqual(json.loads(path.with_name(path.name + '.json').read_text(encoding='utf-8'))['prompt'], 'a red fox')
+        self.assertEqual(self.media.find(entry['id'][:6])['path'], str(path))
+        self.assertEqual(self.media.find('last')['id'], entry['id'])
+
+    def test_gemini_image_and_errors(self):
+        os.environ['GEMINI_API_KEY'] = 'g'
+        import base64
+        ok = {'candidates': [{'content': {'parts': [{'text': 'here'}, {'inlineData': {'mimeType': 'image/png',
+              'data': base64.b64encode(self.PNG).decode()}}]}}]}
+        self.media.http = FakeHttp({('POST', 'gemini-2.5-flash-image:generateContent'): [(200, ok)]})
+        data, ext, _ = self.media.produce({'kind': 'image', 'prompt': 'x', 'provider': 'gemini'}, None)
+        self.assertEqual((data, ext), (self.PNG, '.png'))
+        self.assertEqual(self.media.http.calls[0][2]['x-goog-api-key'], 'g')
+        self.assertNotIn('key=', self.media.http.calls[0][1])  # never in the URL
+        self.media.http = FakeHttp({('POST', 'generateContent'): [(400, {'error': {'message': 'bad prompt'}})]})
+        with self.assertRaisesRegex(ValueError, 'gemini: HTTP 400 — bad prompt'):
+            self.media.produce({'kind': 'image', 'prompt': 'x', 'provider': 'gemini'}, None)
+
+    def test_openai_video_polls_until_completed(self):
+        import threading
+        self.media.set_keys({'OPENAI_API_KEY': 'sk'})
+        http = FakeHttp({('POST', '/v1/videos'): [(200, {'id': 'video_1', 'status': 'queued'})],
+                         ('GET', '/content'): [(200, b'MP4DATA')],
+                         ('GET', '/v1/videos/video_1'): [(200, {'status': 'in_progress', 'progress': 30}),
+                                                         (200, {'status': 'in_progress', 'progress': 80}),
+                                                         (200, {'status': 'completed', 'progress': 100})]})
+        self.media.http = http
+        seen = []
+        job = {'kind': 'video', 'prompt': 'waves', 'provider': 'openai', 'cancel': threading.Event(), 'seconds': 8}
+        data, ext, model = self.media.produce(job, lambda text, **k: seen.append(k.get('percent')))
+        self.assertEqual((data, ext, model), (b'MP4DATA', '.mp4', 'sora-2'))
+        self.assertEqual(seen, [30, 80])
+        body = http.calls[0][3].decode()
+        self.assertIn('name="seconds"\r\n\r\n8', body)
+        self.assertIn('multipart/form-data; boundary=', http.calls[0][2]['Content-Type'])
+
+    def test_veo_operation_and_cancel(self):
+        import threading
+        os.environ['GEMINI_API_KEY'] = 'g'
+        done = {'done': True, 'response': {'generateVideoResponse': {'generatedSamples': [
+            {'video': {'uri': 'https://generativelanguage.googleapis.com/v1beta/files/abc:download?alt=media'}}]}}}
+        self.media.http = FakeHttp({('POST', ':predictLongRunning'): [(200, {'name': 'models/veo/operations/op1'})],
+                                    ('GET', 'files/abc'): [(200, b'VEO')],
+                                    ('GET', 'operations/op1'): [(200, {'done': False}), (200, done)]})
+        job = {'kind': 'video', 'prompt': 'p', 'provider': 'gemini', 'cancel': threading.Event()}
+        self.assertEqual(self.media.produce(job, lambda *a, **k: None)[0], b'VEO')
+        job = {'kind': 'video', 'prompt': 'p', 'provider': 'gemini', 'cancel': threading.Event()}
+        self.media.http = FakeHttp({('POST', ':predictLongRunning'): [(200, {'name': 'models/veo/operations/op2'})],
+                                    ('GET', 'operations/op2'): [(200, {'done': False})]})
+        self.media.sleep = lambda s: job['cancel'].set()
+        from backends.media import Cancelled
+        with self.assertRaises(Cancelled):
+            self.media.produce(job, lambda *a, **k: None)
+
+    async def test_draw_command_runs_in_background_and_emits_media(self):
+        import base64
+        self.media.set_keys({'OPENAI_API_KEY': 'sk'})
+        self.media.http = FakeHttp({('POST', '/images/generations'): [(200, {'data': [{'b64_json': base64.b64encode(self.PNG).decode()}]})]})
+        await self.bridge.command({'mode': 'cc', 'action': 'draw', 'text': 'castle at night'})
+        self.assertTrue(self.kinds('media_progress'))
+        for job in list(self.media.jobs.values()):
+            await job['task']
+        media = self.kinds('media')[-1]
+        self.assertEqual((media['media'], media['prompt'], media['provider']), ('image', 'castle at night', 'openai'))
+        self.assertTrue(Path(media['path']).is_file())
+        await self.bridge.command({'mode': 'cc', 'action': 'img', 'text': 'gen tiny dragon'})
+        for job in list(self.media.jobs.values()):
+            await job['task']
+        self.assertEqual(self.kinds('media')[-1]['prompt'], 'tiny dragon')
+        await self.bridge.command({'mode': 'cc', 'action': 'gallery', 'text': ''})
+        self.assertEqual(len(self.kinds('media_list')[-1]['rows']), 2)
+
+    async def test_failed_generation_is_an_error_event(self):
+        self.media.set_keys({'OPENAI_API_KEY': 'sk'})
+        self.media.http = FakeHttp({('POST', '/images/generations'): [(401, {'error': {'message': 'Incorrect API key'}})]})
+        await self.bridge.command({'mode': 'cc', 'action': 'media', 'text': 'gen --provider openai x'})
+        for job in list(self.media.jobs.values()):
+            await job['task']
+        self.assertIn('HTTP 401', self.kinds('error')[-1]['text'])
+        with self.assertRaises(ValueError):
+            await self.bridge.command({'mode': 'cc', 'action': 'video', 'text': ''})
+
+    def test_agent_written_files_show_up(self):
+        folder = Path(self.bridge.chat_cwd(self.chat))
+        (folder / 'out').mkdir(exist_ok=True)
+        (folder / 'out' / 'logo.png').write_bytes(self.PNG)
+        self.bridge.emit(self.chat, 'Готово: сохранил картинку в out/logo.png', kind='text_part')
+        media = self.kinds('media')
+        self.assertEqual(len(media), 1)
+        self.assertEqual(Path(media[0]['path']), (folder / 'out' / 'logo.png').resolve())
+        self.bridge.emit(self.chat, 'out/logo.png ещё раз', kind='text')  # already in the gallery: not repeated
+        self.assertEqual(len(self.kinds('media')), 1)
+        # a Write tool line names a file that exists only after the tool ran
+        self.bridge.emit(self.chat, 'Writing out/clip.mp4', kind='tool')
+        (folder / 'out' / 'clip.mp4').write_bytes(b'MP4')
+        self.bridge.emit(self.chat, 'Готово', kind='done')
+        self.assertEqual(self.kinds('media')[-1]['media'], 'video')
+        self.bridge.emit(self.chat, 'no such missing.png here', kind='text')
+        self.assertEqual(len(self.kinds('media')), 2)
+
+    def test_parse_gen(self):
+        from backends.media import parse_gen
+        self.assertEqual(parse_gen('video --seconds 8 --provider gemini a cat'), ('video', 'gemini', {'seconds': 8}, 'a cat'))
+        self.assertEqual(parse_gen('a --size 1x1'), ('image', None, {}, 'a --size 1x1'))
+        with self.assertRaises(ValueError):
+            parse_gen('--bogus 1 cat')
+
+
 if __name__ == '__main__':
     unittest.main()

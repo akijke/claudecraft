@@ -91,15 +91,85 @@ final class DevShots {
                 "[{\"var\":\"SENTRY_ACCESS_TOKEN\",\"required\":true,\"set\":false,\"hint\":\"sntrys_...\"},"
                 + "{\"var\":\"SENTRY_HOST\",\"required\":false,\"set\":true,\"hint\":\"sentry.io\"}]").getAsJsonArray()));
             case 620 -> Screenshot.grab(client, true);
-            case 624 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
-            case 640 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
-            case 700 -> Screenshot.grab(client, true);
-            case 720 -> client.stop();
+            case 625 -> { mediaSamples(); client.setScreenAndShow(new MediaGalleryScreen(mod, null, "cc", true)); }
+            case 630 -> Screenshot.grab(client, true);
+            case 632 -> client.setScreenAndShow(new MediaScreen(mod, null, MediaStore.list(), MediaStore.indexOf(MediaStore.list(), "demo2"), "cc"));
+            case 638 -> Screenshot.grab(client, true);
+            case 640 -> {
+                Deque<JsonObject> log = new ArrayDeque<>();
+                for (String e : WORK) log.add(parse(e));
+                MediaStore.Entry first = MediaStore.list().get(0);
+                log.add(parse("{\"seq\":90,\"chat\":\"demo\",\"mode\":\"cc\",\"kind\":\"media\",\"media\":\"image\",\"id\":\"" + first.id()
+                    + "\",\"text\":\"Image: " + first.name() + "\",\"prompt\":\"" + first.prompt() + "\",\"provider\":\"openai\",\"path\":"
+                    + new com.google.gson.JsonPrimitive(first.path().toString()) + "}"));
+                mod.log.put("demo", log);
+                client.setScreenAndShow(new ConversationScreen(mod, parse(STATE)));
+            }
+            case 646 -> Screenshot.grab(client, true);
+            case 650 -> { if ("1".equals(System.getenv("CLAUDECRAFT_SHOTS_PTY"))) { term = new TerminalScreen(mod, null, "ps", ""); client.setScreenAndShow(term); } else client.stop(); }
+            case 666 -> { if (term != null) term.typeForTest("Write-Host 'hello from' -ForegroundColor Green -NoNewline; Write-Host ' Minecraft' -ForegroundColor Cyan; Get-ChildItem | Select-Object -First 4\r"); }
+            case 726 -> Screenshot.grab(client, true);
+            case 746 -> client.stop();
             default -> { }
         }
     }
 
     private static JsonObject parse(String json) { return JsonParser.parseString(json).getAsJsonObject(); }
+
+    /** A sample gallery in run/devshots-media: pictures drawn here (no network), plus a "video" with a poster. */
+    private static void mediaSamples() {
+        java.nio.file.Path dir = java.nio.file.Path.of("devshots-media").toAbsolutePath();
+        String[][] items = {{"sunset", "a pixel-art sunset over a voxel ocean", "image"},
+            {"castle", "castle on a floating island, isometric", "image"}, {"waves", "slow waves at night", "video"},
+            {"logo", "logo for my-mod, flat, orange", "image"}, {"forest", "foggy birch forest, morning light", "image"}};
+        com.google.gson.JsonArray index = new com.google.gson.JsonArray();
+        try {
+            java.nio.file.Files.createDirectories(dir);
+            int n = 0;
+            for (String[] item : items) {
+                java.nio.file.Path png = dir.resolve(item[0] + ".png");
+                java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(n % 2 == 0 ? 640 : 480, 360, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D g = img.createGraphics();
+                java.awt.Color a = java.awt.Color.getHSBColor(n * 0.17f, 0.7f, 0.9f), b = java.awt.Color.getHSBColor(n * 0.17f + 0.5f, 0.6f, 0.25f);
+                g.setPaint(new java.awt.GradientPaint(0, 0, a, 0, 360, b));
+                g.fillRect(0, 0, img.getWidth(), 360);
+                g.setColor(new java.awt.Color(255, 255, 255, 170));
+                g.fillOval(img.getWidth() / 2 - 60, 90, 120, 120);
+                g.setColor(new java.awt.Color(20, 20, 30, 200));
+                for (int x = 0; x < img.getWidth(); x += 40) g.fillRect(x, 260 + (x * 7 % 50), 36, 120);
+                g.dispose();
+                javax.imageio.ImageIO.write(img, "png", png.toFile());
+                JsonObject row = new JsonObject();
+                row.addProperty("id", "demo" + n);
+                row.addProperty("kind", item[2]);
+                row.addProperty("path", item[2].equals("video") ? dir.resolve(item[0] + ".mp4").toString() : png.toString());
+                if (item[2].equals("video")) {
+                    row.addProperty("poster", png.toString());
+                    // what the bridge makes with ffmpeg: frames/<id>/0001.jpg … + frames.json
+                    java.nio.file.Path frames = dir.resolve("frames/demo" + n);
+                    java.nio.file.Files.createDirectories(frames);
+                    for (int f = 0; f < 12; f++) {
+                        java.awt.image.BufferedImage frame = new java.awt.image.BufferedImage(480, 270, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                        java.awt.Graphics2D fg = frame.createGraphics();
+                        fg.setPaint(new java.awt.GradientPaint(0, 0, new java.awt.Color(20, 40, 90), 0, 270, new java.awt.Color(10, 10, 20)));
+                        fg.fillRect(0, 0, 480, 270);
+                        fg.setColor(new java.awt.Color(90, 170, 230));
+                        for (int x = 0; x < 480; x += 8) fg.fillRect(x, 190 + (int) (12 * Math.sin((x + f * 20) / 30.0)), 8, 90);
+                        fg.dispose();
+                        javax.imageio.ImageIO.write(frame, "jpg", frames.resolve(String.format("%04d.jpg", f + 1)).toFile());
+                    }
+                    java.nio.file.Files.writeString(frames.resolve("frames.json"), "{\"count\":12,\"fps\":12}");
+                }
+                row.addProperty("prompt", item[1]);
+                row.addProperty("provider", n % 2 == 0 ? "openai" : "gemini");
+                row.addProperty("created", 1790000000 + n);
+                index.add(row);
+                n++;
+            }
+            java.nio.file.Files.writeString(dir.resolve("index.json"), index.toString());
+        } catch (java.io.IOException e) { throw new RuntimeException(e); }
+        MediaStore.useDir(dir);
+    }
 
     private static JsonObject status(boolean logged, String login) {
         return parse("{\"account\":{\"logged_in\":" + logged + ",\"method\":\"claude.ai\","

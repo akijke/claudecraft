@@ -64,7 +64,8 @@ final class KeyScreen extends Screen {
             String value = boxes.get(i).getValue().strip();
             if (!value.isEmpty()) secret.addProperty(vars.get(i), value);
         }
-        JsonObject data = mod.command("cc", "connect", connector);
+        // "media" = keys for picture / video generation (bridge/backends/media.py), not an MCP connector
+        JsonObject data = mod.command("cc", connector.equals("media") ? "media_key" : "connect", connector);
         data.add("secret", secret);
         mod.send("cc", data);
         onClose();

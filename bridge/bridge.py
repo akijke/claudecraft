@@ -117,6 +117,8 @@ class Bridge:
         self.pulls = Pulls(self)
         self.terminals = Terminals(self)
         self.oauth = OAuth(self)
+        from backends.media import Media
+        self.media = Media(self)
         self.port = 18741  # set by main(); used for the OAuth redirect
         self.extensions = {}
         self.reload_extensions()
@@ -217,6 +219,12 @@ class Bridge:
         # The one place where bridge text gets the user's language (English by default).
         event = translate_event(event, self.language())
         self.events.append(event)
+        if extra.get('kind') in ('text', 'text_part', 'tool', 'done', 'error') and hasattr(self, 'media'):
+            try:  # a picture or video an agent wrote and named: show it in the chat (backends/media.py)
+                for entry in self.media.observe(chat, event):
+                    self.media.media_event(chat, entry)
+            except Exception:  # noqa: BLE001 - never break the event stream
+                pass
         return event
 
     def preview(self, chat_id):
@@ -909,6 +917,14 @@ class Bridge:
             await self.enqueue(chat, text)
         elif action == 'f':
             await self.force(chat, text)
+        elif action == 'img' and text.strip().split(' ')[0] in ('gen', 'generate', 'draw'):
+            await self.media_command(chat, 'draw', text.strip().partition(' ')[2])
+        elif action in ('media', 'draw', 'video'):
+            await self.media_command(chat, action, text)
+        elif action == 'media_key':
+            self.media.set_keys(data.get('secret') or {})
+            have = self.media.providers()
+            self.emit(chat, 'Ключи генерации сохранены: ' + (', '.join(have) or 'нет'), kind='status')
         elif action == 'img':
             # /cc img [f] <file> [question]; the mod's /cc shot sends a fresh screenshot here.
             force = text.startswith('f ')
@@ -1390,6 +1406,9 @@ class Bridge:
         elif action == 'key':
             cid = text.strip()
             from backends.connectors import CATALOG
+            if cid == 'media':  # keys for picture / video generation (backends/media.py)
+                self.emit(chat, 'media: ключи', kind='need_key', connector='media', fields=self.media.key_fields())
+                return {'ok': True}
             if cid not in CATALOG:
                 raise ValueError(f'Нет коннектора {cid}')
             self.emit(chat, f'{cid}: ключи', kind='need_key', connector=cid, fields=self.connectors.fields(cid))
@@ -1509,6 +1528,53 @@ class Bridge:
             raise ValueError('Unknown action')
         return {'ok': True}
 
+    async def media_command(self, chat, action, text):
+        """/cc draw <prompt> · /cc video <prompt> · /cc media [gen|list|cancel|open|folder|frames|add|key]."""
+        from backends import media
+        if action in ('draw', 'video'):
+            sub, rest = 'gen', ('image ' if action == 'draw' else 'video ') + text
+        else:
+            sub, _, rest = text.strip().partition(' ')
+        rest = rest.strip()
+        if sub == 'gen':
+            kind, provider, options, prompt = media.parse_gen(rest)
+            self.media.start(chat, kind, prompt, provider, **options)
+        elif sub == 'cancel':
+            n = self.media.cancel(rest)
+            self.emit(chat, f'Отменено генераций: {n}', kind='status')
+        elif sub in ('open', 'folder'):
+            entry = self.media.find(rest)
+            self.media.open(entry['path'], folder=sub == 'folder')
+            self.emit(chat, f'Открыто: {entry["path"]}', kind='status')
+        elif sub == 'frames':
+            entry = self.media.find(rest)
+            if entry['kind'] != 'video':
+                raise ValueError('Это не видео')
+
+            async def extract():
+                try:
+                    info = await asyncio.to_thread(self.media.frames, entry)
+                    self.emit(chat, f'Кадры видео готовы: {info["count"]}', kind='media_frames', id=entry['id'],
+                              count=info['count'], fps=info['fps'])
+                except Exception as e:  # noqa: BLE001 - shown to the user
+                    self.emit(chat, f'Видео: {e}', kind='error')
+            asyncio.create_task(extract())
+        elif sub == 'add':
+            path = self.files.resolve(chat.mode, rest.strip('"'))
+            if not path.is_file() or path.suffix.lower() not in media.IMAGE_EXT + media.VIDEO_EXT:
+                raise ValueError('media add <картинка или видео>')
+            entry = self.media.register(path, chat.id, source='file') or self.media.find_path(path)
+            self.media.media_event(chat, entry)
+        elif sub == 'key':
+            self.emit(chat, 'media: ключи', kind='need_key', connector='media', fields=self.media.key_fields())
+        elif sub in ('', 'list', 'providers'):
+            rows = [{k: r.get(k) for k in ('id', 'kind', 'path', 'prompt', 'provider', 'created')}
+                    for r in self.media.index()[-20:]][::-1]
+            self.emit(chat, 'Галерея', kind='media_list', rows=rows, providers=self.media.providers(),
+                      ffmpeg=bool(self.media.ffmpeg), folder=str(self.media.dir))
+        else:
+            raise ValueError('media gen|list|cancel|open|folder|frames|add|key · /cc draw <описание> · /cc video <описание>')
+
     def find_chat(self, prefix):
         prefix = (prefix or '').strip()
         matches = [c for c in self.chats.values() if prefix and c.id.startswith(prefix)]
@@ -1546,7 +1612,7 @@ ALIASES = {'queue': 'q', 'guests': 'guest', 'force': 'f', 'c': 'chat', 'chats': 
            'ps': 'tasks', 'jobs': 'tasks', 'mcp': 'connectors', 'unconnect': 'disconnect_connector',
            'detach': 'disconnect_connector', 'explorer': 'open', 'edit': 'code', 'run': 'spawn',
            'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh',
-           'image': 'img', 'picture': 'img', '#': 'remember'}
+           'image': 'img', 'picture': 'img', '#': 'remember', 'gallery': 'media'}
 MODELS = ('opus', 'sonnet', 'haiku')
 OAI_BACKENDS = ('ollama', 'lmstudio', 'openrouter')   # OpenAI-compatible chat APIs (backends/openai_compat.py)
 HTTP_BACKENDS = ('api',) + OAI_BACKENDS               # no live CLI session: no f-injection, history in the chat

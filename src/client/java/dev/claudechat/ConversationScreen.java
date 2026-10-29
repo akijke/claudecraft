@@ -142,11 +142,55 @@ final class ConversationScreen extends Screen {
         shownChat = chat;
         visibleChat = chat;
         Deque<JsonObject> events = mod.log.get(chat);
+        thumbs.clear();
         if (events != null) {
-            for (JsonObject e : events)
+            for (JsonObject e : events) {
                 for (Component c : ChatStyle.render(e)) lines.addAll(font.split(c, mainW - 10));
+                addThumb(e);
+            }
         }
         dirty = false;
+    }
+
+    // ---- media thumbnails (MediaStore): blank log lines reserve the space, the picture is drawn over them ----
+    private record Thumb(int line, MediaStore.Entry entry) { }
+    private static final int THUMB_LINES = 8;
+    private final List<Thumb> thumbs = new ArrayList<>();
+
+    private void addThumb(JsonObject e) {
+        String kind = e.has("kind") ? e.get("kind").getAsString() : "";
+        if (!kind.equals("media") && !kind.equals("image")) return;
+        MediaStore.Entry entry = MediaStore.entry(e);
+        if (entry == null || entry.still() == null) return;
+        thumbs.add(new Thumb(lines.size(), entry));
+        for (int i = 0; i < THUMB_LINES; i++) lines.add(FormattedCharSequence.EMPTY);
+    }
+
+    private Thumb thumbAt(double x, double y) {
+        int first = firstVisible();
+        for (Thumb t : thumbs) {
+            int top = mainY + 3 + (t.line() - first) * 9;
+            if (y >= top && y < top + THUMB_LINES * 9 - 2 && x >= mainX + 14 && x < mainX + 14 + THUMB_LINES * 9 * 16 / 9) return t;
+        }
+        return null;
+    }
+
+    private void drawThumbs(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        int first = firstVisible(), h = THUMB_LINES * 9 - 4;
+        g.enableScissor(mainX, mainY, mainX + mainW, mainY + mainH);
+        for (Thumb t : thumbs) {
+            int top = mainY + 3 + (t.line() - first) * 9 + 1;
+            if (top + h < mainY || top > mainY + mainH) continue;
+            MediaStore.Tex tex = MediaStore.texture(t.entry().still(), 256);
+            int x = mainX + 14;
+            if (tex == null) { g.text(font, "…", x, top + h / 2 - 4, 0xFF5E5E5E); continue; }
+            int w = Math.max(1, tex.width() * h / Math.max(1, tex.height()));
+            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= top && mouseY < top + h;
+            g.fill(x - 1, top - 1, x + w + 1, top + h + 1, hover ? 0xFFD97757 : 0xFF2A2A30);
+            g.blit(tex.id(), x, top, x + w, top + h, 0f, 1f, 0f, 1f);
+            if (t.entry().video()) g.text(font, "▶", x + 3, top + 3, 0xFFF2C14E);
+        }
+        g.disableScissor();
     }
 
     // ---- layout ----------------------------------------------------------------
@@ -350,6 +394,8 @@ final class ConversationScreen extends Screen {
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         double x = event.x(), y = event.y();
         if (x >= mainX && x < mainX + mainW && y >= mainY && y < mainY + mainH) {
+            Thumb thumb = event.button() == 0 ? thumbAt(x, y) : null;
+            if (thumb != null) { mod.viewFile(mode, thumb.entry()); return true; }
             FormattedCharSequence line = lineAt(y);
             if (line == null) return true;
             if (event.button() == 1) {  // right click: copy the line
@@ -458,6 +504,7 @@ final class ConversationScreen extends Screen {
             g.text(font, lines.get(i), mainX + 4, y, 0xFFFFFFFF);
             y += 9;
         }
+        if (!thumbs.isEmpty()) drawThumbs(g, mouseX, mouseY);
         if (lines.isEmpty())
             g.centeredText(font, mode.equals("cc") ? L.t("Напиши задачу внизу или открой проект слева") : L.t("Напиши сообщение внизу"),
                 mainX + mainW / 2, mainY + mainH / 2, 0xFF707070);

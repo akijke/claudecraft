@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "fork", "ide", "export", "search", "open_session", "dashboard", "spend", "pr", "prs", "issues", "issue", "watch", "crossreview", "xreview", "models", "openrouter-key", "guest", "guests", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "style", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "fork", "ide", "export", "search", "open_session", "dashboard", "spend", "pr", "prs", "issues", "issue", "watch", "crossreview", "xreview", "models", "openrouter-key", "guest", "guests", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "style", "img", "image", "pty", "media", "draw", "video", "gallery",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -555,6 +555,12 @@ public final class ClaudeChat implements ClientModInitializer {
             FolderPicker.pick(this);  // system folder dialog; the bridge gets the chosen path
             return;
         }
+        if (action.equals("gallery") || action.equals("media") && (text.isBlank() || text.strip().equals("gallery"))) {
+            Screen from = Minecraft.getInstance().gui.screen();
+            open(() -> new MediaGalleryScreen(this, from instanceof ConversationScreen ? from : null, mode));
+            return;
+        }
+        if (action.equals("media") && text.strip().startsWith("view")) { viewMedia(mode, text.strip().substring(4).strip()); return; }
         if (!ACTIONS.contains(action)) { action = "q"; text = input; }
         JsonObject data = command(mode, action, text);
         if (action.equals("reply")) {
@@ -567,6 +573,34 @@ public final class ClaudeChat implements ClientModInitializer {
             say(mode, L.t("Нужен аргумент: /") + mode + " " + action + " …"); return;
         }
         send(mode, data);
+    }
+
+    /** /cc media view <id>: the picture / video from the gallery (or straight from a chat event) full screen. */
+    void viewMedia(String mode, String id) {
+        List<MediaStore.Entry> items = new ArrayList<>(MediaStore.list());
+        int index = MediaStore.indexOf(items, id);
+        if (index < 0) {  // not in index.json (e.g. a screenshot sent to Claude): look in the chat log
+            for (Deque<JsonObject> events : log.values())
+                for (JsonObject e : events)
+                    if (id.equals(e.has("id") ? e.get("id").getAsString() : null) && MediaStore.entry(e) != null) {
+                        items.add(0, MediaStore.entry(e));
+                        index = 0;
+                    }
+        }
+        if (index < 0) { say(mode, L.t("Нет такого файла в галерее: ") + id); return; }
+        Screen from = Minecraft.getInstance().gui.screen();
+        int at = index;
+        open(() -> new MediaScreen(this, from instanceof ConversationScreen || from instanceof MediaGalleryScreen ? from : null, items, at, mode));
+    }
+
+    /** Opens a picture shown in a chat (path only, e.g. a screenshot for Claude) in the viewer. */
+    void viewFile(String mode, MediaStore.Entry entry) {
+        Screen from = Minecraft.getInstance().gui.screen();
+        List<MediaStore.Entry> items = new ArrayList<>(MediaStore.list());
+        int index = entry.id().isEmpty() ? -1 : MediaStore.indexOf(items, entry.id());
+        if (index < 0) { items.add(0, entry); index = 0; }
+        int at = index;
+        open(() -> new MediaScreen(this, from instanceof ConversationScreen ? from : null, items, at, mode));
     }
 
     /** Explains why the bridge does not answer, based on the launcher state. */
@@ -687,7 +721,7 @@ public final class ClaudeChat implements ClientModInitializer {
         if (k.startsWith("<") || Set.of("c", "project", "ls", "git", "ide", "palette", "undo", "doctor").contains(k)
                 || k.equals("claude") || k.endsWith("craft")) topics.add("basic");
         if (Set.of("compact", "model", "/review", "perms", "plan", "replace", "rewind", "fork", "memory", "skills", "hooks",
-                "style", "shot", "pty", "edit", "agents", "spawn", "connectors", "crash", "watch", "search", "export", "guest",
+                "style", "shot", "draw", "pty", "edit", "agents", "spawn", "connectors", "crash", "watch", "search", "export", "guest",
                 "undo", "ide", "palette", "worktree", "doctor").contains(k)) topics.add("code");
         if (Set.of("git", "pr", "issues", "worktree", "crossreview", "watch").contains(k)) topics.add("git");
         if (k.startsWith("claude") || k.contains("craft") || k.startsWith("new ollama")) topics.add("settings");
@@ -732,6 +766,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/cc doctor", L.t("проверить Python, git, gh, node, CLI, вход, порты и права — с советами")},
             {"/cc undo", L.t("откатить файлы, изменённые Claude в последнем запросе · undo list — история")},
             {c + "shot", L.t("[вопрос] — скриншот игры для Claude · img <файл> [вопрос] — любая картинка")},
+            {c + "draw", L.t("<описание> — картинка нейросетью (OpenAI / Gemini) · video <описание> — видео (Sora / Veo) · media — галерея")},
             {"/pty", L.t("[ps|cmd|bash|pwsh|wsl] — настоящий терминал (vim, htop, REPL) · /pty new — ещё один")},
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude theme", L.t("тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода")},
