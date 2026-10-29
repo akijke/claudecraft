@@ -229,10 +229,10 @@ class Bridge:
         return self.chats[self.selected[mode]]
 
     def new_chat(self, mode, backend, project=None, select=True):
-        if mode not in ('c', 'cc') or backend not in ('local', 'api'):
-            raise ValueError('Unknown mode/backend')
-        if mode == 'cc' and backend == 'api':
-            raise ValueError('/cc uses Agent SDK; API chat belongs to /c')
+        if mode not in ('c', 'cc') or backend not in ('local',) + HTTP_BACKENDS:
+            raise ValueError('Unknown mode/backend: local, api, ollama, lmstudio, openrouter')
+        if mode == 'cc' and backend != 'local':
+            raise ValueError('/cc uses Agent SDK; API and other-model chats belong to /c')
         chat = Chat(uid(), mode, backend, 'Новый чат', updated=time.time(),
                     project=(project or self.projects.current) if mode == 'cc' else None)
         self.chats[chat.id] = chat
@@ -630,7 +630,7 @@ class Bridge:
         if chat.task is None:
             self.start(chat, text)
             return 'started'
-        if chat.backend == 'api':
+        if chat.backend in HTTP_BACKENDS:
             raise ValueError('Messages API: уже отправленный HTTP-запрос нельзя дополнить сообщением. '
                              'Текущий ответ НЕ отменён и продолжается. Используй q (очередь) '
                              'или cancel, затем новый запрос. Для f выбери локальный чат: /c new local.')
@@ -700,7 +700,10 @@ class Bridge:
         pending['future'].set_result(value)
 
     async def run_backend(self, chat, text):
-        if chat.backend == 'api':
+        if chat.backend in OAI_BACKENDS:
+            from backends.openai_compat import run
+            await run(self, chat, text)
+        elif chat.backend in HTTP_BACKENDS:
             await self.run_api(chat, text)
         else:
             await self.run_sdk(chat, text)
@@ -893,7 +896,7 @@ class Bridge:
                                               lambda p: self.files.resolve(mode, p).is_file())
             if not path:
                 raise ValueError('img: /cc img <файл> [вопрос]')
-            if chat.backend == 'api':
+            if chat.backend in HTTP_BACKENDS:
                 raise ValueError('Картинки работают в чатах Claude Code (SDK), не в Messages API-чате. /c new local')
             path = images.check(self.files.resolve(mode, path))
             prompt = images.marked([path], question)
@@ -1096,6 +1099,16 @@ class Bridge:
             self.emit(chat, f'Чат сохранён: {path.name}', kind='exported', path=str(path), format=fmt, count=len(entries))
         elif action == 'fork':
             await self.fork(chat, text.strip())
+        elif action == 'models':
+            from backends import openai_compat
+            name = text.strip() or (chat.backend if chat.backend in OAI_BACKENDS else 'ollama')
+            rows = await openai_compat.models(self, name)
+            self.emit(chat, name, kind='models', provider=name, rows=rows)
+        elif action in ('openrouter-key', 'provider_key'):
+            from backends import openai_compat
+            name, _, key = (text if action == 'provider_key' else 'openrouter ' + text).partition(' ')
+            openai_compat.set_key(self, name.strip(), key)
+            self.emit(chat, f'Ключ {name.strip()} сохранён', kind='status')
         elif action == 'budget':
             sub, _, rest = text.strip().partition(' ')
             if sub == 'resume':
@@ -1113,7 +1126,7 @@ class Bridge:
         elif action == 'plan':
             if not text.strip():
                 raise ValueError('plan: /cc plan <задача> — Claude сначала составит план')
-            if chat.backend == 'api':
+            if chat.backend in HTTP_BACKENDS:
                 raise ValueError('План работает в чатах Claude Code (SDK)')
             from backends.sdk import PLAN_MARK
             await self.enqueue(chat, PLAN_MARK + text.strip())
@@ -1133,7 +1146,7 @@ class Bridge:
             data = await report(self)
             self.emit(chat, 'Диагностика', kind='doctor', **data)
         elif action == 'compact':
-            if chat.backend == 'api':
+            if chat.backend in HTTP_BACKENDS:
                 raise ValueError('compact работает в чатах Claude Code (SDK)')
             if not chat.sdk_id:
                 raise ValueError('Сжимать нечего: в этом чате ещё не было разговора')
@@ -1329,7 +1342,12 @@ class Bridge:
             self.emit(chat, f'{chat.title} | {chat.backend} | {state} | очередь {len(chat.queue)} | '
                       f'auto {chat.auto} | {where}', kind='status')
         elif action == 'new':
-            chat = self.new_chat(mode, text or 'local')
+            backend, _, model = (text or 'local').strip().partition(' ')
+            chat = self.new_chat(mode, backend)
+            if model.strip():
+                chat.model = model.strip()
+                chat.title = f'{backend}: {model.strip()}'[:60]
+                self.persist()
             self.emit(chat, 'Новый чат создан.', kind='status')
             self.chat_menu(mode)
         elif action == 'select':
@@ -1461,6 +1479,8 @@ ALIASES = {'queue': 'q', 'force': 'f', 'c': 'chat', 'chats': 'chat', 'dir': 'ls'
            'pc': 'terminal', 'resume': 'terminal', 'term': 'terminal', '$': 'sh', 'shell': 'sh',
            'image': 'img', 'picture': 'img', '#': 'remember'}
 MODELS = ('opus', 'sonnet', 'haiku')
+OAI_BACKENDS = ('ollama', 'lmstudio', 'openrouter')   # OpenAI-compatible chat APIs (backends/openai_compat.py)
+HTTP_BACKENDS = ('api',) + OAI_BACKENDS               # no live CLI session: no f-injection, history in the chat
 
 
 def context_window(chat):

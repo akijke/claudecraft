@@ -341,6 +341,20 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "models" -> {
+                String provider = s(e, "provider");
+                JsonArray rows = e.getAsJsonArray("rows");
+                out.add(line(mode, lit("◆ " + L.t("Модели ") + provider, GOLD).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + rows.size() + L.t(" шт. · клик — новый чат с моделью"), FAINT))));
+                if (rows.isEmpty()) out.add(line(mode, lit(provider.equals("ollama") ? L.t("  нет моделей — ollama pull llama3.2") : L.t("  нет моделей"), DIM)));
+                int shown = 0;
+                for (JsonElement item : rows) {
+                    if (shown++ >= 40) { out.add(line(mode, lit(L.t("  … ещё ") + (rows.size() - 40), FAINT))); break; }
+                    JsonObject r = item.getAsJsonObject();
+                    out.add(line(mode, Component.literal("  ").append(button(s(r, "id"), "/c new " + provider + " " + s(r, "id"), false, AQUA,
+                        s(r, "name") + (n(r, "context") > 0 ? " · " + human(n(r, "context")) + L.t(" токенов контекста") : "")))));
+                }
+            }
             case "watch_failed" -> {
                 out.add(line(mode, lit("✖ " + s(e, "text"), RED).withStyle(st -> st.withBold(true)).append(sp())
                     .append(button("✦ " + L.t("Claude, почини"), cmd + "watch fix", false, CODE_MODE,

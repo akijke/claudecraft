@@ -1269,6 +1269,77 @@ class PullRequestTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Closes #3', prompt)
 
 
+class OtherModelTests(unittest.IsolatedAsyncioTestCase):
+    """Ollama / LM Studio / OpenRouter through a fake OpenAI-compatible server (SSE streaming)."""
+    async def asyncSetUp(self):
+        from aiohttp import web as aweb
+        from aiohttp.test_utils import TestServer
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(Path(self.temp.name) / 'b')
+        self.requests = []
+        async def models(request):
+            self.requests.append(('models', dict(request.headers)))
+            return aweb.json_response({'data': [{'id': 'llama3.2', 'context_length': 131072}, {'id': 'qwen2.5-coder'}]})
+        async def chat(request):
+            body = await request.json()
+            self.requests.append(('chat', dict(request.headers), body))
+            response = aweb.StreamResponse(headers={'Content-Type': 'text/event-stream'})
+            await response.prepare(request)
+            for piece in ['Hello', ' from ', body['model'], '\nsecond', ' line']:
+                await response.write(f'data: {json.dumps({"choices": [{"delta": {"content": piece}}]})}\n\n'.encode())
+            await response.write(b'data: ' + json.dumps({'choices': [], 'usage': {'prompt_tokens': 12, 'completion_tokens': 5}}).encode() + b'\n\n')
+            await response.write(b'data: [DONE]\n\n')
+            return response
+        app = aweb.Application()
+        app.router.add_get('/v1/models', models)
+        app.router.add_post('/v1/chat/completions', chat)
+        self.server = TestServer(app, host='127.0.0.1')
+        await self.server.start_server()
+        url = f'http://127.0.0.1:{self.server.port}/v1'
+        self.bridge.config['providers'] = {'ollama': {'url': url}, 'openrouter': {'url': url}}
+
+    async def asyncTearDown(self):
+        await self.server.close()
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    async def wait(self, chat):
+        for _ in range(200):
+            if chat.task is None:
+                return
+            await asyncio.sleep(0.02)
+        self.fail('timeout')
+
+    async def test_ollama_models_stream_history_and_openrouter_key(self):
+        await self.bridge.command({'mode': 'c', 'action': 'models', 'text': 'ollama'})
+        card = [e for e in self.bridge.events if e['kind'] == 'models'][-1]
+        self.assertEqual([r['id'] for r in card['rows']], ['llama3.2', 'qwen2.5-coder'])
+        await self.bridge.command({'mode': 'c', 'action': 'new', 'text': 'ollama qwen2.5-coder'})
+        chat = self.bridge.current_chat('c')
+        self.assertEqual((chat.backend, chat.model), ('ollama', 'qwen2.5-coder'))
+        await self.bridge.enqueue(chat, 'hi')
+        await self.wait(chat)
+        parts = [e['text'] for e in self.bridge.events if e['kind'] == 'text_part']
+        self.assertEqual(parts, ['Hello from qwen2.5-coder', 'second line'])
+        await self.bridge.enqueue(chat, 'and again')
+        await self.wait(chat)
+        sent = self.requests[-1][2]['messages']
+        self.assertEqual([m['role'] for m in sent], ['system', 'user', 'assistant', 'user'])
+        self.assertEqual(chat.usage['input_tokens'], 24)
+        with self.assertRaises(ValueError):
+            await self.bridge.command({'mode': 'cc', 'action': 'new', 'text': 'ollama'})   # /cc stays Claude Code
+        await self.bridge.command({'mode': 'c', 'action': 'new', 'text': 'openrouter some/model'})
+        router = self.bridge.current_chat('c')
+        await self.bridge.enqueue(router, 'x')
+        await self.wait(router)
+        self.assertTrue(any('openrouter-key' in e['text'] for e in self.bridge.events if e['kind'] == 'error'))
+        await self.bridge.command({'mode': 'c', 'action': 'openrouter-key', 'text': 'sk-or-test'})
+        await self.bridge.enqueue(router, 'y')
+        await self.wait(router)
+        self.assertEqual(self.requests[-1][1].get('Authorization'), 'Bearer sk-or-test')
+        self.assertNotIn('sk-or-test', json.dumps(list(self.bridge.events)))
+
+
 class AgentFileTests(unittest.IsolatedAsyncioTestCase):
     async def test_export_edit_new_import(self):
         temp = tempfile.TemporaryDirectory()

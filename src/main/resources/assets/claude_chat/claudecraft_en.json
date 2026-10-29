@@ -662,5 +662,12 @@
   "+ файлом .md": "+ as an .md file",
   "Создать .claude/agents/<имя>.md и открыть в редакторе": "Create .claude/agents/<name>.md and open it in the editor",
   "импорт": "import",
-  "Скопировать .md агента из другого проекта или ~/.claude/agents": "Copy an agent .md from another project or ~/.claude/agents"
+  "Скопировать .md агента из другого проекта или ~/.claude/agents": "Copy an agent .md from another project or ~/.claude/agents",
+  "Модели ": "Models ",
+  " шт. · клик — новый чат с моделью": " · click — a new chat with the model",
+  "  нет моделей — ollama pull llama3.2": "  no models — ollama pull llama3.2",
+  "  нет моделей": "  no models",
+  "  … ещё ": "  … more ",
+  " токенов контекста": " context tokens",
+  "[модель] — локальная модель без интернета (Ollama / lmstudio) · /c new openrouter <модель> · /c models": "[model] — a local model without internet (Ollama / lmstudio) · /c new openrouter <model> · /c models"
 }

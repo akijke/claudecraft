@@ -37,7 +37,7 @@ public final class ClaudeChat implements ClientModInitializer {
     static final Set<String> ACTIONS = Set.of(
         "q", "queue", "f", "force", "c", "chats", "chat", "cancel", "restart", "new", "select", "rename",
         "status", "clearqueue", "cq", "reply", "pending", "local", "reload", "tools", "capabilities",
-        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "fork", "ide", "export", "search", "open_session", "dashboard", "spend", "pr", "prs", "issues", "issue", "watch", "crossreview", "xreview", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "style", "img", "image", "pty",
+        "tokens", "usage", "auto", "model", "effort", "undo", "compact", "context", "doctor", "commands", "slash", "perms", "permissions", "plan", "replace", "worktree", "wt", "budget", "palette", "goto", "rewind", "fork", "ide", "export", "search", "open_session", "dashboard", "spend", "pr", "prs", "issues", "issue", "watch", "crossreview", "xreview", "models", "openrouter-key", "memory", "mem", "#", "remember", "skills", "hooks", "bg", "background", "style", "img", "image", "pty",
         // file manager (does not move Claude)
         "ls", "dir", "cd", "pwd", "cat", "type", "tree", "find", "mkdir", "touch", "mv", "cp", "rm",
         "open", "explorer", "code", "edit",
@@ -619,6 +619,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {c + "issues", L.t("issues GitHub · issue <N> — прочитать · issue do <N> — Claude: ветка, работа, PR «Closes #N»")},
             {c + "watch", L.t("<команда> — при изменениях файлов запускать тесты/сборку, при падении — кнопка «Claude, почини» · watch stop")},
             {c + "crossreview", L.t("[фокус] — ревью изменений другим ИИ: Codexcraft ↔ Claudecraft (или агент code-reviewer)")},
+            {"/c new ollama", L.t("[модель] — локальная модель без интернета (Ollama / lmstudio) · /c new openrouter <модель> · /c models")},
             {c + "budget", L.t("лимиты $ / токенов: budget task $0.50 · chat 2M · day $5 · resume")},
             {"/ide", L.t("[файл] — чат | редактор | терминал в одном окне (Ctrl+1/2/3, Ctrl+P — файл, разделители тянутся)")},
             {"/palette", L.t("все команды с поиском (Ctrl+Shift+P) · /goto — быстрый переход к файлу (Ctrl+P в окнах мода)")},
