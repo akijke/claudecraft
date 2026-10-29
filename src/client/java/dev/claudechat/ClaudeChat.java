@@ -368,6 +368,11 @@ public final class ClaudeChat implements ClientModInitializer {
                 say("c", "osnotify: " + (on ? L.t("вкл") : L.t("выкл")) + L.t(" — системные уведомления, когда игра свёрнута"));
                 if (value.equals("test")) OsNotify.show("Claudecraft", L.t("Проверка уведомления"));
             }
+            case "export", "import" -> {
+                String arg = parts.length > 1 ? parts[1].strip() : "";
+                if (parts[0].equals("import") && arg.isEmpty()) say("c", L.t("/claude import <файл.zip> — архив из /claude export"));
+                else send("cc", command("cc", "transfer", parts[0] + (arg.isEmpty() ? "" : " " + arg)));
+            }
             case "remote" -> {
                 // /claude remote <local port> <token> | off — use a bridge on a VPS / another PC via ssh -L
                 String[] a = parts.length > 1 ? parts[1].strip().split("\\s+") : new String[0];
@@ -590,6 +595,11 @@ public final class ClaudeChat implements ClientModInitializer {
             return;
         }
         String chat = event.has("chat") ? event.get("chat").getAsString() : "";
+        if (kind.equals("settings_imported")) {
+            // the bridge wrote client.json and bridge-config.json: reread ours, restart the bridge to apply its own
+            launcher.loadSettings();
+            if (launcher.remote() == null) launcher.restart();
+        }
         if (kind.equals("need_key") && event.has("connector"))
             keyFields.put(event.get("connector").getAsString(), event.getAsJsonArray("fields"));
         if (!kind.equals("history")) Notify.onEvent(event);
@@ -670,6 +680,7 @@ public final class ClaudeChat implements ClientModInitializer {
             {"/edit", L.t("<файл> — встроенный редактор с подсветкой (Ctrl+S сохранить)")},
             {"/claude theme", L.t("тема dark | light | contrast · /claude scale auto|1..4 — масштаб окон мода")},
             {"/claude osnotify", L.t("уведомления Windows и мигание в панели задач, когда игра свёрнута — вкл/выкл")},
+            {"/claude export", L.t("настройки и проекты в zip (без ключей и чатов) · /claude import <zip> — на другом ПК")},
             {"/claude remote", L.t("мост на VPS / другом ПК через SSH-туннель: remote <порт> <токен> · remote off")},
             {"/claude sound", L.t("звуки: готово / вопрос / ошибка — свой звук на каждое, громкость, проверка")},
             {"/claude hud",L.t("индикатор задач на экране · /claude toasts · /claude sound — вкл/выкл")},

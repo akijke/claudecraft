@@ -341,6 +341,21 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "settings_exported" -> {
+                String path = s(e, "path");
+                out.add(line(mode, lit("✔ " + L.t("Настройки экспортированы"), GREEN).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + e.getAsJsonArray("files").size() + L.t(" файлов, без ключей и чатов"), FAINT))));
+                out.add(line(mode, Component.literal("  ").append(PathLinks.linkify(path, TEXT, AQUA))));
+            }
+            case "settings_imported" -> {
+                out.add(line(mode, lit("✔ " + L.t("Настройки импортированы"), GREEN).withStyle(st -> st.withBold(true))
+                    .append(lit("  " + s(e, "text"), FAINT))));
+                JsonArray projects = e.getAsJsonArray("projects"), missing = e.getAsJsonArray("missing");
+                if (!projects.isEmpty()) out.add(line(mode, lit(L.t("  новые проекты: ") + projects.size(), TEXT)));
+                for (JsonElement m : missing)
+                    out.add(line(mode, lit("  ⚠ " + m.getAsString() + L.t(": папки нет на этом ПК — /cc project rm ") + m.getAsString() + L.t(", затем /cc project add ") + m.getAsString() + " <папка>", GOLD)));
+                out.add(line(mode, lit(L.t("  Старые файлы — в config/claude-chat/backups. Мост перезапускается."), DIM)));
+            }
             case "guest_token" -> {
                 // shown once: the bridge stores only its hash
                 String token = s(e, "token");

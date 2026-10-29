@@ -691,5 +691,14 @@
   "  Гость видит ответы и инструменты этого чата, не видит запросы разрешений; отвечать на них можешь только ты": "  The guest sees this chat's answers and tools, not permission prompts; only you can answer those",
   "Гости": "Guests",
   "  нет — ": "  none — ",
-  "парное программирование: guest new <имя> [view|chat] [часов] · guest list · guest revoke <имя>": "pair programming: guest new <name> [view|chat] [hours] · guest list · guest revoke <name>"
+  "парное программирование: guest new <имя> [view|chat] [часов] · guest list · guest revoke <имя>": "pair programming: guest new <name> [view|chat] [hours] · guest list · guest revoke <name>",
+  "/claude import <файл.zip> — архив из /claude export": "/claude import <file.zip> — an archive from /claude export",
+  "настройки и проекты в zip (без ключей и чатов) · /claude import <zip> — на другом ПК": "settings and projects to a zip (no keys or chats) · /claude import <zip> on another PC",
+  "Настройки экспортированы": "Settings exported",
+  " файлов, без ключей и чатов": " files, no keys or chats",
+  "Настройки импортированы": "Settings imported",
+  "  новые проекты: ": "  new projects: ",
+  ": папки нет на этом ПК — /cc project rm ": ": folder missing on this PC — /cc project rm ",
+  ", затем /cc project add ": ", then /cc project add ",
+  "  Старые файлы — в config/claude-chat/backups. Мост перезапускается.": "  Old files are in config/claude-chat/backups. The bridge restarts."
 }

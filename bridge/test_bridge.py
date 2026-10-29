@@ -1940,5 +1940,51 @@ class GuestTests(unittest.IsolatedAsyncioTestCase):
         await self.bridge.command({'mode': 'cc', 'action': 'guest', 'text': 'revoke bob'})
         self.assertEqual((await self.call('POST', '/guest/say', writer, {'text': 'x'}))[0], 401)
 
+
+class TransferTests(unittest.IsolatedAsyncioTestCase):
+    """#81: settings export has no secrets; import merges projects and keeps this PC's keys."""
+    async def test_export_import(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            src = Bridge(a, AsyncMock())
+            (Path(a) / 'client.json').write_text(json.dumps({'theme': 'dark', 'python': 'C:/py.exe',
+                                                             'remote': {'port': 18751, 'token': 'x' * 20}}))
+            (Path(a) / 'secrets.json').write_text('{"anthropic_api_key": "sk-secret"}')
+            proj = Path(a) / 'mod'
+            proj.mkdir()
+            await src.command({'mode': 'cc', 'action': 'project', 'text': f'add mymod {proj}'})
+            (Path(a) / 'gone').mkdir()
+            await src.command({'mode': 'cc', 'action': 'project', 'text': f'add gone {Path(a) / "gone"}'})
+            (Path(a) / 'gone').rmdir()
+            await src.command({'mode': 'cc', 'action': 'transfer', 'text': 'export'})
+            zpath = src.events[-1]['path']
+            with zipfile.ZipFile(zpath) as z:
+                names = z.namelist()
+                self.assertNotIn('secrets.json', names)
+                self.assertNotIn('chats.json', names)
+                self.assertNotIn('connection.json', names)
+                client = json.loads(z.read('client.json'))
+                self.assertEqual(client, {'theme': 'dark'})
+                self.assertNotIn(b'sk-secret', b''.join(z.read(n) for n in names))
+            await src.close()
+            dst = Bridge(b, AsyncMock())
+            (Path(b) / 'client.json').write_text(json.dumps({'theme': 'light', 'python': 'D:/py.exe'}))
+            await dst.command({'mode': 'cc', 'action': 'transfer', 'text': 'import ' + zpath})
+            event = dst.events[-1]
+            self.assertEqual(event['kind'], 'settings_imported')
+            self.assertEqual(sorted(event['projects']), ['gone', 'mymod'])
+            self.assertEqual(event['missing'], ['gone'])
+            self.assertIn('mymod', dst.projects.items)
+            client = json.loads((Path(b) / 'client.json').read_text())
+            self.assertEqual(client, {'theme': 'dark', 'python': 'D:/py.exe'})
+            self.assertTrue(any((Path(b) / 'backups').rglob('client.json')))
+            # an archive with a path inside is ignored, a random zip is refused
+            bad = Path(b) / 'bad.zip'
+            with zipfile.ZipFile(bad, 'w') as z:
+                z.writestr('../evil.json', '{}')
+            with self.assertRaises(ValueError):
+                await dst.command({'mode': 'cc', 'action': 'transfer', 'text': f'import {bad}'})
+            await dst.close()
+
 if __name__ == '__main__':
     unittest.main()

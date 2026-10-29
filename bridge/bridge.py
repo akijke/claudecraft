@@ -1111,6 +1111,20 @@ class Bridge:
             name, _, key = (text if action == 'provider_key' else 'openrouter ' + text).partition(' ')
             openai_compat.set_key(self, name.strip(), key)
             self.emit(chat, f'Ключ {name.strip()} сохранён', kind='status')
+        elif action == 'transfer':
+            # /claude export [file.zip] · /claude import <file.zip> (backends/transfer.py)
+            from backends import transfer
+            sub, _, rest = text.strip().partition(' ')
+            if sub == 'export':
+                out, names = await asyncio.to_thread(transfer.export, self.directory, rest.strip() or None)
+                self.emit(chat, f'Настройки экспортированы: {out}', kind='settings_exported', path=str(out), files=names)
+            elif sub == 'import' and rest.strip():
+                written, merged, missing = await asyncio.to_thread(transfer.import_, self.directory, rest.strip(),
+                                                                   self.projects)
+                self.emit(chat, f'Импортировано: {", ".join(written) or "ничего"}', kind='settings_imported',
+                          files=written, projects=merged, missing=missing)
+            else:
+                raise ValueError('export [файл.zip] | import <файл.zip>')
         elif action == 'guest':
             # pair programming: /cc guest new <name> [view|chat] [hours] · list · revoke <name>
             sub, _, rest = text.strip().partition(' ')
