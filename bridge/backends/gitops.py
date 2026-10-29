@@ -374,9 +374,12 @@ class Git:
 
         async def go():
             await self.ok('clone', '--', url, str(target), cwd=self.bridge.workspace, timeout=600)
-            self.bridge.projects.add(name, target)
+            self.bridge.projects.add(name, target, trusted=False)
             self.bridge.open_project(name)
             self.emit(mode, f'Склонировано в {target}; проект «{name}» открыт.', kind='status')
+            if (target / '.claude').is_dir() or (target / 'CLAUDE.md').is_file():
+                self.emit(mode, 'В репозитории есть свои настройки Claude (.claude, CLAUDE.md) — они не применяются, '
+                                'пока ты не доверишь папку: /cc perms trust', kind='status')
             await self.status(mode)
         self.background(mode, f'git clone {url}', go())
 

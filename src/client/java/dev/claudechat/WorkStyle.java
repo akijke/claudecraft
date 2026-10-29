@@ -562,6 +562,13 @@ final class WorkStyle {
             case "perms" -> {
                 out.add(line(mode, lit("⚙ " + L.t("Правила разрешений"), GOLD).withStyle(st -> st.withBold(true))
                     .append(lit("  " + s(e, "path"), FAINT))));
+                if (e.has("trusted")) {
+                    boolean trusted = b(e, "trusted");
+                    out.add(line(mode, lit(trusted ? "  ✔ " + L.t("папка доверенная: её .claude и CLAUDE.md применяются")
+                            : "  ⚠ " + L.t("папка не доверенная: её allow-правила, хуки и CLAUDE.md не применяются"), trusted ? GREEN : GOLD)
+                        .append(sp()).append(button(trusted ? L.t("не доверять") : L.t("доверять"), cmd + "perms " + (trusted ? "untrust" : "trust"),
+                            false, trusted ? DIM : GOLD, L.t("Как вопрос Claude Code «доверяешь файлам в этой папке?»")))));
+                }
                 JsonObject rules = e.getAsJsonObject("rules");
                 for (String kind : new String[]{"deny", "ask", "allow"}) {
                     int color = kind.equals("deny") ? RED : kind.equals("ask") ? GOLD : GREEN;

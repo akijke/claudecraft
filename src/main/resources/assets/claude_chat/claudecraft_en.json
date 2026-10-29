@@ -737,5 +737,10 @@
   "только что": "just now",
   " мин назад": " min ago",
   " ч назад": " h ago",
-  " дн. назад": " d ago"
+  " дн. назад": " d ago",
+  "папка доверенная: её .claude и CLAUDE.md применяются": "trusted folder: its .claude settings and CLAUDE.md apply",
+  "папка не доверенная: её allow-правила, хуки и CLAUDE.md не применяются": "untrusted folder: its allow rules, hooks and CLAUDE.md are not used",
+  "не доверять": "untrust",
+  "доверять": "trust",
+  "Как вопрос Claude Code «доверяешь файлам в этой папке?»": "Like Claude Code's \"Do you trust the files in this folder?\""
 }

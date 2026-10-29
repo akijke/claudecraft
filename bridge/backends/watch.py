@@ -7,6 +7,8 @@ project folder and reports: failure → a card with the end of the output and a
 again → a short green line. One watcher per project; /cc watch stop ends it.
 """
 import asyncio
+
+from backends.shell import _kill_tree as kill_tree
 import os
 import time
 from pathlib import Path
@@ -55,8 +57,11 @@ class Watcher:
         try:
             out, _ = await asyncio.wait_for(process.communicate(), 900)
         except TimeoutError:
-            process.kill()
+            kill_tree(process.pid)
             out = b'(timed out after 15 min)'
+        except asyncio.CancelledError:
+            kill_tree(process.pid)  # /cc watch stop: the tests it started stop too
+            raise
         text = out.decode('utf-8', 'replace')
         ok = process.returncode == 0
         chat = self.bridge.chats.get(self.chat_id)

@@ -157,6 +157,16 @@ EN = {
     'ID воркспейса (T…)': 'Workspace ID (T…)', 'Каналы, сообщения, треды': 'Channels, messages, threads',
     'Макеты Figma для вёрстки': 'Figma designs for implementation',
     'Модель': 'Model',
+    'perms [allow|deny|ask <правило> | rm <правило> | trust | untrust]': 'perms [allow|deny|ask <rule> | rm <rule> | trust | untrust]',
+    'Совпадение через несколько строк в {} — замена работает в пределах строки': 'A match spans several lines in {} — replace works within a line',
+    'Это папка, не файл: {}': 'This is a folder, not a file: {}',
+    'save: text — строка': 'save: text must be a string',
+    'Ожидалось число: {}': 'A number was expected: {}',
+    'Неверный запрос: нужен JSON-объект': 'Bad request: a JSON object is expected',
+    'Неверный запрос: неверный тип поля': 'Bad request: wrong field type',
+    'open_session <id сессии>': 'open_session <session id>',
+    'В репозитории есть свои настройки Claude (.claude, CLAUDE.md) — они не применяются, пока ты не доверишь папку: /cc perms trust': 'The repository has its own Claude settings (.claude, CLAUDE.md) — they are not used until you trust the folder: /cc perms trust',
+    'этого файла': 'this file',
     'git: адрес — https://, ssh://, git@host: или git://': 'git: the URL must be https://, ssh://, git@host: or git://',
     '{}: адрес с ключом — только https://': '{}: a URL that gets a key must be https://',
     '{}: адрес — https:// или http://localhost': '{}: the URL must be https:// or http://localhost',
@@ -425,6 +435,12 @@ EN = {
         'No API key: add it in /c settings (or ANTHROPIC_API_KEY in the bridge environment)',
 }
 
+# Codexcraft/Geminicraft rename "Claude" in the bridge they copy (their build.gradle sets BRAND):
+# the same keys with the addon's names are added, so their messages are translated too.
+BRAND = []
+for _old, _new in BRAND:
+    EN.update({re.sub(_old, _new, k): re.sub(_old, _new, v) for k, v in list(EN.items())})
+
 _SETTINGS = {'mtime': None, 'lang': 'en'}
 _PATTERNS = []
 
@@ -433,7 +449,7 @@ def _compile():
     """Templates with {} become anchored regexes; more specific (longer) ones first."""
     items = sorted((k for k in EN if '{}' in k), key=lambda k: -len(k.replace('{}', '')))
     for key in items:
-        regex = '^' + '(.+?)'.join(re.escape(part) for part in key.split('{}')) + '$'
+        regex = '^' + '(.*?)'.join(re.escape(part) for part in key.split('{}')) + '$'
         _PATTERNS.append((re.compile(regex, re.S), EN[key]))
 
 

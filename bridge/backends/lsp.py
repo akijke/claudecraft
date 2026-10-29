@@ -145,9 +145,9 @@ class Server:
             await self.notify('exit', None)
         except Exception:
             pass
-        if self.process and self.process.returncode is None:
+        if getattr(self, 'process', None) is not None and self.process.returncode is None:
             self.process.kill()
-        if self.reader:
+        if getattr(self, 'reader', None):
             self.reader.cancel()
 
 
@@ -155,6 +155,7 @@ class Lsp:
     def __init__(self, bridge):
         self.bridge = bridge
         self.servers = {}
+        self.starting = {}   # key -> lock: parallel first requests start one server, not four
 
     def command_for(self, ext):
         custom = (self.bridge.config.get('lsp') or {}).get(ext)
@@ -170,10 +171,16 @@ class Lsp:
             raise ValueError('Нет языкового сервера для ' + (ext or 'этого файла')
                              + (f' — установи: {HINTS[ext]}' if ext in HINTS else ''))
         key = (tuple(command), str(root))
-        server = self.servers.get(key)
-        if server is None or server.process.returncode is not None:
-            server = await Server(command, str(root)).start()
-            self.servers[key] = server
+        async with self.starting.setdefault(key, asyncio.Lock()):
+            server = self.servers.get(key)
+            if server is None or server.process.returncode is not None:
+                fresh = Server(command, str(root))
+                try:
+                    server = await fresh.start()
+                except BaseException:
+                    await fresh.close()  # a server that failed to initialize must not stay running
+                    raise
+                self.servers[key] = server
         return server, ext
 
     @staticmethod

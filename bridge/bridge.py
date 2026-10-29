@@ -59,6 +59,7 @@ class Chat:
     wt_repo: str | None = None
     paused: bool = False             # budget reached: the queue waits for /cc budget resume (not saved)
     budget_override: bool = False    # "continue anyway" for the current request
+    guest_turn: bool = False         # the running request came from a guest (/cc guest): nothing is auto-approved
     budget_hit: tuple | None = None  # the limit that interrupted the running request
     live_tokens: int = 0             # tokens of the running request, counted per model call
     cwd: str | None = None           # legacy field (old `cd`), ignored
@@ -108,6 +109,8 @@ class Bridge:
         self.ledger = Ledger(self.directory)
         from backends.guests import Guests
         self.guests = Guests(self.directory)
+        from backends.trust import Trust
+        self.trust = Trust(self.directory, self.workspace, self.projects.items)
         from backends.lsp import Lsp
         self.lsp = Lsp(self)
         from backends.pulls import Pulls
@@ -341,6 +344,7 @@ class Bridge:
                 chat.budget_hit = None
                 chat.started = started = time.monotonic()
                 chat.step = 'думает…'
+                chat.guest_turn = question.startswith('[guest ')
                 try:
                     await self.runner(chat, question)
                     chat.updated = time.time()
@@ -364,6 +368,9 @@ class Bridge:
                     if re.search(r'auth|login|credential|401|api key', str(e), re.I):
                         message += '\nПроверь вход в аккаунт Claude: /c settings'
                     self.emit(chat, message, kind='error')
+                finally:
+                    chat.budget_override = False  # "resume" lets one request past the limit, not the whole queue
+                    chat.guest_turn = False
         except asyncio.CancelledError:
             self.emit(chat, 'Текущий запрос прерван.', kind='status')
         finally:
@@ -928,14 +935,18 @@ class Bridge:
             from backends import permrules
             project = self.chat_cwd(chat)
             sub, _, rule = text.strip().partition(' ')
-            if sub in permrules.KINDS:
+            if sub in ('trust', 'untrust'):
+                (self.trust.add if sub == 'trust' else self.trust.remove)(project)
+            elif sub in permrules.KINDS:
                 permrules.add(project, sub, rule)
             elif sub in ('rm', 'remove', 'del'):
                 permrules.remove(project, rule.strip())
             elif sub:
-                raise ValueError('perms [allow|deny|ask <правило> | rm <правило>]')
+                raise ValueError('perms [allow|deny|ask <правило> | rm <правило> | trust | untrust]')
+            trusted = self.trust.trusted(project)
             table = permrules.rules(project)
             self.emit(chat, 'Правила разрешений', kind='perms', path=str(permrules.project_settings(project)),
+                      trusted=trusted, folder=project,
                       rules={k: [{'rule': r, 'source': s} for r, s in v] for k, v in table.items()})
         elif action == 'style':
             from backends import styles
@@ -1080,6 +1091,8 @@ class Bridge:
         elif action == 'open_session':
             # a search hit from a session this bridge has no chat for (e.g. started on the PC)
             sid = text.strip()
+            if not sid:
+                raise ValueError('open_session <id сессии>')
             existing = next((c for c in self.chats.values() if c.sdk_id == sid), None)
             target = existing or self.new_chat('cc', 'local')
             if not existing:
@@ -1121,6 +1134,11 @@ class Bridge:
             elif sub == 'import' and rest.strip():
                 written, merged, missing, skipped = await asyncio.to_thread(
                     transfer.import_, self.directory, rest.strip(), self.projects)
+                if 'bridge-config.json' in written:  # the running bridge uses the imported values at once
+                    fresh = json.loads((self.directory / 'bridge-config.json').read_text(encoding='utf-8'))
+                    self.config.update({k: v for k, v in fresh.items() if k in transfer.SAFE_CONFIG})
+                if 'budget.json' in written:
+                    from backends.budget import Budget; self.budget = Budget(self)
                 self.emit(chat, f'Импортировано: {", ".join(written) or "-"}', kind='settings_imported',
                           files=written, projects=merged, missing=missing, skipped=skipped)
             else:
@@ -1537,6 +1555,22 @@ CRASH_PROMPT = ('Investigate the latest Minecraft failure: read the newest crash
                 'words, name the responsible mod/class and propose a fix. If the cause is in this project, fix it.')
 
 
+# actions that run without bridge.lock: cancel, and read-only work that waits on the network/disk
+LOCKLESS = {'cancel', 'doctor', 'models', 'search', 'export'}
+
+
+def clean_error(e):
+    """Python's own messages for bad input (int('abc'), a JSON list instead of an object) in plain words."""
+    text = str(e)
+    if isinstance(e, ValueError) and text.startswith('invalid literal for int()'):
+        return 'Ожидалось число: ' + text.split(':', 1)[-1].strip()
+    if isinstance(e, AttributeError) and "object has no attribute 'get'" in text:
+        return 'Неверный запрос: нужен JSON-объект'
+    if isinstance(e, TypeError) and 'has no len()' in text:
+        return 'Неверный запрос: неверный тип поля'
+    return text
+
+
 def create_app(bridge, token):
     @web.middleware
     async def authenticate(request, handler):
@@ -1547,15 +1581,15 @@ def create_app(bridge, token):
             if guest and request.path.startswith('/guest/') and not request.headers.get('Origin'):
                 try:
                     return await guest_request(request, *guest)
-                except (ValueError, KeyError, TypeError) as e:
-                    return web.json_response({'error': bridge.tr(str(e))}, status=400)
+                except (ValueError, KeyError, TypeError, AttributeError) as e:
+                    return web.json_response({'error': bridge.tr(clean_error(e))}, status=400)
             return web.json_response({'error': 'Unauthorized'}, status=401)
         if request.headers.get('Origin'):
             return web.json_response({'error': 'Browser origins are not accepted'}, status=403)
         try:
             return await handler(request)
-        except (ValueError, KeyError, TypeError, OSError) as e:
-            return web.json_response({'error': bridge.tr(str(e))}, status=400)
+        except (ValueError, KeyError, TypeError, OSError, AttributeError) as e:
+            return web.json_response({'error': bridge.tr(clean_error(e))}, status=400)
         except Exception as e:
             return web.json_response({'error': str(e)[:1000]}, status=500)
     async def guest_request(request, name, row):
@@ -1568,7 +1602,7 @@ def create_app(bridge, token):
             cursor = int(request.query.get('after', '0') or 0)
             batch = [e for e in bridge.events if e['seq'] > cursor and visible(e, chat.id)][:80]
             batch = [{k: v for k, v in e.items() if k not in ('items', 'token')} for e in batch]
-            return web.json_response({'events': batch, 'boot': bridge.boot, 'title': chat.title,
+            return web.json_response({'events': batch, 'boot': bridge.boot, 'title': bridge.tr(chat.title),
                                       'running': bool(chat.task), 'scope': row['scope'],
                                       'cursor': batch[-1]['seq'] if batch else max(cursor, 0)})
         if request.path == '/guest/say' and request.method == 'POST' and row['scope'] == 'chat':
@@ -1583,8 +1617,13 @@ def create_app(bridge, token):
     # 4 MB: the in-game editor saves whole files (loopback only, token required).
     app = web.Application(middlewares=[authenticate], client_max_size=4 * 1024 * 1024)
     async def command(request):
+        data = await request.json()
+        action = ALIASES.get(data.get('action'), data.get('action')) if isinstance(data, dict) else None
+        if action in LOCKLESS:
+            # cancel must not wait behind a slow doctor/gh call; these never change the queues
+            return web.json_response(await bridge.command(data))
         async with bridge.lock:
-            return web.json_response(await bridge.command(await request.json()))
+            return web.json_response(await bridge.command(data))
     async def events(request):
         boot = request.query.get('boot', '')
         if not boot:

@@ -26,12 +26,15 @@ async def _version(executable, *args, timeout=15):
     command = [executable, *args]
     if os.name == 'nt' and executable.lower().endswith(('.cmd', '.bat')):
         command = ['cmd', '/c', *command]
+    process = None
     try:
         process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE,
                                                        stderr=asyncio.subprocess.STDOUT,
                                                        stdin=asyncio.subprocess.DEVNULL)
         out, _ = await asyncio.wait_for(process.communicate(), timeout)
     except (OSError, asyncio.TimeoutError):
+        if process is not None and process.returncode is None:
+            process.kill()  # a hanging --version must not outlive the check
         return None
     text = out.decode('utf-8', 'replace').strip()
     return (text.splitlines() or [''])[0] if process.returncode == 0 else None

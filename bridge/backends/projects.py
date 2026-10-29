@@ -55,7 +55,7 @@ class Projects:
             raise ValueError('Имя проекта: 1–40 символов, буквы, цифры, . _ -')
         return name
 
-    def add(self, name, path):
+    def add(self, name, path, trusted=True):
         self.check_name(name)
         folder = Path(path).expanduser().resolve()
         if not folder.is_dir():
@@ -67,6 +67,9 @@ class Projects:
             raise ValueError(f'Эта папка уже проект «{existing}»')
         self.items[name] = {'path': str(folder), 'created': int(time.time())}
         self.save()
+        trust = getattr(self.bridge, 'trust', None)
+        if trusted and trust is not None:
+            trust.add(folder)  # the player chose this folder: like accepting Claude Code's trust question
         return name
 
     def remove(self, name):

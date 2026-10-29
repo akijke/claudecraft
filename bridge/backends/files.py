@@ -148,6 +148,12 @@ class FileManager:
     def save(self, mode, arg, text, mtime=None, eol='\n', force=False):
         """Atomic write from the editor; refuses if the file changed on disk since it was opened."""
         path = self.resolve(mode, arg)
+        if not isinstance(text, str):
+            raise ValueError('save: text — строка')
+        if path.is_dir():
+            raise ValueError(f'Это папка, не файл: {path}')
+        if not path.parent.is_dir():
+            raise ValueError(f'Нет такой папки: {path.parent}')
         if path.exists() and mtime is not None and not force and path.stat().st_mtime_ns != int(mtime):
             raise ValueError('Файл изменился на диске после открытия (возможно, его правил Claude). '
                              'Сохранить всё равно?')
@@ -157,8 +163,12 @@ class FileManager:
         if eol == '\r\n':
             data = data.replace('\n', '\r\n')
         temp = path.with_name(path.name + '.claudecraft-tmp')
-        temp.write_bytes(data.encode('utf-8'))
-        temp.replace(path)
+        try:
+            temp.write_bytes(data.encode('utf-8'))
+            temp.replace(path)
+        except OSError:
+            temp.unlink(missing_ok=True)  # no stray .claudecraft-tmp next to the file
+            raise
         return {'path': str(path), 'mtime': path.stat().st_mtime_ns}
 
     def read(self, mode, arg, start=1, count=400):

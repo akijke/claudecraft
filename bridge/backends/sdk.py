@@ -291,6 +291,20 @@ class SdkTurn:
             raise ValueError(error)
 
 
+def plans_folder():
+    """Where the CLI keeps plan files: <CLAUDE_CONFIG_DIR or ~/.claude>/plans."""
+    import os
+    return (Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude') / 'plans').resolve()
+
+
+def is_plan_file(file_path):
+    """Only the CLI's own plans folder is written without a question in plan mode (not any "plans" folder)."""
+    try:
+        return bool(file_path) and Path(str(file_path)).resolve().parent == plans_folder()
+    except OSError:
+        return False
+
+
 ASKS_IN_EDITS = {'mcp__minecraft__reload_extensions'}  # loads extension manifests = starts programs
 
 
@@ -358,7 +372,7 @@ async def run(bridge, chat, text):
             return PermissionResultDeny(message='No answer from the Minecraft user in time')
 
     async def decide(name, data):
-        if plan_mode and name in ('Write', 'Edit', 'MultiEdit') and Path(str(data.get('file_path', ''))).parent.name == 'plans':
+        if plan_mode and name in ('Write', 'Edit', 'MultiEdit') and is_plan_file(data.get('file_path')):
             plan_file[0] = Path(data['file_path'])  # the plan file the CLI asked for: no question
             return PermissionResultAllow(updated_input=data)
         if name == 'ExitPlanMode':
@@ -396,11 +410,13 @@ async def run(bridge, chat, text):
         path = undo_files.target(name, data, effective) if chat.mode == 'cc' else None
         changes = undo_files.diff(name, data, path) if path else None
         icon, line = describe(name, data, effective)
-        verdict, rule = permrules.decide(name, data, effective) if chat.mode == 'cc' else (None, None)
+        verdict, rule = permrules.decide(name, data, effective, bridge.trust.trusted(effective)) \
+            if chat.mode == 'cc' else (None, None)
         if verdict == 'deny':
             bridge.emit(chat, f'{name} запрещён правилом {rule}', kind='status')
             return PermissionResultDeny(message=f'Denied by the permission rule {rule}')
-        if verdict == 'allow' or (verdict is None and auto_allows(chat, name, path, effective)):
+        guest = getattr(chat, 'guest_turn', False)  # a guest's message never runs tools without the owner's click
+        if not guest and (verdict == 'allow' or (verdict is None and auto_allows(chat, name, path, effective))):
             if path:
                 bridge.checkpoints.remember(chat.id, path)
                 if changes:
@@ -494,7 +510,9 @@ async def run(bridge, chat, text):
         tools=tools, mcp_servers=mcp, can_use_tool=permission,
         permission_mode='plan' if plan_mode else 'default',
         # CLAUDE.md memory, permission rules and hooks from disk, like Claude Code (off: load_claude_settings=false)
-        setting_sources=['user', 'project', 'local'] if bridge.config.get('load_claude_settings', True) else [],
+        # an untrusted folder (a cloned repo) brings no settings, hooks or CLAUDE.md of its own
+        setting_sources=(['user', 'project', 'local'] if bridge.trust.trusted(effective) else ['user'])
+            if bridge.config.get('load_claude_settings', True) else [],
         # Lines of the answer are shown while they are generated.
         include_partial_messages=True, include_hook_events=True,
         hooks={'PreToolUse': [HookMatcher(matcher='Write|Edit|MultiEdit|NotebookEdit', hooks=[snapshot_hook])]}

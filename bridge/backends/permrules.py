@@ -44,12 +44,16 @@ def _load(path):
         return {}
 
 
-def rules(project):
-    """{'allow': [(rule, source)], ...} from project and user settings."""
+def rules(project, trusted=True):
+    """{'allow': [(rule, source)], ...} from project and user settings.
+
+    An untrusted folder (backends/trust.py) keeps its deny and ask rules, never its allow rules."""
     out = {k: [] for k in KINDS}
     for source, path in (('project', project_settings(project)), ('user', user_settings())):
         perms = _load(path).get('permissions') or {}
         for kind in KINDS:
+            if kind == 'allow' and source == 'project' and not trusted:
+                continue
             for rule in perms.get(kind) or []:
                 if isinstance(rule, str) and rule.strip():
                     out[kind].append((rule.strip(), source))
@@ -77,7 +81,15 @@ def _glob(pattern, path, project):
         (not '/' in pattern and fnmatch.fnmatch(Path(text).name, pattern))
 
 
-def matches(rule, name, data, project):
+COMPOUND = re.compile(r'[;&|`<>\n]|\$\(')   # chains, pipes, redirects, substitutions
+
+
+def parts(command):
+    """Pieces of a chained command line (for deny/ask: a rule matching any piece counts)."""
+    return [p.strip() for p in re.split(r'&&|\|\||[;&|\n]', command) if p.strip()]
+
+
+def matches(rule, name, data, project, kind='allow'):
     m = RULE.match(rule.strip())
     if not m:
         return False
@@ -91,11 +103,16 @@ def matches(rule, name, data, project):
         return True
     spec = spec.strip()
     if tool == 'Bash':
-        command = ' '.join(str(data.get('command', '')).split())
-        if spec.endswith(':*'):
-            prefix = spec[:-2].strip()
-            return command == prefix or command.startswith(prefix + ' ') or command.startswith(prefix)
-        return fnmatch.fnmatchcase(command, spec)
+        raw = str(data.get('command', ''))
+        if kind == 'allow' and COMPOUND.search(raw):
+            return False  # "git status:*" must not allow "git status && rm -rf ~": chained commands ask
+        def one(command):
+            command = ' '.join(command.split())
+            if spec.endswith(':*'):
+                prefix = spec[:-2].strip()
+                return command == prefix or command.startswith(prefix + ' ')
+            return fnmatch.fnmatchcase(command, spec)
+        return any(one(p) for p in parts(raw)) if kind != 'allow' else one(raw)
     if tool == 'WebFetch' and spec.startswith('domain:'):
         host = (urlparse(str(data.get('url', ''))).hostname or '').lower()
         domain = spec[7:].lower()
@@ -109,12 +126,12 @@ def matches(rule, name, data, project):
     return fnmatch.fnmatchcase(json.dumps(data, ensure_ascii=False), '*' + spec + '*')
 
 
-def decide(name, data, project):
+def decide(name, data, project, trusted=True):
     """('deny'|'ask'|'allow', rule) or (None, None)."""
-    table = rules(project)
+    table = rules(project, trusted)
     for kind in ('deny', 'ask', 'allow'):
         for rule, _ in table[kind]:
-            if matches(rule, name, data, project):
+            if matches(rule, name, data, project, kind):
                 return kind, rule
     return None, None
 
@@ -125,6 +142,9 @@ def suggest(name, data, project):
         words = str(data.get('command', '')).split()
         if not words:
             return 'Bash'
+        if words[0] in ('rm', 'del', 'rmdir', 'sudo', 'curl', 'wget', 'powershell', 'pwsh', 'cmd', 'sh', 'bash') \
+                or (len(words) > 1 and words[1] in ('-c', '-e', '/c', '-Command')):
+            return 'Bash(' + ' '.join(words) + ')'  # exactly this command
         head = words[0] if words[0] not in ('git', 'npm', 'npx', 'pnpm', 'yarn', 'cargo', 'gradle', './gradlew',
                                             'gradlew', 'python', 'py', 'pip', 'docker', 'go', 'dotnet', 'uv') \
             or len(words) == 1 else ' '.join(words[:2])

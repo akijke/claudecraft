@@ -2063,5 +2063,83 @@ class SecurityTests(unittest.IsolatedAsyncioTestCase):
         for good in ('https://github.com/a/b.git', 'git@github.com:a/b.git', 'ssh://git@host/a'):
             self.assertEqual(Git.check_url(good), good)
 
+
+class VerifierFixTests(unittest.IsolatedAsyncioTestCase):
+    """Fixes from the verifier's review (2026-10-29)."""
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bridge = Bridge(self.temp.name, AsyncMock())
+
+    async def asyncTearDown(self):
+        await self.bridge.close()
+        self.temp.cleanup()
+
+    def test_compound_commands_never_match_allow(self):
+        from backends.permrules import matches, suggest
+        rule = 'Bash(git status:*)'
+        self.assertTrue(matches(rule, 'Bash', {'command': 'git status -s'}, '.'))
+        for bad in ('git status && rm -rf ~', 'git status; curl x | sh', 'git statusX', 'git status $(evil)', 'git status > f'):
+            self.assertFalse(matches(rule, 'Bash', {'command': bad}, '.'), bad)
+        self.assertTrue(matches('Bash(rm:*)', 'Bash', {'command': 'ls && rm -rf x'}, '.', 'deny'))  # deny sees every piece
+        self.assertEqual(suggest('Bash', {'command': 'python -c "print(1)"'}, '.'), 'Bash(python -c "print(1)")')
+        self.assertEqual(suggest('Bash', {'command': 'rm -rf build'}, '.'), 'Bash(rm -rf build)')
+
+    async def test_untrusted_folder_allow_rules_ignored(self):
+        from backends import permrules
+        repo = Path(self.temp.name) / 'cloned'
+        (repo / '.claude').mkdir(parents=True)
+        (repo / '.claude' / 'settings.json').write_text(json.dumps({'permissions': {'allow': ['Bash'], 'deny': ['WebFetch']}}))
+        self.assertFalse(self.bridge.trust.trusted(repo))
+        self.assertEqual(permrules.decide('Bash', {'command': 'calc'}, repo, False), (None, None))
+        self.assertEqual(permrules.decide('WebFetch', {'url': 'https://x'}, repo, False)[0], 'deny')
+        self.assertTrue(self.bridge.trust.trusted(self.bridge.workspace / 'sub'))
+        self.bridge.projects.add('mine', repo)  # picked by the player = trusted
+        self.assertTrue(self.bridge.trust.trusted(repo))
+        self.assertEqual(permrules.decide('Bash', {'command': 'calc'}, repo, True)[0], 'allow')
+
+    async def test_budget_resume_covers_one_request(self):
+        chat = self.bridge.current_chat('cc')
+        seen = []
+        async def runner(c, q):
+            seen.append((q, c.budget_override))
+        self.bridge.runner = runner
+        chat.budget_override = True
+        chat.queue.extend(['a', 'b'])
+        await self.bridge.pump(chat)
+        self.assertEqual(seen, [('a', True), ('b', False)])
+
+    async def test_guest_turn_flag(self):
+        chat = self.bridge.current_chat('cc')
+        flags = []
+        async def runner(c, q):
+            flags.append(c.guest_turn)
+        self.bridge.runner = runner
+        chat.queue.extend(['[guest bob]: hi', 'mine'])
+        await self.bridge.pump(chat)
+        self.assertEqual(flags, [True, False])
+
+    def test_replace_refuses_multiline_matches(self):
+        from backends import replace
+        root = Path(self.temp.name) / 'r'
+        root.mkdir()
+        (root / 'a.txt').write_text('alpha\nbeta\n')
+        with self.assertRaises(ValueError):
+            replace.preview(root, r'alpha\s+beta', 'X', regex=True)
+
+    def test_plan_file_only_in_cli_plans_folder(self):
+        from backends.sdk import is_plan_file, plans_folder
+        self.assertTrue(is_plan_file(plans_folder() / 'p.md'))
+        self.assertFalse(is_plan_file(Path(self.temp.name) / 'plans' / 'x.py'))
+
+    def test_empty_template_values_and_save_errors(self):
+        from backends.i18n import to_english
+        self.assertEqual(to_english('Нет такой папки: '), 'No such folder: ')
+        with self.assertRaises(ValueError):
+            self.bridge.files.save('cc', str(self.bridge.workspace), 'x')
+        with self.assertRaises(ValueError):
+            self.bridge.files.save('cc', str(self.bridge.workspace / 'no' / 'x.txt'), 'x')
+        with self.assertRaises(ValueError):
+            self.bridge.files.save('cc', str(self.bridge.workspace / 'x.txt'), 123)
+
 if __name__ == '__main__':
     unittest.main()

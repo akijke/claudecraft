@@ -119,7 +119,11 @@ tasks.register('generateShared') {
             def target = new File(core.parentFile, "backends/${source.name}")
             target.parentFile.mkdirs()
             // Keep SDK protocol identifiers intact: this module only supplies TurnClosed.
-            target.setText(source.getText('UTF-8'), 'UTF-8')
+            def text = source.getText('UTF-8')
+            // translations: the same keys with this addon's names (see BRAND in i18n.py)
+            if (source.name == 'i18n.py') text = text.replaceFirst('(?m)^BRAND = \\[\\]',
+                "BRAND = [(r'Claude Code', 'Gemini CLI'), (r'Claude', 'Gemini'), (r'/cc\\\\\\b', '/gemini'), (r'/c\\\\\\b', '/gem'), (r'/claude', '/geminicraft')]")
+            target.setText(text, 'UTF-8')
         }
     }
 }

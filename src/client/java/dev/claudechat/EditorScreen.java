@@ -148,22 +148,32 @@ final class EditorScreen extends Screen {
 
     /** Typing at the extra carets too (same text, rows below first so positions stay right). */
     private void typeAtCarets(String text) {
-        carets.sort((a, b) -> b[0] - a[0]);
+        // rows below first, and right to left within a row, so earlier positions stay right
+        carets.sort((a, b) -> a[0] != b[0] ? b[0] - a[0] : b[1] - a[1]);
+        List<int[]> done = new ArrayList<>();
         for (int[] c : carets) {
             if (c[0] == row || c[0] >= lines.size()) continue;
             String l = lines.get(c[0]);
             int x = Math.min(c[1], l.length());
             lines.set(c[0], l.substring(0, x) + text + l.substring(x));
             c[1] = x + text.length();
+            for (int[] d : done) if (d[0] == c[0]) d[1] += text.length();  // carets to the right moved too
+            done.add(c);
         }
     }
 
     private void backspaceAtCarets() {
+        carets.sort((a, b) -> a[0] != b[0] ? b[0] - a[0] : a[1] - b[1]);  // left to right within a row
+        int[] last = null;
+        int shift = 0;
         for (int[] c : carets) {
+            if (last == null || last[0] != c[0]) shift = 0;
+            c[1] = Math.max(0, c[1] - shift);
+            last = c;
             if (c[0] == row || c[0] >= lines.size()) continue;
             String l = lines.get(c[0]);
             int x = Math.min(c[1], l.length());
-            if (x > 0) { lines.set(c[0], l.substring(0, x - 1) + l.substring(x)); c[1] = x - 1; }
+            if (x > 0) { lines.set(c[0], l.substring(0, x - 1) + l.substring(x)); c[1] = x - 1; shift++; }
         }
     }
 
@@ -638,10 +648,11 @@ final class EditorScreen extends Screen {
             col--;
             return;
         }
-        if (!forward && !carets.isEmpty()) backspaceAtCarets();
+        boolean snapped = false;
+        if (!forward && !carets.isEmpty()) { snapshot(); snapped = true; backspaceAtCarets(); }  // one undo step for all carets
         if (!forward && col == 0 && row == 0) return;
         if (forward && col == line.length() && row == lines.size() - 1) return;
-        snapshot();
+        if (!snapped) snapshot();
         if (!forward && col == 0) {
             col = lines.get(row - 1).length();
             lines.set(row - 1, lines.get(row - 1) + line);

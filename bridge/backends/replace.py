@@ -69,6 +69,9 @@ def preview(root, query, replacement, regex=False, case=False, glob=None, limit=
         text = _text(path)
         if text is None or not pattern.search(text):
             continue
+        if regex and any('\n' in m.group(0) for m in pattern.finditer(text)):
+            # the preview is per line: a match across lines would be applied without being shown
+            raise ValueError(f'Совпадение через несколько строк в {path.name} — замена работает в пределах строки')
         count = 0
         for number, line in enumerate(text.split('\n'), 1):
             new, n = pattern.subn(lambda m: _expand(pattern, regex, replacement, m), line)
