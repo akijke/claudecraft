@@ -134,6 +134,27 @@ bridge/ с заменой строк ('ClaudeChat', '/cc', 'literal(mode)', 'SHO
 - Подвох инструментов: в heredoc Bash `\\n`/`\\r` становятся настоящими переводами
   строки — Java/Python-строки с экранированием писать через Write/Edit.
 
+## Ночь 2026-10-29: ветка night/2026-10-29 (48 коммитов, НЕ запушена, НЕ смержена)
+
+Полный список и что нужно от пользователя — docs/NIGHT_REPORT.md. Главное для продолжения:
+- Новые модули моста (bridge/backends): commands, permrules, replace, hunks, worktrees, budget,
+  rewind, memory, skills, hooks, styles, export, search, ledger, formatters, lsp (+ bridge/fake_lsp.py),
+  conflicts, pulls, watch, openai_compat (ollama/lmstudio/openrouter), doctor, guests (#69),
+  transfer (#81). Константы в bridge.py: OAI_BACKENDS, HTTP_BACKENDS.
+- Мод: EditorScreen, Highlighter, TerminalScreen, PaletteScreen, IdeScreen, DashboardScreen, Theme,
+  Sounds, OsNotify, InputHistory, PathLinks, Achievements (#85). JUnit: src/test/java (16 тестов).
+- Окно игры в 26.3 — SDL3 (org.lwjgl.sdl.SDLVideo), не GLFW.
+- Geminicraft (geminicraft/): Gemini CLI через ACP (`gemini --experimental-acp`), /gem и /gemini,
+  клавиша G, порт 18743. Как и Codexcraft, генерирует код из основного мода заменой строк, поэтому
+  литералы 'codexcraft'/'/cc' в bridge.py собираются из частей.
+- #70: client.json → "remote" {port, token}: request() идёт на 127.0.0.1:<порт> SSH-туннеля, локальный
+  мост не стартует. #69: гостевые токены (в guests.json только хеш), только /guest/events и /guest/say.
+- Проверка: `$TEMP/check.sh` (сборка, тесты моста с CLAUDECRAFT_CLI_IT=1, тесты аддонов) и
+  `gradlew runLiveTest` (41/41). Gemini CLI, Ollama, LSP-серверы, форматтеры, CI, настоящий gh — не
+  проверялись: на этом ПК их нет, ветка не запушена.
+- Открытые вопросы к пользователю: мерж и push ветки; три решения по #69 (транспорт, клиент гостя,
+  auto off для гостей); пункт 4 (держать CLI живым); достижения по умолчанию.
+
 ## Отложено: аддон для модеров (просьба пользователя 2026-10-28, не забыть)
 
 Сделать ОТДЕЛЬНЫМ аддоном (как Codexcraft), не в основном моде:
@@ -186,7 +207,7 @@ Claude Code может писать расширения и вызвать minec
 
 ## Проверка и ближайшая работа
 
-23 теста ядра проходят (Python 3.14, SDK 0.2.174): `cd bridge && python -m unittest -v`.
+102 теста моста проходят (Python 3.14, SDK 0.2.174, на 2026-10-29): `cd bridge && python -m unittest -v`.
 HTTP middleware тестируется в памяти, без реального TCP. Нет подтверждённой
 запуска в Minecraft, реального SDK/API, Docker image (демон Docker не был запущен).
 
