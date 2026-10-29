@@ -647,5 +647,12 @@
   "  открытых issues нет": "  no open issues",
   "сделай": "do it",
   "Claude: ветка issue-N, реализация, тесты, черновик PR с «Closes #N»": "Claude: branch issue-N, implementation, tests, a draft PR with “Closes #N”",
-  "issues GitHub · issue <N> — прочитать · issue do <N> — Claude: ветка, работа, PR «Closes #N»": "GitHub issues · issue <N> — read · issue do <N> — Claude: branch, work, PR “Closes #N”"
+  "issues GitHub · issue <N> — прочитать · issue do <N> — Claude: ветка, работа, PR «Closes #N»": "GitHub issues · issue <N> — read · issue do <N> — Claude: branch, work, PR “Closes #N”",
+  "Claude, почини": "Claude, fix it",
+  "Claude получит вывод, найдёт причину и исправит": "Claude gets the output, finds the cause and fixes it",
+  "стоп": "stop",
+  "Наблюдение выключено — /cc watch <команда>": "Watch mode is off — /cc watch <command>",
+  "Слежу: ": "Watching: ",
+  " запусков · ": " runs · ",
+  "<команда> — при изменениях файлов запускать тесты/сборку, при падении — кнопка «Claude, почини» · watch stop": "<command> — rerun tests/build when files change; on failure a “Claude, fix it” button · watch stop"
 }

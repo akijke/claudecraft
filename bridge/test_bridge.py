@@ -1269,6 +1269,39 @@ class PullRequestTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Closes #3', prompt)
 
 
+class WatchTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rerun_on_change_failure_card_fix_button_and_recovery(self):
+        from backends import watch
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        bridge = Bridge(Path(temp.name) / 'b', AsyncMock())
+        self.addAsyncCleanup(bridge.close)
+        project = Path(bridge.projects.path_of_current())
+        (project / 'state.txt').write_text('bad', encoding='utf-8')
+        command = f'"{sys.executable}" -c "import sys; print(\'checking\'); sys.exit(0 if open(\'state.txt\').read() == \'good\' else 3)"'
+        chat = bridge.current_chat('cc')
+        watcher = watch.Watcher(bridge, chat.id, project, command, interval=0.1, settle=0.2).start()
+        bridge.watchers[str(project)] = watcher
+        async def until(pred):
+            for _ in range(200):
+                if pred():
+                    return
+                await asyncio.sleep(0.05)
+            self.fail('timeout')
+        await until(lambda: any(e['kind'] == 'watch_failed' for e in bridge.events))
+        failed = [e for e in bridge.events if e['kind'] == 'watch_failed'][-1]
+        self.assertEqual(failed['code'], 3)
+        self.assertIn('checking', failed['output'])
+        bridge.runner.assert_not_awaited()                        # nothing goes to Claude without the click
+        await bridge.command({'mode': 'cc', 'action': 'watch', 'text': 'fix'})
+        await until(lambda: bridge.runner.await_count == 1)
+        self.assertIn('checking', bridge.runner.await_args.args[1])
+        (project / 'state.txt').write_text('good', encoding='utf-8')   # a change → rerun → passes again
+        await until(lambda: any(e['kind'] == 'watch_ok' for e in bridge.events))
+        await bridge.command({'mode': 'cc', 'action': 'watch', 'text': 'stop'})
+        self.assertNotIn(str(project), bridge.watchers)
+
+
 class LspTests(unittest.IsolatedAsyncioTestCase):
     async def test_diagnostics_definition_completion_with_a_real_protocol_server(self):
         temp = tempfile.TemporaryDirectory()

@@ -126,7 +126,8 @@ class Bridge:
         self.account = Account(self)
         self.rate_limits = {}
         self.bg_tasks = {}
-        self.branch_cache = {}  # folder -> (git branch, time) for the status line  # Claude's background tasks: id -> info (see background_task)
+        self.branch_cache = {}
+        self.watchers = {}  # project folder -> Watcher (/cc watch)  # folder -> (git branch, time) for the status line  # Claude's background tasks: id -> info (see background_task)
         state = self.directory / 'chats.json'
         if state.exists():
             data = json.loads(state.read_text(encoding='utf-8'))
@@ -972,6 +973,28 @@ class Bridge:
             self.emit(chat, f'Запомнено в {path}', kind='status')
         elif action == 'rewind':
             await self.rewind(chat, text.strip())
+        elif action == 'watch':
+            from backends import watch
+            folder = self.chat_cwd(chat)
+            arg = text.strip()
+            current = self.watchers.get(folder)
+            if arg in ('stop', 'off'):
+                if current:
+                    current.stop()
+                    self.watchers.pop(folder, None)
+                self.emit(chat, 'Наблюдение остановлено', kind='status')
+            elif arg == 'fix':
+                if not current or current.last != 'failed':
+                    raise ValueError('Сейчас ничего не падает')
+                await self.enqueue(chat, watch.fix_prompt(current.command, current.last_output))
+            elif arg:
+                if current:
+                    current.stop()
+                self.watchers[folder] = watch.Watcher(self, chat.id, folder, arg).start()
+                self.emit(chat, f'Слежу за проектом: при изменениях запускаю «{arg}»', kind='watch_on', command=arg, root=folder)
+            else:
+                self.emit(chat, 'Наблюдение', kind='watch_status', command=current.command if current else '',
+                          last=current.last if current else '', runs=current.runs if current else 0)
         elif action in ('issues', 'issue'):
             from backends import pulls
             folder = self.chat_cwd(chat)
@@ -1371,6 +1394,8 @@ class Bridge:
             job.cancel()
         await self.shell.close()
         self.terminals.close_all()
+        for watcher in self.watchers.values():
+            watcher.stop()
         await self.oauth.close()
         await self.lsp.close()
         self.persist()

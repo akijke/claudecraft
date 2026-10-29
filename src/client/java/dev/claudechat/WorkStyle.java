@@ -341,6 +341,19 @@ final class WorkStyle {
                 }
                 out.add(line(mode, lit(L.t("  при достижении лимита запрос прерывается, очередь ждёт /cc budget resume"), FAINT)));
             }
+            case "watch_failed" -> {
+                out.add(line(mode, lit("✖ " + s(e, "text"), RED).withStyle(st -> st.withBold(true)).append(sp())
+                    .append(button("✦ " + L.t("Claude, почини"), cmd + "watch fix", false, CODE_MODE,
+                        L.t("Claude получит вывод, найдёт причину и исправит")))
+                    .append(sp()).append(button(L.t("стоп"), cmd + "watch stop", false, DIM, null))));
+                String[] lines = clean(s(e, "output")).split("\\R");
+                for (int i = Math.max(0, lines.length - 12); i < lines.length; i++)
+                    out.add(line(mode, lit("  │ ", FAINT).append(PathLinks.linkify(lines[i], 0xD0D0D0, AQUA))));
+            }
+            case "watch_ok" -> out.add(line(mode, lit("✔ " + s(e, "text"), GREEN)));
+            case "watch_on" -> out.add(line(mode, lit("◎ " + s(e, "text") + "  ", AQUA).append(button(L.t("стоп"), cmd + "watch stop", false, DIM, null))));
+            case "watch_status" -> out.add(line(mode, lit("◎ " + (s(e, "command").isEmpty() ? L.t("Наблюдение выключено — /cc watch <команда>")
+                : L.t("Слежу: ") + s(e, "command") + " · " + n(e, "runs") + L.t(" запусков · ") + s(e, "last")), AQUA)));
             case "issue_list" -> {
                 JsonArray rows = e.getAsJsonArray("rows");
                 out.add(line(mode, lit("☰ Issues", GOLD).withStyle(st -> st.withBold(true)).append(lit("  " + rows.size() + L.t(" открыто"), FAINT))));
