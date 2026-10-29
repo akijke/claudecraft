@@ -58,7 +58,8 @@ final class BridgeLauncher {
 
     /** Boolean client setting (hud, toasts, sound …) from client.json. */
     boolean flag(String key, boolean fallback) {
-        return settings.has(key) ? settings.get(key).getAsBoolean() : fallback;
+        com.google.gson.JsonElement v = settings.get(key);
+        return v != null && v.isJsonPrimitive() && v.getAsJsonPrimitive().isBoolean() ? v.getAsBoolean() : fallback;
     }
 
     void setFlag(String key, boolean value) {

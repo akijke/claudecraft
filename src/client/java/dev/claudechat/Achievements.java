@@ -82,7 +82,7 @@ final class Achievements {
         if (state.toString().hashCode() != before) launcher.saveAll();
         for (String id : earned) {
             String[] a = find(id);
-            if (!launcher.flag("achievements", true) || a == null) continue;
+            if (!launcher.flag("achievementsOn", true) || a == null) continue;
             Minecraft client = Minecraft.getInstance();
             SystemToast.add(client.gui.toastManager(), TOAST, Component.literal("✦ " + L.t("Достижение: ") + L.t(a[1])),
                 Component.literal(L.t(a[2])));

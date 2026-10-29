@@ -58,6 +58,12 @@ final class LiveTest {
 
     private Minecraft mc() { return Minecraft.getInstance(); }
     private Screen screen() { return mc().gui.screen(); }
+    private net.minecraft.client.gui.components.EditBox chatBox() {
+        if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return null;
+        for (var child : chat.children())
+            if (child instanceof net.minecraft.client.gui.components.EditBox box) return box;
+        return null;
+    }
 
     private void step(String name, Runnable action, BooleanSupplier done, int timeoutSeconds) {
         steps.add(new Step(name, action, done, timeoutSeconds * 20, true));
@@ -141,6 +147,14 @@ final class LiveTest {
         step("/cc skills lists skills", () -> { markEvents(); mod.runLine("cc", "/cc skills"); }, () -> event("skills"), 20);
         step("/cc hooks lists hooks", () -> { markEvents(); mod.runLine("cc", "/cc hooks"); }, () -> event("hooks"), 20);
         step("/cc style lists output styles", () -> { markEvents(); mod.runLine("cc", "/cc style"); }, () -> event("styles"), 20);
+        step("vanilla chat keeps the text after Esc", () -> mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false)), () -> {
+            if (waited == 10 && chatBox() != null) chatBox().setValue("/cc livetest draft");
+            if (waited == 20 && screen() != null) screen().onClose();  // what Esc does
+            if (waited == 30) mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false));
+            boolean ok = waited > 40 && chatBox() != null && chatBox().getValue().equals("/cc livetest draft");
+            if (ok) { chatBox().setValue(""); mc().setScreenAndShow(null); }
+            return ok;
+        }, 10);
         step("K window opens", () -> mc().setScreenAndShow(new ConversationScreen(mod)),
             () -> screen() instanceof ConversationScreen && waited > 20, 10);
         step("↑ in the K window recalls the last prompt", () -> {

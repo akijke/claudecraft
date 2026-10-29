@@ -425,7 +425,15 @@ final class ConversationScreen extends Screen {
         long now = System.currentTimeMillis();
         if (now >= nextState) { nextState = now + 1500; fetchState(); }
         if (dirty || !selectedChat().equals(shownChat)) rebuildLines();
+        // keep the draft on disk while typing: quitting the game or a crash must not lose it
+        if (input != null && !preview && now >= nextDraftSave && !input.getValue().equals(savedDraft)) {
+            nextDraftSave = now + 1000;
+            savedDraft = input.getValue();
+            InputHistory.setDraft(mode, savedDraft);
+        }
     }
+    private long nextDraftSave;
+    private String savedDraft;
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, width, height, 0xB0101014);

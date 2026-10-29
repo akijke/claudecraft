@@ -104,6 +104,8 @@ public final class ClaudeChat implements ClientModInitializer {
         if (launcher.autoStart() && !DevShots.ENABLED) launcher.start();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> launcher.stop());
         Notify.register();
+        // addons copy this class; only the main mod keeps the vanilla chat draft
+        if (getClass().getPackageName().equals("dev.claude" + "chat")) ChatDraft.register();
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("claude_chat", "main"));
         openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.claude_chat.open",
             InputConstants.KEY_K, category));
@@ -383,12 +385,12 @@ public final class ClaudeChat implements ClientModInitializer {
             }
             case "achievements", "ach" -> {
                 String v = parts.length > 1 ? parts[1].strip() : "";
-                if (v.equals("on") || v.equals("off")) launcher.setFlag("achievements", v.equals("on"));
+                if (v.equals("on") || v.equals("off")) launcher.setFlag("achievementsOn", v.equals("on"));
                 int got = 0;
                 for (String[] a : Achievements.ALL) if (Achievements.has(launcher, a[0])) got++;
                 show(ChatStyle.line("c", ChatStyle.lit("✦ " + L.t("Достижения"), ChatStyle.GOLD).withStyle(st -> st.withBold(true))
                     .append(ChatStyle.lit("  " + got + "/" + Achievements.ALL.length, ChatStyle.DIM)).append(" ")
-                    .append(launcher.flag("achievements", true)
+                    .append(launcher.flag("achievementsOn", true)
                         ? ChatStyle.button(L.t("тосты выкл"), "/claude achievements off", false, ChatStyle.DIM, null)
                         : ChatStyle.button(L.t("тосты вкл"), "/claude achievements on", false, ChatStyle.GREEN, null))));
                 for (String[] a : Achievements.ALL) {
