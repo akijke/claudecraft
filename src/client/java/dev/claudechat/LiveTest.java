@@ -58,13 +58,7 @@ final class LiveTest {
 
     private Minecraft mc() { return Minecraft.getInstance(); }
     private Screen screen() { return mc().gui.screen(); }
-    private net.minecraft.client.gui.components.Button chatToggle() {
-        if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return null;
-        for (var child : chat.children())
-            if (child instanceof net.minecraft.client.gui.components.Button b
-                && (b.getMessage().getString().equals(L.t("Развернуть")) || b.getMessage().getString().equals(L.t("Свернуть")))) return b;
-        return null;
-    }
+    private boolean chatOpen() { return screen() instanceof net.minecraft.client.gui.screens.ChatScreen; }
     private net.minecraft.client.gui.components.EditBox chatBox() {
         if (!(screen() instanceof net.minecraft.client.gui.screens.ChatScreen chat)) return null;
         for (var child : chat.children())
@@ -89,6 +83,8 @@ final class LiveTest {
 
     private long mark;  // only events after the step started count
     private int expandedWidth;
+    private int[] gripBox;
+    private boolean gripResized;
 
     private void markEvents() {
         mark = 0;
@@ -164,16 +160,33 @@ final class LiveTest {
             return ok;
         }, 10);
         step("vanilla chat: Expand fills the screen", () -> mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false)), () -> {
-            net.minecraft.client.gui.components.Button toggle = chatToggle();
-            if (toggle == null) return false;
-            if (waited == 10 && toggle.getMessage().getString().equals(L.t("Развернуть"))) toggle.onPress(null);
+            if (!chatOpen()) return false;
+            if (waited == 10 && !ChatSize.expandedForTest()) ChatSize.toggle();
             expandedWidth = ChatSize.width(true);
-            return waited > 20 && expandedWidth > 330 && toggle.getMessage().getString().equals(L.t("Свернуть"));
+            return waited > 20 && expandedWidth > 330 && ChatSize.expandedForTest();
         }, 10);
         step("vanilla chat: Collapse brings the normal size back", () -> {
-            net.minecraft.client.gui.components.Button toggle = chatToggle();
-            if (toggle != null) toggle.onPress(null);
-        }, () -> waited > 10 && chatToggle() != null && ChatSize.width(true) < expandedWidth, 10);
+            if (chatOpen() && ChatSize.expandedForTest()) ChatSize.toggle();
+        }, () -> waited > 10 && chatOpen() && !ChatSize.expandedForTest() && ChatSize.width(true) < expandedWidth, 10);
+        // the real mouse path (MouseHandler), as a hand makes it: press on the grip, move, release
+        step("vanilla chat: the corner grip resizes the chat with the mouse", () -> { }, () -> {
+            var mouse = mc().mouseHandler;
+            long win = mc().getWindow().handle();
+            double k = mc().getWindow().getGuiScale();
+            if (waited == 5) { gripBox = ChatSize.boxForTest(); mouse.onMove(win, (gripBox[2] - 3) * k, (gripBox[1] + 3) * k, 0, 0); }
+            if (waited == 7) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
+            if (waited >= 8 && waited <= 18) {
+                double t = (waited - 8) / 10.0;
+                mouse.onMove(win, (gripBox[2] - 3 + 60 * t) * k, (gripBox[1] + 3 - 25 * t) * k, 0, 0);
+            }
+            if (waited == 20) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
+            if (waited == 22) gripResized = ChatSize.width(true) > 0 && ChatSize.boxForTest()[2] > gripBox[2] + 20;
+            // double click on the grip: back to the game's size
+            if (waited == 24) { int[] b = ChatSize.boxForTest(); mouse.onMove(win, (b[2] - 3) * k, (b[1] + 3) * k, 0, 0); }
+            if (waited == 25 || waited == 27) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
+            if (waited == 26 || waited == 28) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
+            return waited > 32 && gripResized && ChatSize.width(true) == 0;
+        }, 10);
         quiet("close the chat", () -> mc().setScreenAndShow(null), () -> screen() == null, 5);
         step("/cc chats opens the chat picker with this mode's chats", () -> mod.runLine("cc", "/cc chats"),
             () -> screen() instanceof ChatPickerScreen p && p.modeForTest().equals("cc") && p.countForTest() > 0 && waited > 20, 10);
