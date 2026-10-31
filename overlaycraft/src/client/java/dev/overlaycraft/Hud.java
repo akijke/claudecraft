@@ -55,10 +55,13 @@ final class Hud {
                 // events (MouseHandler.onButton returns early), so the card follows the cursor
                 // here, every frame, from the press until the release event
                 if (dragging != null) drag(mx, my);
+                // F1 hides the HUD and the cards with it, but an open chat still shows them:
+                // the chat is opened to use them
+                if (Config.enabled && Minecraft.getInstance().gui.hud.isHidden()) draw(g, true);
             });
             ScreenMouseEvents.allowMouseClick(screen).register((s, e) -> !press(e.x(), e.y(), e.button()));
             ScreenMouseEvents.allowMouseDrag(screen).register((s, e, dx, dy) -> !drag(e.x(), e.y()));
-            ScreenMouseEvents.allowMouseRelease(screen).register((s, e) -> !release());
+            ScreenMouseEvents.allowMouseRelease(screen).register((s, e) -> !release(e.x(), e.y()));
             ScreenEvents.remove(screen).register(s -> { dragging = null; mouseX = mouseY = -1; HITS.clear(); });
         });
     }
@@ -330,7 +333,7 @@ final class Hud {
     // ---- input (chat open) -----------------------------------------------------------
 
     static boolean press(double mx, double my, int button) {
-        if (!Config.enabled) return false;
+        if (!Config.enabled || Palette.chatClaims(mx, my)) return false;
         for (int i = CARDS.size() - 1; i >= 0; i--) {
             Card c = CARDS.get(i);
             if (!c.in(mx, my)) continue;
@@ -350,8 +353,9 @@ final class Hud {
         return false;
     }
 
-    static boolean release() {
+    static boolean release(double mx, double my) {
         if (dragging == null) return false;
+        drag(mx, my);  // the frame may lag behind the cursor: the card ends where the button was released
         dragging = null;
         Config.save();
         return true;

@@ -256,6 +256,15 @@ tracking-for-desktop, Bearer из cookie webapitoken). Запускать игр
 (без двоеточия стартуют все подпроекты, и порт 18745 занимает лишняя игра). ChatSize тянется в afterExtract
 (LiveTest-шаг с настоящей мышью). Подробности — overlaycraft/DEVELOPMENT.md.
 
+Проверка 2026-10-31 (все четыре мода в одной игре): `gradlew runLiveTest` 52/52 ×2, `:overlaycraft:runLiveTest`
+6/6. Что чинилось: (1) копии ChatSize в Codexcraft/Geminicraft тоже вешали хуки на чат — теперь только
+владелец (`ChatSize.OWNER`, бренды в коде собраны из частей, чтобы branded() их не переписал); (2) карточка
+оверлея над уголком/панелью чата уступает клик чату (`ChatSize.claims` ← `Palette.chatClaims`); (3) drag через
+afterExtract идёт по кадрам, а при `inactivityFpsLimit: afk` окно без ввода даёт ~10 FPS — release теперь
+применяет позицию из события; (4) LiveTest: перед шагами размера чата `ChatSize.reset()`, верхний край тянется
+ВНИЗ (в окне теста чат по умолчанию уже максимальной высоты). Opera не открывает opera://extensions извне —
+`/ov ext` просит Ctrl+Shift+E. Скрины и описание функций оверлея: overlaycraft/docs/features.html.
+
 ## Всё в одном jar (2026-10-29, #6)
 
 Пользователь: «кодекс отвалился», «пришей всё обратно». Теперь корневой build.gradle

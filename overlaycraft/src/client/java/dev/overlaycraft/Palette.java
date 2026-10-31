@@ -36,6 +36,24 @@ final class Palette {
         }
     }
 
+    private static java.lang.reflect.Method claims;
+    private static boolean noClaims;
+
+    /**
+     * True when Claudecraft's chat frame wants the click at x, y (its edges, corner or the
+     * "< >" / ↺ toolbar): a card lying over them lets the chat have it.
+     */
+    static boolean chatClaims(double x, double y) {
+        if (!CLAUDECRAFT || noClaims) return false;
+        try {
+            if (claims == null) claims = Class.forName("dev.claude" + "chat.ChatSize").getMethod("claims", double.class, double.class);
+            return (Boolean) claims.invoke(null, x, y);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            noClaims = true;  // another Claudecraft version without it
+            return false;
+        }
+    }
+
     private static int rgb(Class<?> owner, String name, int fallback) throws ReflectiveOperationException {
         Field f = owner.getDeclaredField(name);
         f.setAccessible(true);

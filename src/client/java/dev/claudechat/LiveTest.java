@@ -159,7 +159,10 @@ final class LiveTest {
             if (ok) { chatBox().setValue(""); mc().setScreenAndShow(null); }
             return ok;
         }, 10);
-        step("vanilla chat: Expand fills the screen", () -> mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false)), () -> {
+        step("vanilla chat: Expand fills the screen", () -> {
+            ChatSize.reset();  // a size left by an earlier run must not shape these steps
+            mc().setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen("", false));
+        }, () -> {
             if (!chatOpen()) return false;
             if (waited == 10 && !ChatSize.expandedForTest()) ChatSize.toggle();
             expandedWidth = ChatSize.width(true);
@@ -194,11 +197,12 @@ final class LiveTest {
             double k = mc().getWindow().getGuiScale();
             if (waited == 5) { gripBox = ChatSize.boxForTest(); mouse.onMove(win, (gripBox[2] / 2.0) * k, (gripBox[1] + 1) * k, 0, 0); }
             if (waited == 7) mouse.onButton(win, new MouseButtonInfo(0, 0), 1);
-            if (waited >= 8 && waited <= 14) mouse.onMove(win, (gripBox[2] / 2.0) * k, (gripBox[1] + 1 - 5 * (waited - 7)) * k, 0, 0);
+            // down: the game's own chat height is already the most this window allows
+            if (waited >= 8 && waited <= 14) mouse.onMove(win, (gripBox[2] / 2.0) * k, (gripBox[1] + 1 + 5 * (waited - 7)) * k, 0, 0);
             if (waited == 16) mouse.onButton(win, new MouseButtonInfo(0, 0), 0);
             if (waited == 18) {
                 int[] b = ChatSize.boxForTest();
-                edgesOk = b[1] < gripBox[1] - 20 && b[2] == gripBox[2] && b[0] == 0 && b[3] == gripBox[3];
+                edgesOk = b[1] > gripBox[1] + 20 && b[2] == gripBox[2] && b[0] == 0 && b[3] == gripBox[3];
                 gripBox = b;
                 mouse.onMove(win, (b[2] + 1) * k, ((b[1] + b[3]) / 2.0) * k, 0, 0);
             }

@@ -124,11 +124,13 @@ public final class Overlaycraft implements ClientModInitializer {
             return;
         }
         Minecraft.getInstance().keyboardHandler.setClipboard(dir.toString());
+        // Opera ignores an opera:// address given from outside, so the page is asked for by hand too
         String browser = Installer.openExtensionsPage();
-        say("Подключение браузера" + (browser.isEmpty() ? "" : " (" + browser + ")") + ":");
-        say("1. " + (browser.isEmpty() ? "Открой страницу расширений (opera://extensions, chrome://extensions)" : "Открылась страница расширений")
-            + " → включи «Режим разработчика»");
-        say("2. «Загрузить распакованное» → вставь путь Ctrl+V (он уже скопирован) → «Выбрать папку»");
+        boolean opera = browser.startsWith("Opera");
+        say("Подключение браузера" + (browser.isEmpty() ? "" : " (" + browser + ")") + ". Путь к расширению уже скопирован.");
+        say("1. В браузере нажми Ctrl+Shift+E" + (opera ? "" : " или открой chrome://extensions")
+            + " — страница расширений. Справа сверху включи «Режим разработчика»");
+        say("2. «Загрузить распакованное» → в окне выбора папки вставь путь Ctrl+V в строку адреса, Enter → «Выбор папки»");
         say("Если Overlaycraft там уже есть — нажми у него ⟳ и проверь, что переключатель включён (после обновления браузер выключает его сам)");
         say("3. Всё: карточка «Браузер» оживёт сама, вкладки перезагружать не нужно. Для заказа войди на eda.yandex.ru в этом браузере");
     }

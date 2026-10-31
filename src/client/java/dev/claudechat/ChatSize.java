@@ -3,6 +3,7 @@ package dev.claudechat;
 import com.google.gson.JsonObject;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -38,10 +39,35 @@ public final class ChatSize {
         "..###..",
     };
 
+    /**
+     * Codexcraft and Geminicraft are built from copies of this class. In a game with several of
+     * them only one may hook the chat (else each copy takes the clicks and draws its own toolbar):
+     * Claudecraft's when it is loaded, otherwise the first addon's. The others stay inert.
+     */
+    private static final boolean OWNER = owner();
+
     private ChatSize() { }
+
+    private static boolean owner() {
+        String mine = ChatSize.class.getPackageName();
+        // split literals: the addon build replaces the brand strings when it copies this file
+        String[][] brands = {{"dev.claude" + "chat", "claude" + "_chat"}, {"dev.codex" + "craft", "codex" + "craft"}, {"dev.gemini" + "craft", "gemini" + "craft"}};
+        for (String[] b : brands) if (FabricLoader.getInstance().isModLoaded(b[1])) return mine.equals(b[0]);
+        return true;
+    }
+
+    /**
+     * True when a click at x, y (chat open) belongs to the chat's frame: an edge, the corner or
+     * the toolbar. Other mods with clickable things in chat (Overlaycraft) leave such clicks alone.
+     */
+    public static boolean claims(double x, double y) {
+        if (!OWNER || !(Minecraft.getInstance().gui.screen() instanceof ChatScreen)) return false;
+        return buttonAt(x, y) != 0 || edgeAt(x, y) != 0;
+    }
 
     /** Chat width in chat pixels, or 0 to keep the game's. */
     public static int width(boolean focused) {
+        if (!OWNER) return 0;
         load();
         if (expanded && focused) return maxW();
         return w;
@@ -49,6 +75,7 @@ public final class ChatSize {
 
     /** Chat height in chat pixels, or 0 to keep the game's. Only the open chat changes size. */
     public static int height(boolean focused) {
+        if (!OWNER) return 0;
         load();
         if (!focused) return 0;
         if (expanded) return maxH();
@@ -56,6 +83,7 @@ public final class ChatSize {
     }
 
     static void register() {
+        if (!OWNER) return;
         ScreenEvents.AFTER_INIT.register((client, screen, sw, sh) -> {
             if (!(screen instanceof ChatScreen)) return;
             rescale();  // the expanded size applies only while the chat is open
@@ -91,6 +119,7 @@ public final class ChatSize {
             });
             ScreenMouseEvents.allowMouseRelease(screen).register((s, event) -> {
                 if (!dragging) return true;
+                dragTo(event.x(), event.y());  // the frame may lag behind the cursor: end where the button was released
                 dragging = false;
                 if (moved) save();
                 return false;
